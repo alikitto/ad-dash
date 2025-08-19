@@ -28,9 +28,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- 3. ВАША ЛОГИКА ИЗ СТАРЫХ ФАЙЛОВ ---
-# Эти функции мы берем из вашего проекта target_tg-main. Они уже умеют получать данные.
-
+# --- 3. Функции для работы с Meta API ---
 async def fb_get(session: aiohttp.ClientSession, url: str, params: dict = None):
     """Асинхронная функция для выполнения GET-запросов к Graph API."""
     params = params or {}
@@ -60,48 +58,52 @@ async def get_insights_for_account(session: aiohttp.ClientSession, account_id: s
     return data.get("data", [])
 
 
-# --- 4. ГЛАВНАЯ ТОЧКА ДОСТУПА (API Endpoint) ---
-# Когда ваш дэшборд сделает запрос на /api/active-campaigns, выполнится эта функция
-
+# --- 4. ГЛАВНАЯ ТОЧКА ДОСТУПА С УЛУЧШЕННЫМ ЛОГИРОВАНИЕМ ---
 @app.get("/api/active-campaigns")
 async def get_all_active_campaigns():
     all_campaigns_data = []
     timeout = aiohttp.ClientTimeout(total=180)
 
+    # Добавляем блок try...except для отлова скрытых ошибок
     try:
+        print("--- Начинаю сбор данных с Meta API ---") # Добавили лог начала
         async with aiohttp.ClientSession(timeout=timeout) as session:
             accounts = await get_ad_accounts(session)
             if not accounts:
-                return [] # Возвращаем пустой список, если аккаунтов нет
+                print("--- Рекламные аккаунты не найдены ---")
+                return []
 
-            # Для каждого аккаунта запрашиваем его статистику
+            print(f"--- Найдено аккаунтов: {len(accounts)} ---")
+
             for acc in accounts:
+                print(f"--- Обрабатываю аккаунт: {acc['name']} ---")
                 insights = await get_insights_for_account(session, acc['account_id'])
 
                 for campaign in insights:
                     spend = float(campaign.get("spend", 0))
                     if spend == 0:
-                        continue # Пропускаем кампании без расхода
-
+                        continue
+                    
                     leads = sum(int(a["value"]) for a in campaign.get("actions", []) if a.get("action_type") == LEAD_ACTION_TYPE)
                     cpl = (spend / leads) if leads > 0 else 0
-
-                    # Формируем красивый объект с данными для фронтенда
+                    
                     all_campaigns_data.append({
                         "account_name": acc['name'],
                         "campaign_name": campaign.get('campaign_name', 'N/A'),
                         "objective": campaign.get('objective', 'N/A').replace('_', ' ').capitalize(),
-                        "status": "ACTIVE", # Мы уже отфильтровали по активным
+                        "status": "ACTIVE",
                         "spend": spend,
                         "leads": leads,
                         "cpl": cpl
                     })
+        
+        print(f"--- Успешно собрано данных по {len(all_campaigns_data)} кампаниям ---")
+        return all_campaigns_data
 
-    except aiohttp.ClientResponseError as e:
-        print(f"Ошибка API Facebook: {e.status} - {e.message}")
-        return {"error": f"Ошибка API Facebook: {e.message}"}
     except Exception as e:
-        print(f"Произошла ошибка: {e}")
-        return {"error": f"Произошла внутренняя ошибка сервера: {str(e)}"}
-    
-    return all_campaigns_data
+        # ЭТА ЧАСТЬ САМАЯ ВАЖНАЯ
+        # Если внутри блока try произойдет любая ошибка, мы поймаем ее
+        # и принудительно напечатаем в лог.
+        print(f"!!! КРИТИЧЕСКАЯ ОШИБКА ВНУТРИ API: {e} !!!")
+        # Возвращаем ошибку на фронтенд, чтобы было понятнее
+        return {"error": f"Internal Server Error: {e}"}
