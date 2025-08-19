@@ -44,7 +44,7 @@ function Tables() {
     async function fetchCampaigns() {
       try {
         // УБЕДИТЕСЬ, ЧТО ЗДЕСЬ ВАШ ПРАВИЛЬНЫЙ URL
-        const response = await fetch("https://ad-dash-frontend-production.up.railway.app/api/active-campaigns"); // <-- ЗАМЕНИТЕ НА ВАШ URL
+        const response = await fetch("https://ad-dash-backend-production.up.railway.app/api/active-campaigns"); // <-- ЗАМЕНИТЕ НА ВАШ URL
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
