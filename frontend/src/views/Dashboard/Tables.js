@@ -1,3 +1,12 @@
+Конечно, вот полный и исправленный код для вашего файла Tables.js.
+
+В нем учтены все наши предыдущие шаги: загрузка данных с сервера, обработка состояний загрузки/ошибки и исправление с импортом Td.
+
+## Код для файла frontend/src/views/Dashboard/Tables.js
+Вам нужно полностью заменить содержимое вашего локального файла этим кодом.
+
+JavaScript
+
 /*!
 
 =========================================================
@@ -16,18 +25,19 @@
 
 */
 
-// ИЗМЕНЕНИЕ: Импортируем хуки useState и useEffect из React
+// Импортируем хуки useState и useEffect из React
 import React, { useState, useEffect } from "react";
 
 // Chakra imports
 import {
- Flex,
- Table,
- Tbody,
- Text,
- Th,
- Thead,
- Tr,
+  Flex,
+  Table,
+  Tbody,
+  Td, // ИСПРАВЛЕНО: Добавлен импорт Td
+  Text,
+  Th,
+  Thead,
+  Tr,
 } from "@chakra-ui/react";
 
 // Custom components
@@ -36,21 +46,20 @@ import CardHeader from "components/Card/CardHeader.js";
 import CardBody from "components/Card/CardBody.js";
 
 // Table Components
-// ВАЖНО: Убедитесь, что TablesTableRow может принимать новые пропсы, которые мы передадим
 import TablesTableRow from "components/Tables/TablesTableRow";
 
 function Tables() {
-  // ИЗМЕНЕНИЕ: Создаем состояния для хранения кампаний, статуса загрузки и ошибок
+  // Создаем состояния для хранения кампаний, статуса загрузки и ошибок
   const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // ИЗМЕНЕНИЕ: Используем useEffect для загрузки данных при первом рендере компонента
+  // Используем useEffect для загрузки данных при первом рендере компонента
   useEffect(() => {
     async function fetchCampaigns() {
       try {
-        // УКАЖИТЕ ЗДЕСЬ URL ВАШЕГО БЭКЕНДА
-        const response = await fetch("https://ad-dash-frontend-production.up.railway.app/api/active-campaigns");
+        // ВАЖНО: Убедитесь, что здесь указан правильный URL вашего рабочего бэкенда
+        const response = await fetch("https://ad-dash-backend-production-1234.up.railway.app/api/active-campaigns"); // <-- ЗАМЕНИТЕ НА ВАШ URL
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -90,68 +99,54 @@ function Tables() {
         )
     }
     return campaigns.map((campaign, index) => (
-      // Мы используем существующий компонент TablesTableRow, но передаем в него
-      // новые данные. Возможно, вам понадобится адаптировать сам компонент
-      // TablesTableRow, чтобы он правильно отображал эти данные.
       <TablesTableRow
         key={index}
-        // Для колонки "КАМПАНИЯ / КАБИНЕТ"
-        logo={campaign.logo || ""} // Нужно добавить URL лого в данные
         name={campaign.campaign_name}
         email={campaign.account_name}
-        // Для колонки "ЦЕЛЬ"
-        domain={campaign.objective} // Используем поле domain для цели
+        domain={campaign.objective}
         subdomain=""
-        // Для колонки "СТАТУС"
         status={campaign.status}
-        // Для колонки "КЛЮЧЕВЫЕ МЕТРИКИ"
         date={`${campaign.spend.toFixed(2)} / ${campaign.leads} / ${campaign.cpl.toFixed(2)}`}
         lastItem={index === campaigns.length - 1}
       />
     ));
   };
 
-
- return (
-  <Flex direction='column' pt={{ base: "120px", md: "75px" }}>
-   {/* ИЗМЕНЕНИЕ: Таблица активных кампаний */}
-   <Card overflowX={{ sm: "scroll", xl: "hidden" }} pb='0px'>
-    <CardHeader p='6px 0px 22px 0px'>
-     <Text fontSize='lg' color='#fff' fontWeight='bold'>
-      Active Campaigns Table
-     </Text>
-    </CardHeader>
-    <CardBody>
-     <Table variant='simple' color='#fff'>
-      <Thead>
-       <Tr my='.8rem' ps='0px' color='gray.400'>
-        {/* ИЗМЕНЕНИЕ: Меняем заголовки колонок */}
-        <Th ps='0px' color='gray.400' fontFamily='Plus Jakarta Display' borderBottomColor='#56577A'>
-         Кампания / Кабинет
-        </Th>
-        <Th color='gray.400' fontFamily='Plus Jakarta Display' borderBottomColor='#56577A'>
-         Цель
-        </Th>
-        <Th color='gray.400' fontFamily='Plus Jakarta Display' borderBottomColor='#56577A'>
-         Статус
-        </Th>
-        <Th color='gray.400' fontFamily='Plus Jakarta Display' borderBottomColor='#56577A'>
-         Расход / Лиды / CPL
-        </Th>
-        <Th borderBottomColor='#56577A'></Th>
-       </Tr>
-      </Thead>
-      <Tbody>
-              {/* ИЗМЕНЕНИЕ: Вызываем нашу новую функцию для рендера тела таблицы */}
+  return (
+    <Flex direction='column' pt={{ base: "120px", md: "75px" }}>
+      <Card overflowX={{ sm: "scroll", xl: "hidden" }} pb='0px'>
+        <CardHeader p='6px 0px 22px 0px'>
+          <Text fontSize='lg' color='#fff' fontWeight='bold'>
+            Active Campaigns Table
+          </Text>
+        </CardHeader>
+        <CardBody>
+          <Table variant='simple' color='#fff'>
+            <Thead>
+              <Tr my='.8rem' ps='0px' color='gray.400'>
+                <Th ps='0px' color='gray.400' fontFamily='Plus Jakarta Display' borderBottomColor='#56577A'>
+                  Кампания / Кабинет
+                </Th>
+                <Th color='gray.400' fontFamily='Plus Jakarta Display' borderBottomColor='#56577A'>
+                  Цель
+                </Th>
+                <Th color='gray.400' fontFamily='Plus Jakarta Display' borderBottomColor='#56577A'>
+                  Статус
+                </Th>
+                <Th color='gray.400' fontFamily='Plus Jakarta Display' borderBottomColor='#56577A'>
+                  Расход / Лиды / CPL
+                </Th>
+                <Th borderBottomColor='#56577A'></Th>
+              </Tr>
+            </Thead>
+            <Tbody>
               {renderTableBody()}
             </Tbody>
-     </Table>
-    </CardBody>
-   </Card>
-      {/* Я закомментировал вторую таблицу, чтобы упростить задачу */}
-   {/* <Card my='22px' overflowX={{ sm: "scroll", xl: "hidden" }} pb='0px'> ... </Card> */}
-  </Flex>
- );
+          </Table>
+        </CardBody>
+      </Card>
+    </Flex>
+  );
 }
 
 export default Tables;
