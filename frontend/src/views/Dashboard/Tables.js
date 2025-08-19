@@ -1,3 +1,12 @@
+Конечно, вот полный код для файла Tables.js с диагностической, упрощенной версией renderTableBody.
+
+Эта версия не использует компонент TablesTableRow, а создает ячейки таблицы напрямую. Это поможет нам точно определить, где скрывается проблема.
+
+Код для файла frontend/src/views/Dashboard/Tables.js
+Замените всё содержимое вашего файла этим кодом и загрузите на GitHub.
+
+JavaScript
+
 /*!
 
 =========================================================
@@ -16,7 +25,6 @@
 
 */
 
-// Импортируем хуки useState и useEffect из React
 import React, { useState, useEffect } from "react";
 
 // Chakra imports
@@ -24,7 +32,7 @@ import {
   Flex,
   Table,
   Tbody,
-  Td, // ИСПРАВЛЕНО: Добавлен импорт Td
+  Td,
   Text,
   Th,
   Thead,
@@ -36,37 +44,32 @@ import Card from "components/Card/Card.js";
 import CardHeader from "components/Card/CardHeader.js";
 import CardBody from "components/Card/CardBody.js";
 
-// Table Components
-import TablesTableRow from "components/Tables/TablesTableRow";
-
 function Tables() {
-  // Создаем состояния для хранения кампаний, статуса загрузки и ошибок
   const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Используем useEffect для загрузки данных при первом рендере компонента
   useEffect(() => {
     async function fetchCampaigns() {
       try {
-        // ВАЖНО: Убедитесь, что здесь указан правильный URL вашего рабочего бэкенда
-        const response = await fetch("https://ad-dash-backend-production-1234.up.railway.app/api/active-campaigns"); // <-- ЗАМЕНИТЕ НА ВАШ URL
+        // УБЕДИТЕСЬ, ЧТО ЗДЕСЬ ВАШ ПРАВИЛЬНЫЙ URL
+        const response = await fetch("https://ad-dash-backend-production-....up.railway.app/api/active-campaigns"); // <-- ЗАМЕНИТЕ НА ВАШ URL
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         const data = await response.json();
-        setCampaigns(data); // Сохраняем данные в состояние
+        setCampaigns(data);
       } catch (e) {
-        setError(e.message); // Сохраняем ошибку
+        setError(e.message);
       } finally {
-        setLoading(false); // Убираем статус загрузки
+        setLoading(false);
       }
     }
 
     fetchCampaigns();
-  }, []); // Пустой массив зависимостей означает, что эффект выполнится один раз
+  }, []);
 
-  // Функция для отображения тела таблицы в зависимости от состояния
+  // ДИАГНОСТИЧЕСКАЯ ВЕРСИЯ: Отображаем данные напрямую, без TablesTableRow
   const renderTableBody = () => {
     if (loading) {
       return (
@@ -89,17 +92,24 @@ function Tables() {
             </Tr>
         )
     }
+    // Используем обычный <Tr> и <Td>
     return campaigns.map((campaign, index) => (
-      <TablesTableRow
-        key={index}
-        name={campaign.campaign_name}
-        email={campaign.account_name}
-        domain={campaign.objective}
-        subdomain=""
-        status={campaign.status}
-        date={`${campaign.spend.toFixed(2)} / ${campaign.leads} / ${campaign.cpl.toFixed(2)}`}
-        lastItem={index === campaigns.length - 1}
-      />
+      <Tr key={index}>
+        <Td>
+            <Text fontSize="md" color="#fff" fontWeight="bold">{campaign.campaign_name}</Text>
+            <Text fontSize="sm" color="gray.400">{campaign.account_name}</Text>
+        </Td>
+        <Td>
+            <Text fontSize="md" color="#fff">{campaign.objective}</Text>
+        </Td>
+        <Td>
+            <Text fontSize="md" color="#fff">{campaign.status}</Text>
+        </Td>
+        <Td>
+            <Text fontSize="md" color="#fff">{`${campaign.spend.toFixed(2)} / ${campaign.leads} / ${campaign.cpl.toFixed(2)}`}</Text>
+        </Td>
+        <Td></Td>
+      </Tr>
     ));
   };
 
