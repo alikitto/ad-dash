@@ -50,7 +50,7 @@ function Tables() {
     async function fetchCampaigns() {
       try {
         // УКАЖИТЕ ЗДЕСЬ URL ВАШЕГО БЭКЕНДА
-        const response = await fetch("http://127.0.0.1:8000/api/active-campaigns");
+        const response = await fetch("https://ad-dash-frontend-production.up.railway.app/api/active-campaigns");
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
