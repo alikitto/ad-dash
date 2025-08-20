@@ -181,7 +181,7 @@ function Tables() {
                     position="sticky"
                     left="0"
                     zIndex="1"
-                    bg="#0F1535" // Тот же фон, что и у ячейки
+                    bg="#1A202C" // Тот же фон, что и у ячейки
                   >
                     Ad Set / Campaign
                   </Th>
