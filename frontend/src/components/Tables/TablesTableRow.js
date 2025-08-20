@@ -31,7 +31,7 @@ function TablesTableRow(props) {
       {/* Status Switch */}
       <Td>
         {isUpdating ? (
-          <Spinner size="sm" />
+          <Spinner size="sm" color="white" />
         ) : (
           <Switch
             colorScheme="teal"
