@@ -1,4 +1,4 @@
-# --- main_backend.py (Final Robust Version) ---
+# --- main_backend.py (Final Corrected Version) ---
 
 import os
 import asyncio
@@ -47,7 +47,7 @@ async def get_insights_for_adsets(session: aiohttp.ClientSession, account_id: st
     url = f"https://graph.facebook.com/{API_VERSION}/act_{account_id}/insights"
     params = {
         "level": "adset",
-        "fields": "adset_id,spend,actions,cpm,ctr,inline_link_ctr,clicks",
+        "fields": "adset_id,spend,actions,cpm,ctr,clicks",
         "filtering": f'[{{"field":"adset.id","operator":"IN","value":{json.dumps(adset_ids)}}}]',
         "date_preset": date_preset,
     }
@@ -89,11 +89,10 @@ async def get_all_adsets_data(date_preset: str = Query("last_7d")):
                         "adset_name": adset['name'],
                         "campaign_name": adset.get('campaign', {}).get('name'),
                         "status": adset['effective_status'],
-                        "objective": adset.get("objective", "N/A"), # THE FIX IS HERE
+                        "objective": adset.get("objective", "N/A"),
                         "spend": spend, "leads": leads, "cpl": cpl, "cpa": cpa,
                         "cpm": float(adset_insight.get("cpm", 0)),
                         "ctr_all": float(adset_insight.get("ctr", 0)),
-                        "ctr_link_click": float(adset_insight.get("inline_link_ctr", 0)),
                         "clicks": int(adset_insight.get("clicks", 0)),
                     })
         return all_data
