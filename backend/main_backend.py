@@ -76,7 +76,6 @@ async def get_insights_for_account(session: aiohttp.ClientSession, account_id: s
     params = {
         "fields": "campaign_id,campaign_name,spend,actions,objective,cpm,ctr,inline_link_ctr,clicks,cpc",
         "level": "campaign",
-        "filtering": f'[{{"field":"campaign.effective_status","operator":"IN","value":["ACTIVE", "PAUSED"]}}]',
         "date_preset": "last_7d",
         "limit": 500
     }
