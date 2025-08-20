@@ -1,39 +1,11 @@
-/*!
-
-=========================================================
-* Vision UI Free Chakra - v1.0.0
-=========================================================
-
-* Product Page: https://www.creative-tim.com/product/vision-ui-free-chakra
-* Copyright 2021 Creative Tim (https://www.creative-tim.com/)
-* Licensed under MIT (https://github.com/creativetimofficial/vision-ui-free-chakra/blob/master LICENSE.md)
-
-* Design and Coded by Simmmple & Creative Tim
-
-=========================================================
-
-* The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-*/
+// --- Файл: frontend/src/views/Dashboard/Tables.js ---
 
 import React, { useState, useEffect } from "react";
-
-// Chakra imports
-import {
-  Flex,
-  Table,
-  Tbody,
-  Td,
-  Text,
-  Th,
-  Thead,
-  Tr,
-} from "@chakra-ui/react";
-
-// Custom components
+import { Flex, Table, Tbody, Td, Text, Th, Thead, Tr } from "@chakra-ui/react";
 import Card from "components/Card/Card.js";
 import CardHeader from "components/Card/CardHeader.js";
 import CardBody from "components/Card/CardBody.js";
+import TablesTableRow from "components/Tables/TablesTableRow";
 
 function Tables() {
   const [campaigns, setCampaigns] = useState([]);
@@ -43,12 +15,15 @@ function Tables() {
   useEffect(() => {
     async function fetchCampaigns() {
       try {
-        // УБЕДИТЕСЬ, ЧТО ЗДЕСЬ ВАШ ПРАВИЛЬНЫЙ URL
-        const response = await fetch("https://ad-dash-backend-production.up.railway.app/api/active-campaigns"); // <-- ЗАМЕНИТЕ НА ВАШ URL
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
+        // УБЕДИТЕСЬ, ЧТО ЗДЕСЬ ВАШ ПРАВИЛЬНЫЙ URL БЭКЕНДА
+        const response = await fetch("https://ad-dash-backend-production-....up.railway.app/api/active-campaigns"); // <-- ЗАМЕНИТЕ НА ВАШ URL
         const data = await response.json();
+        
+        // Проверяем, не вернул ли бэкенд объект с ошибкой
+        if (data.error) {
+          throw new Error(data.error);
+        }
+
         setCampaigns(data);
       } catch (e) {
         setError(e.message);
@@ -60,7 +35,6 @@ function Tables() {
     fetchCampaigns();
   }, []);
 
-  // ДИАГНОСТИЧЕСКАЯ ВЕРСИЯ: Отображаем данные напрямую, без TablesTableRow
   const renderTableBody = () => {
     if (loading) {
       return (
@@ -69,6 +43,7 @@ function Tables() {
         </Tr>
       );
     }
+    
     if (error) {
       return (
         <Tr>
@@ -76,31 +51,26 @@ function Tables() {
         </Tr>
       );
     }
-    if (campaigns.length === 0) {
+    
+    if (!Array.isArray(campaigns) || campaigns.length === 0) {
         return (
             <Tr>
                 <Td colSpan="6" textAlign="center">Активные кампании не найдены.</Td>
             </Tr>
         )
     }
-    // Используем обычный <Tr> и <Td>
+
     return campaigns.map((campaign, index) => (
-      <Tr key={index}>
-        <Td>
-            <Text fontSize="md" color="#fff" fontWeight="bold">{campaign.campaign_name}</Text>
-            <Text fontSize="sm" color="gray.400">{campaign.account_name}</Text>
-        </Td>
-        <Td>
-            <Text fontSize="md" color="#fff">{campaign.objective}</Text>
-        </Td>
-        <Td>
-            <Text fontSize="md" color="#fff">{campaign.status}</Text>
-        </Td>
-        <Td>
-            <Text fontSize="md" color="#fff">{`${campaign.spend.toFixed(2)} / ${campaign.leads} / ${campaign.cpl.toFixed(2)}`}</Text>
-        </Td>
-        <Td></Td>
-      </Tr>
+      <TablesTableRow
+        key={index}
+        name={campaign.campaign_name}
+        email={campaign.account_name}
+        domain={campaign.objective}
+        subdomain=""
+        status={campaign.status}
+        date={`${campaign.spend.toFixed(2)} / ${campaign.leads} / ${campaign.cpl.toFixed(2)}`}
+        lastItem={index === campaigns.length - 1}
+      />
     ));
   };
 
