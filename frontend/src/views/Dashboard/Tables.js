@@ -12,6 +12,7 @@ function Tables() {
   const [error, setError] = useState(null);
   const [updatingId, setUpdatingId] = useState(null);
   const toast = useToast();
+
   const [datePreset, setDatePreset] = useState("last_7d");
   const [selectedAccount, setSelectedAccount] = useState("all");
   const [statusFilter, setStatusFilter] = useState("ACTIVE");
@@ -23,7 +24,7 @@ function Tables() {
       setLoading(true);
       setError(null);
       try {
-        const response = await fetch(`https://ad-dash-backend-production.up.railway.app/api/adsets?date_preset=${datePreset}`); // REPLACE WITH YOUR URL
+        const response = await fetch(`https://ad-dash-backend-production.up.railway.app/api/adsets?date_preset=${datePreset}`); // We fetch all statuses from backend
         const data = await response.json();
         if (data.detail) throw new Error(data.detail);
         setAllAdsets(data);
@@ -36,7 +37,7 @@ function Tables() {
   const handleStatusChange = async (adsetId, newStatus) => {
     setUpdatingId(adsetId);
     try {
-      const response = await fetch(`https://ad-dash-backend-production.up.railway.app/api/adsets/${adsetId}/update-status`, { // REPLACE WITH YOUR URL
+      const response = await fetch(`https://ad-dash-backend-production.up.railway.app/api/adsets/${adsetId}/update-status`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus })
@@ -56,9 +57,12 @@ function Tables() {
 
   const processedAdsets = useMemo(() => {
     let filtered = [...allAdsets];
+    // --- THE CHANGE IS HERE ---
+    // Status filter now works on the frontend, checking the actual current status
     if (statusFilter !== "ALL") {
       filtered = filtered.filter(adset => adset.status === statusFilter);
     }
+    // --- END OF CHANGE ---
     if (selectedAccount !== "all") {
       filtered = filtered.filter(adset => adset.account_name === selectedAccount);
     }
@@ -74,7 +78,7 @@ function Tables() {
   }, [allAdsets, selectedAccount, objectiveFilter, statusFilter, sortConfig]);
 
   const accounts = useMemo(() => ['all', ...new Set(allAdsets.map(a => a.account_name))], [allAdsets]);
-  const objectives = useMemo(() => ['all', ...new Set(allAdsets.map(a => a.objective))], [allAdsets]);
+  const objectives = useMemo(() => ['all', ...new Set(allAdsets.map(a => a.objective || "N/A"))], [allAdsets]);
 
   const requestSort = (key) => {
     let direction = 'ascending';
@@ -96,9 +100,9 @@ function Tables() {
   );
   
   const renderTableBody = () => {
-    if (loading) return <Tr><Td colSpan="9" textAlign="center">Loading ad sets...</Td></Tr>;
-    if (error) return <Tr><Td colSpan="9" textAlign="center">Error: {error}</Td></Tr>;
-    if (!processedAdsets.length) return <Tr><Td colSpan="9" textAlign="center">No ad sets found matching your criteria.</Td></Tr>;
+    if (loading) return <Tr><Td colSpan="12" textAlign="center">Loading ad sets...</Td></Tr>;
+    if (error) return <Tr><Td colSpan="12" textAlign="center">Error: {error}</Td></Tr>;
+    if (!processedAdsets.length) return <Tr><Td colSpan="12" textAlign="center">No ad sets found matching your criteria.</Td></Tr>;
     
     return processedAdsets.map((adset) => (
       <TablesTableRow key={adset.adset_id} adset={adset} onStatusChange={handleStatusChange} isUpdating={updatingId === adset.adset_id} />
@@ -139,10 +143,13 @@ function Tables() {
                 <Th color="gray.400">Ad Set / Campaign</Th>
                 <Th color="gray.400">Objective</Th>
                 <SortableTh sortKey="spend">Spent</SortableTh>
+                <Th color="gray.400">Impressions</Th>
+                <Th color="gray.400">Frequency</Th>
                 <Th color="gray.400">Leads (CPA)</Th>
                 <SortableTh sortKey="cpl">CPL</SortableTh>
                 <Th color="gray.400">CPM</Th>
                 <Th color="gray.400">CTR (All)</Th>
+                <Th color="gray.400">CTR (Link Click)</Th>
                 <Th color="gray.400">Clicks</Th>
                 <Th color="gray.400">Status</Th>
               </Tr>
