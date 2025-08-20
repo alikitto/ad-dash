@@ -1,124 +1,105 @@
-# --- main_backend.py (Final Ad Set Level Version) ---
+# --- main_backend.py (Финальная версия с логикой бота) ---
 
 import os
 import asyncio
 import aiohttp
 import logging
 from dotenv import load_dotenv
-from fastapi import FastAPI, Body, HTTPException
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from typing import Dict
 
-# --- Configuration ---
+# --- Конфигурация ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 load_dotenv()
 META_TOKEN = os.getenv("META_ACCESS_TOKEN")
 API_VERSION = "v19.0"
-LEAD_ACTION_TYPE = "onsite_conversion.messaging_conversation_started_7d"
 
 app = FastAPI()
 
-# --- CORS Configuration ---
 origins = [
-    "https://ad-dash-frontend-production.up.railway.app", # REPLACE WITH YOUR FRONTEND URL
+    "https://ad-dash-frontend-production.up.railway.app", # ЗАМЕНИТЕ НА ВАШ URL
     "http://localhost:3000",
 ]
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
-# --- Meta API Functions ---
-async def fb_request(session: aiohttp.ClientSession, method: str, url: str, params: dict = None, data: dict = None):
-    if params is None: params = {}
+# --- Функции API ---
+async def fb_get(session: aiohttp.ClientSession, url: str, params: dict = None):
+    params = params or {}
     params["access_token"] = META_TOKEN
-    
-    async with session.request(method, url, params=params, json=data) as response:
+    async with session.get(url, params=params) as response:
         response.raise_for_status()
         return await response.json()
 
 async def get_ad_accounts(session: aiohttp.ClientSession):
     url = f"https://graph.facebook.com/{API_VERSION}/me/adaccounts"
     params = {"fields": "name,account_id"}
-    response = await fb_request(session, "get", url, params=params)
-    return response.get("data", [])
+    return (await fb_get(session, url, params)).get("data", [])
 
-async def get_adset_insights_for_account(session: aiohttp.ClientSession, account_id: str):
+async def get_all_adsets(session: aiohttp.ClientSession, account_id: str):
+    """НОВАЯ ФУНКЦИЯ: Получает все группы и их статусы."""
+    url = f"https://graph.facebook.com/{API_VERSION}/act_{account_id}/adsets"
+    params = {"fields": "id,name,campaign{name},effective_status", "limit": 500}
+    return (await fb_get(session, url, params)).get("data", [])
+
+async def get_insights_for_adsets(session: aiohttp.ClientSession, account_id: str, adset_ids: list):
+    """Получает статистику для конкретных групп."""
     url = f"https://graph.facebook.com/{API_VERSION}/act_{account_id}/insights"
-    # --- THE CHANGE IS HERE ---
-    # We are now fetching data at the 'adset' level with all requested fields.
     params = {
-        "fields": "adset_id,adset_name,campaign_name,spend,actions,objective,cpm,ctr,inline_link_ctr,clicks,effective_status",
         "level": "adset",
+        "fields": "adset_id,spend,actions,cpm,ctr,clicks",
+        "filtering": f'[{{"field":"adset.id","operator":"IN","value":{adset_ids}}}]',
         "date_preset": "last_7d",
-        "limit": 500
     }
-    # --- END OF CHANGE ---
-    response = await fb_request(session, "get", url, params=params)
-    return response.get("data", [])
+    return (await fb_get(session, url, params)).get("data", [])
 
-# --- API Endpoints ---
+# --- Главный эндпоинт ---
 @app.get("/api/adsets")
-async def get_all_adsets():
+async def get_all_adsets_data():
     if not META_TOKEN:
         raise HTTPException(status_code=500, detail="Token not configured")
 
-    all_adsets_data = []
+    all_data = []
     try:
         async with aiohttp.ClientSession() as session:
             accounts = await get_ad_accounts(session)
-            if not accounts: return []
-
             for acc in accounts:
-                insights = await get_adset_insights_for_account(session, acc['account_id'])
-                for adset in insights:
-                    spend = float(adset.get("spend", 0))
-                    if spend == 0: continue
-                    
-                    leads = sum(int(a["value"]) for a in adset.get("actions", []) if a.get("action_type") == LEAD_ACTION_TYPE)
-                    purchases = sum(int(a["value"]) for a in adset.get("actions", []) if "purchase" in a.get("action_type", ""))
-                    
+                adsets = await get_all_adsets(session, acc['account_id'])
+                if not adsets:
+                    continue
+
+                adset_ids = [adset['id'] for adset in adsets]
+                insights = await get_insights_for_adsets(session, acc['account_id'], adset_ids)
+                
+                # Преобразуем статистику в словарь для удобного доступа
+                insights_map = {item['adset_id']: item for item in insights}
+
+                # Объединяем данные
+                for adset in adsets:
+                    adset_insight = insights_map.get(adset['id'])
+                    if not adset_insight or float(adset_insight.get("spend", 0)) == 0:
+                        continue
+
+                    spend = float(adset_insight.get("spend", 0))
+                    leads = sum(int(a["value"]) for a in adset_insight.get("actions", []) if "lead" in a.get("action_type", ""))
+                    purchases = sum(int(a["value"]) for a in adset_insight.get("actions", []) if "purchase" in a.get("action_type", ""))
                     cpl = (spend / leads) if leads > 0 else 0
                     cpa = (spend / purchases) if purchases > 0 else 0
 
-                    all_adsets_data.append({
+                    all_data.append({
                         "account_name": acc['name'],
-                        "adset_id": adset.get('adset_id'),
-                        "adset_name": adset.get('adset_name'),
-                        "campaign_name": adset.get('campaign_name'),
-                        "status": adset.get('effective_status'),
-                        "objective": adset.get('objective'),
+                        "adset_id": adset['id'],
+                        "adset_name": adset['name'],
+                        "campaign_name": adset.get('campaign', {}).get('name'),
+                        "status": adset['effective_status'],
                         "spend": spend,
                         "leads": leads,
                         "cpl": cpl,
                         "cpa": cpa,
-                        "cpm": float(adset.get("cpm", 0)),
-                        "ctr_all": float(adset.get("ctr", 0)),
-                        "ctr_link_click": float(adset.get("inline_link_ctr", 0)),
-                        "clicks": int(adset.get("clicks", 0)),
+                        "cpm": float(adset_insight.get("cpm", 0)),
+                        "ctr": float(adset_insight.get("ctr", 0)),
+                        "clicks": int(adset_insight.get("clicks", 0)),
                     })
-        
-        return all_adsets_data
+        return all_data
     except Exception as e:
         logging.error(f"!!! API ERROR: {e} !!!", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/api/adsets/{adset_id}/update-status")
-async def update_adset_status(adset_id: str, payload: Dict = Body(...)):
-    new_status = payload.get("status")
-    if new_status not in ["ACTIVE", "PAUSED"]:
-        raise HTTPException(status_code=400, detail="Invalid status provided.")
-
-    url = f"https://graph.facebook.com/{API_VERSION}/{adset_id}"
-    data = {"status": new_status}
-    
-    try:
-        async with aiohttp.ClientSession() as session:
-            response = await fb_request(session, "post", url, data=data)
-            return response
-    except Exception as e:
-        logging.error(f"!!! Status Update Error: {e} !!!", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
