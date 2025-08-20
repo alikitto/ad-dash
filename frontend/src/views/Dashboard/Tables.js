@@ -37,7 +37,7 @@ function Tables() {
   const handleStatusChange = async (adsetId, newStatus) => {
     setUpdatingId(adsetId);
     try {
-      const response = await fetch(https://ad-dash-backend-production.up.railway.app/api/adsets/${adsetId}/update-status`, { // ЗАМЕНИТЕ НА ВАШ URL
+      const response = await fetch(`https://ad-dash-backend-production.up.railway.app/api/adsets/${adsetId}/update-status`, { // ЗАМЕНИТЕ НА ВАШ URL
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus })
