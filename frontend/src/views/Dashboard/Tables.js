@@ -24,7 +24,7 @@ function Tables() {
       setLoading(true);
       setError(null);
       try {
-        const response = await fetch(`https://ad-dash-backend-production.up.railway.app/api/adsets?date_preset=${datePreset}&status=${statusFilter}`); // REPLACE WITH YOUR URL
+        const response = await fetch(`https://ad-dash-backend-production.up.railway.app/api/adsets?date_preset=${datePreset}&status=${statusFilter}`); // ЗАМЕНИТЕ НА ВАШ URL
         const data = await response.json();
         if (data.detail) throw new Error(data.detail);
         setAllAdsets(data);
@@ -37,7 +37,7 @@ function Tables() {
   const handleStatusChange = async (adsetId, newStatus) => {
     setUpdatingId(adsetId);
     try {
-      const response = await fetch(`https://ad-dash-backend-production.up.railway.app/api/adsets/${adsetId}/update-status`, { // REPLACE WITH YOUR URL
+      const response = await fetch(`https://ad-dash-backend-production.up.railway.app/api/adsets/${adsetId}/update-status`, { // ЗАМЕНИТЕ НА ВАШ URL
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus })
@@ -92,7 +92,7 @@ function Tables() {
       </Flex>
     </Th>
   );
-  
+
   const renderTableBody = () => {
     if (loading) return <Tr><Td colSpan="10" textAlign="center">Loading ad sets...</Td></Tr>;
     if (error) return <Tr><Td colSpan="10" textAlign="center">Error: {error}</Td></Tr>;
