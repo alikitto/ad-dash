@@ -7,7 +7,7 @@ import CardHeader from "components/Card/CardHeader.js";
 import CardBody from "components/Card/CardBody.js";
 import TablesTableRow from "components/Tables/TablesTableRow";
 
-// ... (хук useStickyState остается без изменений) ...
+// ... (useStickyState, и вся логика компонента остаются без изменений) ...
 function useStickyState(defaultValue, key) {
   const [value, setValue] = useState(() => {
     const stickyValue = window.localStorage.getItem(key);
@@ -20,13 +20,11 @@ function useStickyState(defaultValue, key) {
 }
 
 function Tables() {
-  // ... (все состояния useState и useEffect остаются без изменений) ...
   const [allAdsets, setAllAdsets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [updatingId, setUpdatingId] = useState(null);
   const toast = useToast();
-
   const [datePreset, setDatePreset] = useStickyState("last_7d", "datePreset");
   const [selectedAccount, setSelectedAccount] = useStickyState("all", "selectedAccount");
   const [statusFilter, setStatusFilter] = useStickyState("ACTIVE", "statusFilter");
@@ -37,7 +35,7 @@ function Tables() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`https://ad-dash-backend-production.up.railway.app/api/adsets?date_preset=${datePreset}`); // ЗАМЕНИТЕ НА ВАШ URL
+      const response = await fetch(`https://ad-dash-backend-production.up.railway.app/api/adsets?date_preset=${datePreset}`);
       const data = await response.json();
       if (data.detail) throw new Error(data.detail);
       setAllAdsets(data);
@@ -52,8 +50,7 @@ function Tables() {
     fetchData();
   }, [fetchData]);
 
-  // ... (handleStatusChange, processedAdsets, accounts, objectives, requestSort, SortableTh, renderTableBody остаются без изменений) ...
-    const handleStatusChange = async (adsetId, newStatus) => {
+  const handleStatusChange = async (adsetId, newStatus) => {
     setUpdatingId(adsetId);
     try {
       const response = await fetch(`https://ad-dash-backend-production.up.railway.app/api/adsets/${adsetId}/update-status`, {
@@ -124,15 +121,15 @@ function Tables() {
       <TablesTableRow key={adset.adset_id} adset={adset} onStatusChange={handleStatusChange} isUpdating={updatingId === adset.adset_id} />
     ));
   };
-  
+
   return (
     <Flex direction='column' pt={{ base: "120px", md: "75px" }}>
       <Card>
         <CardHeader>
-        {/* ... (код фильтров остается без изменений) ... */}
           <Flex direction="column">
             <Text fontSize='xl' color='#fff' fontWeight='bold'>Active Ad Sets</Text>
             <HStack mt="20px" spacing={3}>
+              {/* ... (фильтры остаются без изменений) ... */}
               <Select value={selectedAccount} onChange={(e) => setSelectedAccount(e.target.value)} size="sm" borderRadius="md"  borderColor="gray.600" color="white" sx={{ "> option": { background: "#0F1535" }}}>
                 {accounts.map(acc => <option key={acc} value={acc}>{acc === 'all' ? 'All Accounts' : acc}</option>)}
               </Select>
@@ -156,21 +153,38 @@ function Tables() {
           </Flex>
         </CardHeader>
         <CardBody>
-          {/* ИЗМЕНЕНИЕ: Оборачиваем таблицу в Box для скролла */}
-          <Box overflowX="auto">
+          {/* ИЗМЕНЕНИЕ: Добавляем Box со стилями для скроллбара */}
+          <Box
+            overflowX="auto"
+            sx={{
+              "&::-webkit-scrollbar": {
+                height: "8px",
+              },
+              "&::-webkit-scrollbar-track": {
+                background: "transparent",
+              },
+              "&::-webkit-scrollbar-thumb": {
+                background: "#2D3748", // Темно-серый
+                borderRadius: "8px",
+              },
+              "&::-webkit-scrollbar-thumb:hover": {
+                background: "#4A5568", // Серый посветлее
+              },
+            }}
+          >
             <Table variant='simple' color='#fff'>
               <Thead>
                 <Tr my='.8rem' ps='0px'>
-                  {/* ИЗМЕНЕНИЕ: "Замораживаем" первый заголовок */}
                   <Th
                     color="gray.400"
                     position="sticky"
                     left="0"
                     zIndex="1"
-                    bg="#1A202C" // Фон должен совпадать с фоном карточки
+                    bg="#0F1535" // Тот же фон, что и у ячейки
                   >
                     Ad Set / Campaign
                   </Th>
+                  {/* ... (остальные заголовки Th остаются без изменений) ... */}
                   <Th color="gray.400">Objective</Th>
                   <SortableTh sortKey="spend">Spent</SortableTh>
                   <Th color="gray.400">Impressions</Th>
