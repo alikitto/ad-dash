@@ -46,7 +46,7 @@ export default function Footer(props) {
         <Text as='span'>
           {document.documentElement.dir === "rtl"
             ? " مصنوع من ❤️ بواسطة"
-            : "Made by Alasgarov Aliakbar"}
+            : "Made by "}
         </Text>
         <Link href='https://www.simmmple.com' target='_blank'>
           {document.documentElement.dir === "rtl"
@@ -54,8 +54,8 @@ export default function Footer(props) {
             : ""}
         </Link>
         &
-        <Link href='https://www.creative-tim.com' target='_blank'>
-          {document.documentElement.dir === "rtl" ? "سيممبل " : " Creative Tim"}
+        <Link href='https://www.alasgarov.com' target='_blank'>
+          {document.documentElement.dir === "rtl" ? "سيممبل " : " Alasgarov Aliakbar"}
         </Link>
         {document.documentElement.dir === "rtl"
           ? "للحصول على ويب أفضل"
