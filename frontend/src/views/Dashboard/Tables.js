@@ -7,12 +7,14 @@ import CardHeader from "components/Card/CardHeader.js";
 import CardBody from "components/Card/CardBody.js";
 import TablesTableRow from "components/Tables/TablesTableRow";
 
+// Кастомный хук для сохранения состояния в localStorage
 function useStickyState(defaultValue, key) {
   const [value, setValue] = useState(() => {
     try {
       const stickyValue = window.localStorage.getItem(key);
       return stickyValue !== null ? JSON.parse(stickyValue) : defaultValue;
     } catch (error) {
+      console.warn(`Error reading localStorage key “${key}”:`, error);
       return defaultValue;
     }
   });
@@ -28,6 +30,7 @@ function Tables() {
   const [error, setError] = useState(null);
   const [updatingId, setUpdatingId] = useState(null);
   const toast = useToast();
+
   const [datePreset, setDatePreset] = useStickyState("last_7d", "datePreset");
   const [selectedAccount, setSelectedAccount] = useStickyState("all", "selectedAccount");
   const [statusFilter, setStatusFilter] = useStickyState("ACTIVE", "statusFilter");
@@ -42,8 +45,11 @@ function Tables() {
       const data = await response.json();
       if (data.detail) throw new Error(data.detail);
       setAllAdsets(data);
-    } catch (e) { setError(e.message); } 
-    finally { setLoading(false); }
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
   }, [datePreset]);
   
   useEffect(() => {
@@ -187,4 +193,5 @@ function Tables() {
     </Flex>
   );
 }
+
 export default Tables;
