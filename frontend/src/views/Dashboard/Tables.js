@@ -60,55 +60,55 @@ function Tables() {
         )
     }
 
+    // Используем TablesTableRow и передаем в него данные в правильные поля
     return campaigns.map((campaign, index) => (
       <TablesTableRow
-        key={index}
+        key={campaign.campaign_id || index} // Используем ID кампании для ключа, если он есть
         name={campaign.campaign_name}
         email={campaign.account_name}
-        domain={campaign.objective}
-        subdomain=""
+        domain={campaign.objective} // "domain" теперь используется для Цели
         status={campaign.status}
-        date={`${campaign.spend.toFixed(2)} / ${campaign.leads} / ${campaign.cpl.toFixed(2)}`}
-        lastItem={index === campaigns.length - 1}
+        date={`$${campaign.spend.toFixed(2)} / ${campaign.leads} / $${campaign.cpl.toFixed(2)}`} // "date" для метрик
+        logo={''} // Оставляем лого пустым, можно будет добавить позже
       />
     ));
   };
 
-  return (
-    <Flex direction='column' pt={{ base: "120px", md: "75px" }}>
-      <Card overflowX={{ sm: "scroll", xl: "hidden" }} pb='0px'>
-        <CardHeader p='6px 0px 22px 0px'>
-          <Text fontSize='lg' color='#fff' fontWeight='bold'>
-            Active Campaigns Table
-          </Text>
-        </CardHeader>
-        <CardBody>
-          <Table variant='simple' color='#fff'>
-            <Thead>
-              <Tr my='.8rem' ps='0px' color='gray.400'>
-                <Th ps='0px' color='gray.400' fontFamily='Plus Jakarta Display' borderBottomColor='#56577A'>
-                  Кампания / Кабинет
-                </Th>
-                <Th color='gray.400' fontFamily='Plus Jakarta Display' borderBottomColor='#56577A'>
-                  Цель
-                </Th>
-                <Th color='gray.400' fontFamily='Plus Jakarta Display' borderBottomColor='#56577A'>
-                  Статус
-                </Th>
-                <Th color='gray.400' fontFamily='Plus Jakarta Display' borderBottomColor='#56577A'>
-                  Расход / Лиды / CPL
-                </Th>
-                <Th borderBottomColor='#56577A'></Th>
-              </Tr>
-            </Thead>
-            <Tbody>
+  return (
+    <Flex direction='column' pt={{ base: "120px", md: "75px" }}>
+      <Card overflowX={{ sm: "scroll", xl: "hidden" }} pb='0px'>
+        <CardHeader p='6px 0px 22px 0px'>
+          <Text fontSize='lg' color='#fff' fontWeight='bold'>
+            Active Campaigns Table
+          </Text>
+        </CardHeader>
+        <CardBody>
+          <Table variant='simple' color='#fff'>
+            <Thead>
+              <Tr my='.8rem' ps='0px' color='gray.400'>
+                <Th ps='0px' color='gray.400' fontFamily='Plus Jakarta Display' borderBottomColor='#56577A'>
+                  Кампания / Кабинет
+                </Th>
+                <Th color='gray.400' fontFamily='Plus Jakarta Display' borderBottomColor='#56577A'>
+                  Цель
+                </Th>
+                <Th color='gray.400' fontFamily='Plus Jakarta Display' borderBottomColor='#56577A'>
+                  Статус
+                </Th>
+                <Th color='gray.400' fontFamily='Plus Jakarta Display' borderBottomColor='#56577A'>
+                  Расход / Лиды / CPL
+                </Th>
+                <Th borderBottomColor='#56577A'></Th>
+              </Tr>
+            </Thead>
+            <Tbody>
               {renderTableBody()}
             </Tbody>
-          </Table>
-        </CardBody>
-      </Card>
-    </Flex>
-  );
+          </Table>
+        </CardBody>
+      </Card>
+    </Flex>
+  );
 }
 
 export default Tables;
