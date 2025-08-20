@@ -24,6 +24,8 @@ import RTLPage from "views/RTL/RTLPage.js";
 import Profile from "views/Dashboard/Profile.js";
 import SignIn from "views/Pages/SignIn.js";
 import SignUp from "views/Pages/SignUp.js";
+import { SettingsIcon } from "@chakra-ui/icons";
+import Settings from "views/Dashboard/Settings.js"; // Наш новый компонент
 
 import {
   HomeIcon,
@@ -67,6 +69,13 @@ var dashRoutes = [
     icon: <SupportIcon color='inherit' />,
     component: RTLPage,
     layout: "/rtl",
+  },
+  {
+    path: "/settings",
+    name: "Settings",
+    icon: <SettingsIcon color="inherit" />,
+    component: Settings,
+    layout: "/admin",
   },
   {
     name: "ACCOUNT PAGES",
