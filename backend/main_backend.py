@@ -1,4 +1,4 @@
-# --- main_backend.py (Final Version) ---
+# --- main_backend.py (Final Ad Set Level Version) ---
 
 import os
 import asyncio
@@ -46,69 +46,73 @@ async def get_ad_accounts(session: aiohttp.ClientSession):
     response = await fb_request(session, "get", url, params=params)
     return response.get("data", [])
 
-async def get_insights_for_account(session: aiohttp.ClientSession, account_id: str):
+async def get_adset_insights_for_account(session: aiohttp.ClientSession, account_id: str):
     url = f"https://graph.facebook.com/{API_VERSION}/act_{account_id}/insights"
+    # --- THE CHANGE IS HERE ---
+    # We are now fetching data at the 'adset' level with all requested fields.
     params = {
-        "fields": "campaign_id,campaign_name,spend,actions,objective,cpm,ctr,inline_link_ctr,clicks,cpc,effective_status",
-        "level": "campaign",
+        "fields": "adset_id,adset_name,campaign_name,spend,actions,objective,cpm,ctr,inline_link_ctr,clicks,effective_status",
+        "level": "adset",
         "date_preset": "last_7d",
         "limit": 500
     }
+    # --- END OF CHANGE ---
     response = await fb_request(session, "get", url, params=params)
     return response.get("data", [])
 
 # --- API Endpoints ---
-@app.get("/api/active-campaigns")
-async def get_all_active_campaigns():
+@app.get("/api/adsets")
+async def get_all_adsets():
     if not META_TOKEN:
         raise HTTPException(status_code=500, detail="Token not configured")
 
-    all_campaigns_data = []
+    all_adsets_data = []
     try:
         async with aiohttp.ClientSession() as session:
             accounts = await get_ad_accounts(session)
             if not accounts: return []
 
             for acc in accounts:
-                insights = await get_insights_for_account(session, acc['account_id'])
-                for campaign in insights:
-                    spend = float(campaign.get("spend", 0))
+                insights = await get_adset_insights_for_account(session, acc['account_id'])
+                for adset in insights:
+                    spend = float(adset.get("spend", 0))
                     if spend == 0: continue
                     
-                    leads = sum(int(a["value"]) for a in campaign.get("actions", []) if a.get("action_type") == LEAD_ACTION_TYPE)
-                    purchases = sum(int(a["value"]) for a in campaign.get("actions", []) if "purchase" in a.get("action_type", ""))
+                    leads = sum(int(a["value"]) for a in adset.get("actions", []) if a.get("action_type") == LEAD_ACTION_TYPE)
+                    purchases = sum(int(a["value"]) for a in adset.get("actions", []) if "purchase" in a.get("action_type", ""))
                     
                     cpl = (spend / leads) if leads > 0 else 0
                     cpa = (spend / purchases) if purchases > 0 else 0
 
-                    all_campaigns_data.append({
+                    all_adsets_data.append({
                         "account_name": acc['name'],
-                        "campaign_id": campaign.get('campaign_id'),
-                        "campaign_name": campaign.get('campaign_name'),
-                        "status": campaign.get('effective_status'),
-                        "objective": campaign.get('objective'),
+                        "adset_id": adset.get('adset_id'),
+                        "adset_name": adset.get('adset_name'),
+                        "campaign_name": adset.get('campaign_name'),
+                        "status": adset.get('effective_status'),
+                        "objective": adset.get('objective'),
                         "spend": spend,
                         "leads": leads,
                         "cpl": cpl,
                         "cpa": cpa,
-                        "cpm": float(campaign.get("cpm", 0)),
-                        "ctr_all": float(campaign.get("ctr", 0)),
-                        "ctr_link_click": float(campaign.get("inline_link_ctr", 0)),
-                        "clicks": int(campaign.get("clicks", 0)),
+                        "cpm": float(adset.get("cpm", 0)),
+                        "ctr_all": float(adset.get("ctr", 0)),
+                        "ctr_link_click": float(adset.get("inline_link_ctr", 0)),
+                        "clicks": int(adset.get("clicks", 0)),
                     })
         
-        return all_campaigns_data
+        return all_adsets_data
     except Exception as e:
         logging.error(f"!!! API ERROR: {e} !!!", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/campaigns/{campaign_id}/update-status")
-async def update_campaign_status(campaign_id: str, payload: Dict = Body(...)):
+@app.post("/api/adsets/{adset_id}/update-status")
+async def update_adset_status(adset_id: str, payload: Dict = Body(...)):
     new_status = payload.get("status")
     if new_status not in ["ACTIVE", "PAUSED"]:
         raise HTTPException(status_code=400, detail="Invalid status provided.")
 
-    url = f"https://graph.facebook.com/{API_VERSION}/{campaign_id}"
+    url = f"https://graph.facebook.com/{API_VERSION}/{adset_id}"
     data = {"status": new_status}
     
     try:
