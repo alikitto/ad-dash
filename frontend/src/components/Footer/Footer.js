@@ -53,7 +53,7 @@ export default function Footer(props) {
             ? " توقيت الإبداعية"
             : ""}
         </Link>
-        &
+        
         <Link href='https://www.alasgarov.com' target='_blank'>
           {document.documentElement.dir === "rtl" ? "سيممبل " : " Alasgarov Aliakbar"}
         </Link>
