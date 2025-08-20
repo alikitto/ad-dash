@@ -177,11 +177,11 @@ function Tables() {
               <Thead>
                 <Tr my='.8rem' ps='0px'>
                   <Th
-                    color="black"
+                    color="white"
                     position="sticky"
                     left="0"
                     zIndex="1"
-                    bg="#1A202C" // Тот же фон, что и у ячейки
+                    bg="#2a406e" // Тот же фон, что и у ячейки
                   >
                     Ad Set / Campaign
                   </Th>
