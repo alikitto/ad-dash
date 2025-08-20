@@ -2,7 +2,7 @@ import React from "react";
 import { Avatar, Flex, Td, Text, Tr, Switch, useColorModeValue, Spinner } from "@chakra-ui/react";
 
 function TablesTableRow(props) {
-  const { adset, onStatusChange, isUpdating } = props;
+  const { adset, onStatusChange, isUpdating } = props; 
   const textColor = useColorModeValue("white", "white");
   const stickyBg = useColorModeValue("white", "#1A202C"); // Правильный темный фон для "замороженной" колонки
 
