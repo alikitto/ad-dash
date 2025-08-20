@@ -1,5 +1,5 @@
 import React from "react";
-import { Avatar, Badge, Flex, Td, Text, Tr, Switch, useColorModeValue } from "@chakra-ui/react";
+import { Avatar, Flex, Td, Text, Tr, Switch, useColorModeValue } from "@chakra-ui/react";
 
 function TablesTableRow(props) {
   const { campaign, onStatusChange } = props;
@@ -7,24 +7,34 @@ function TablesTableRow(props) {
 
   return (
     <Tr>
+      {/* Campaign / Client */}
       <Td minWidth={{ sm: "250px" }} pl="0px">
         <Flex align="center" py=".8rem" minWidth="100%" flexWrap="nowrap">
-          <Avatar src={campaign.avatarUrl} w="50px" borderRadius="12px" me="18px" />
+          <Avatar w="50px" borderRadius="12px" me="18px" />
           <Flex direction="column">
             <Text fontSize="md" color={textColor} fontWeight="bold">{campaign.campaign_name}</Text>
             <Text fontSize="sm" color="gray.400" fontWeight="normal">{campaign.account_name}</Text>
           </Flex>
         </Flex>
       </Td>
-      <Td><Text>{`$${campaign.spend.toFixed(2)}`}</Text></Td>
-      <Td><Text>{campaign.leads}</Text></Td>
-      <Td><Text>{`$${campaign.cpl.toFixed(2)}`}</Text></Td>
-      <Td><Text>{`$${campaign.cpm.toFixed(2)}`}</Text></Td>
-      <Td><Text>{`${campaign.ctr}%`}</Text></Td>
-      <Td><Text>{`${campaign.inline_link_ctr}%`}</Text></Td>
-      <Td><Text>{campaign.clicks}</Text></Td>
+      {/* Spent */}
+      <Td><Text fontSize="md" color={textColor}>{`$${campaign.spend.toFixed(2)}`}</Text></Td>
+      {/* Leads (CPA) */}
+      <Td><Text fontSize="md" color={textColor}>{`${campaign.leads} ($${campaign.cpa.toFixed(2)})`}</Text></Td>
+      {/* CPL */}
+      <Td><Text fontSize="md" color={textColor}>{`$${campaign.cpl.toFixed(2)}`}</Text></Td>
+      {/* CPM */}
+      <Td><Text fontSize="md" color={textColor}>{`$${campaign.cpm.toFixed(2)}`}</Text></Td>
+      {/* CTR (All) */}
+      <Td><Text fontSize="md" color={textColor}>{`${campaign.ctr_all}%`}</Text></Td>
+      {/* CTR (Link Click) */}
+      <Td><Text fontSize="md" color={textColor}>{`${campaign.ctr_link_click}%`}</Text></Td>
+      {/* Clicks */}
+      <Td><Text fontSize="md" color={textColor}>{campaign.clicks}</Text></Td>
+      {/* Status Switch */}
       <Td>
         <Switch
+          colorScheme="teal"
           isChecked={campaign.status === "ACTIVE"}
           onChange={() => onStatusChange(campaign.campaign_id, campaign.status === "ACTIVE" ? "PAUSED" : "ACTIVE")}
         />
