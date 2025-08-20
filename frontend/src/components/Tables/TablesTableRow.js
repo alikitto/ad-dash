@@ -3,7 +3,23 @@ import { Avatar, Flex, Td, Text, Tr, Switch, useColorModeValue } from "@chakra-u
 
 function TablesTableRow(props) {
   const { adset, onStatusChange } = props;
-  const textColor = useColorModeValue("gray.700", "white");
+  const textColor = useColorModeValue("gray.700", "white"); // Main text color is white in dark mode
+
+  // Function to safely format currency values
+  const formatCurrency = (value) => {
+    if (typeof value !== 'number' || !isFinite(value)) {
+      return "$0.00";
+    }
+    return `$${value.toFixed(2)}`;
+  };
+  
+  // Function to safely format percentage values
+  const formatPercentage = (value) => {
+    if (typeof value !== 'number' || !isFinite(value)) {
+      return "0.00%";
+    }
+    return `${value.toFixed(2)}%`;
+  };
 
   return (
     <Tr>
@@ -18,17 +34,17 @@ function TablesTableRow(props) {
         </Flex>
       </Td>
       {/* Spent */}
-      <Td><Text fontSize="md" color={textColor}>{`$${adset.spend.toFixed(2)}`}</Text></Td>
+      <Td><Text fontSize="md" color={textColor}>{formatCurrency(adset.spend)}</Text></Td>
       {/* Leads (CPA) */}
-      <Td><Text fontSize="md" color={textColor}>{`${adset.leads} ($${adset.cpa.toFixed(2)})`}</Text></Td>
+      <Td><Text fontSize="md" color={textColor}>{`${adset.leads} (${formatCurrency(adset.cpa)})`}</Text></Td>
       {/* CPL */}
-      <Td><Text fontSize="md" color={textColor}>{`$${adset.cpl.toFixed(2)}`}</Text></Td>
+      <Td><Text fontSize="md" color={textColor}>{formatCurrency(adset.cpl)}</Text></Td>
       {/* CPM */}
-      <Td><Text fontSize="md" color={textColor}>{`$${adset.cpm.toFixed(2)}`}</Text></Td>
+      <Td><Text fontSize="md" color={textColor}>{formatCurrency(adset.cpm)}</Text></Td>
       {/* CTR (All) */}
-      <Td><Text fontSize="md" color={textColor}>{`${adset.ctr_all}%`}</Text></Td>
+      <Td><Text fontSize="md" color={textColor}>{formatPercentage(adset.ctr_all)}</Text></Td>
       {/* CTR (Link Click) */}
-      <Td><Text fontSize="md" color={textColor}>{`${adset.ctr_link_click}%`}</Text></Td>
+      <Td><Text fontSize="md" color={textColor}>{formatPercentage(adset.ctr_link_click)}</Text></Td>
       {/* Clicks */}
       <Td><Text fontSize="md" color={textColor}>{adset.clicks}</Text></Td>
       {/* Status Switch */}
