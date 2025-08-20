@@ -1,11 +1,10 @@
-# --- main_backend.py (Final Corrected Version) ---
+# --- main_backend.py (Final Version with Link Clicks) ---
 
 import os
 import asyncio
 import aiohttp
 import json
 import logging
-from datetime import datetime
 from dotenv import load_dotenv
 from fastapi import FastAPI, Body, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -46,14 +45,14 @@ async def get_all_adsets_from_account(session: aiohttp.ClientSession, account_id
 
 async def get_insights_for_adsets(session: aiohttp.ClientSession, account_id: str, adset_ids: list, date_preset: str):
     url = f"https://graph.facebook.com/{API_VERSION}/act_{account_id}/insights"
-    # --- THE FIX IS HERE ---
+    # --- THE CHANGE IS HERE ---
     params = {
         "level": "adset",
-        "fields": "adset_id,spend,actions,cpm,ctr,clicks,impressions,frequency",
+        "fields": "adset_id,spend,actions,cpm,ctr,clicks,impressions,frequency,inline_link_clicks",
         "filtering": f'[{{"field":"adset.id","operator":"IN","value":{json.dumps(adset_ids)}}}]',
         "date_preset": date_preset,
     }
-    # --- END OF FIX ---
+    # --- END OF CHANGE ---
     response = await fb_request(session, "get", url, params=params)
     return response.get("data", [])
 
@@ -92,11 +91,12 @@ async def get_all_adsets_data(date_preset: str = Query("last_7d")):
                         "adset_name": adset['name'],
                         "campaign_name": adset.get('campaign', {}).get('name'),
                         "status": adset['effective_status'],
-                        "objective": adset.get("objective", "N/A"),
+                        "objective": adset.get('campaign', {}).get('objective', "N/A"), # THE FIX IS HERE
                         "spend": spend, "leads": leads, "cpl": cpl, "cpa": cpa,
                         "cpm": float(adset_insight.get("cpm", 0)),
                         "ctr_all": float(adset_insight.get("ctr", 0)),
                         "clicks": int(adset_insight.get("clicks", 0)),
+                        "link_clicks": int(adset_insight.get("inline_link_clicks", 0)),
                         "impressions": int(adset_insight.get("impressions", 0)),
                         "frequency": float(adset_insight.get("frequency", 0)),
                     })
