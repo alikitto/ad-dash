@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { Flex, Select, Table, Tbody, Td, Text, Th, Thead, Tr, useToast, HStack, Icon, IconButton } from "@chakra-ui/react";
+import { Box, Flex, Select, Table, Tbody, Td, Text, Th, Thead, Tr, useToast, HStack, Icon, IconButton } from "@chakra-ui/react";
 import { TriangleDownIcon, TriangleUpIcon, RepeatIcon } from "@chakra-ui/icons";
 import { FaSave } from "react-icons/fa";
 import Card from "components/Card/Card.js";
@@ -7,7 +7,7 @@ import CardHeader from "components/Card/CardHeader.js";
 import CardBody from "components/Card/CardBody.js";
 import TablesTableRow from "components/Tables/TablesTableRow";
 
-// Custom hook to sync state with localStorage
+// ... (хук useStickyState остается без изменений) ...
 function useStickyState(defaultValue, key) {
   const [value, setValue] = useState(() => {
     const stickyValue = window.localStorage.getItem(key);
@@ -20,6 +20,7 @@ function useStickyState(defaultValue, key) {
 }
 
 function Tables() {
+  // ... (все состояния useState и useEffect остаются без изменений) ...
   const [allAdsets, setAllAdsets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -36,7 +37,7 @@ function Tables() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`https://ad-dash-backend-production.up.railway.app/api/adsets?date_preset=${datePreset}`);
+      const response = await fetch(`https://ad-dash-backend-production.up.railway.app/api/adsets?date_preset=${datePreset}`); // ЗАМЕНИТЕ НА ВАШ URL
       const data = await response.json();
       if (data.detail) throw new Error(data.detail);
       setAllAdsets(data);
@@ -51,7 +52,8 @@ function Tables() {
     fetchData();
   }, [fetchData]);
 
-  const handleStatusChange = async (adsetId, newStatus) => {
+  // ... (handleStatusChange, processedAdsets, accounts, objectives, requestSort, SortableTh, renderTableBody остаются без изменений) ...
+    const handleStatusChange = async (adsetId, newStatus) => {
     setUpdatingId(adsetId);
     try {
       const response = await fetch(`https://ad-dash-backend-production.up.railway.app/api/adsets/${adsetId}/update-status`, {
@@ -127,6 +129,7 @@ function Tables() {
     <Flex direction='column' pt={{ base: "120px", md: "75px" }}>
       <Card>
         <CardHeader>
+        {/* ... (код фильтров остается без изменений) ... */}
           <Flex direction="column">
             <Text fontSize='xl' color='#fff' fontWeight='bold'>Active Ad Sets</Text>
             <HStack mt="20px" spacing={3}>
@@ -153,25 +156,37 @@ function Tables() {
           </Flex>
         </CardHeader>
         <CardBody>
-          <Table variant='simple' color='#fff'>
-            <Thead>
-              <Tr my='.8rem' ps='0px'>
-                <Th color="gray.400">Ad Set / Campaign</Th>
-                <Th color="gray.400">Objective</Th>
-                <SortableTh sortKey="spend">Spent</SortableTh>
-                <Th color="gray.400">Impressions</Th>
-                <Th color="gray.400">Frequency</Th>
-                <Th color="gray.400">Leads (CPA)</Th>
-                <SortableTh sortKey="cpl">CPL</SortableTh>
-                <Th color="gray.400">CPM</Th>
-                <Th color="gray.400">CTR (All)</Th>
-                <Th color="gray.400">CTR (Link Click)</Th>
-                <Th color="gray.400">Link Clicks</Th>
-                <Th color="gray.400">Status</Th>
-              </Tr>
-            </Thead>
-            <Tbody>{renderTableBody()}</Tbody>
-          </Table>
+          {/* ИЗМЕНЕНИЕ: Оборачиваем таблицу в Box для скролла */}
+          <Box overflowX="auto">
+            <Table variant='simple' color='#fff'>
+              <Thead>
+                <Tr my='.8rem' ps='0px'>
+                  {/* ИЗМЕНЕНИЕ: "Замораживаем" первый заголовок */}
+                  <Th
+                    color="gray.400"
+                    position="sticky"
+                    left="0"
+                    zIndex="1"
+                    bg="#1A202C" // Фон должен совпадать с фоном карточки
+                  >
+                    Ad Set / Campaign
+                  </Th>
+                  <Th color="gray.400">Objective</Th>
+                  <SortableTh sortKey="spend">Spent</SortableTh>
+                  <Th color="gray.400">Impressions</Th>
+                  <Th color="gray.400">Frequency</Th>
+                  <Th color="gray.400">Leads (CPA)</Th>
+                  <SortableTh sortKey="cpl">CPL</SortableTh>
+                  <Th color="gray.400">CPM</Th>
+                  <Th color="gray.400">CTR (All)</Th>
+                  <Th color="gray.400">CTR (Link Click)</Th>
+                  <Th color="gray.400">Link Clicks</Th>
+                  <Th color="gray.400">Status</Th>
+                </Tr>
+              </Thead>
+              <Tbody>{renderTableBody()}</Tbody>
+            </Table>
+          </Box>
         </CardBody>
       </Card>
     </Flex>
