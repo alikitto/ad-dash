@@ -1,4 +1,4 @@
-# --- main_backend.py (Финальная версия с разделением запросов) ---
+# --- main_backend.py (Final Robust Version) ---
 
 import os
 import asyncio
@@ -15,11 +15,11 @@ load_dotenv()
 META_TOKEN = os.getenv("META_ACCESS_TOKEN")
 API_VERSION = "v19.0"
 LEAD_ACTION_TYPE = "onsite_conversion.messaging_conversation_started_7d"
-client_avatars = {} # Добавьте сюда ваши аватарки
+client_avatars = {}
 
 app = FastAPI()
 origins = [
-    "https://ad-dash-frontend-production.up.railway.app", # ЗАМЕНИТЕ НА ВАШ URL
+    "https://ad-dash-frontend-production.up.railway.app", # REPLACE WITH YOUR FRONTEND URL
     "http://localhost:3000",
 ]
 app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
@@ -45,10 +45,9 @@ async def get_all_adsets_from_account(session: aiohttp.ClientSession, account_id
 
 async def get_insights_for_adsets(session: aiohttp.ClientSession, account_id: str, adset_ids: list, date_preset: str):
     url = f"https://graph.facebook.com/{API_VERSION}/act_{account_id}/insights"
-    # ИСПРАВЛЕНО: УБРАНЫ ВСЕ ПРОБЛЕМНЫЕ ПОЛЯ. ОСТАВЛЕН ТОЛЬКО ГАРАНТИРОВАННО РАБОТАЮЩИЙ НАБОР.
     params = {
         "level": "adset",
-        "fields": "adset_id,spend,actions,cpm,ctr,clicks",
+        "fields": "adset_id,spend,actions,cpm,ctr,inline_link_ctr,clicks",
         "filtering": f'[{{"field":"adset.id","operator":"IN","value":{json.dumps(adset_ids)}}}]',
         "date_preset": date_preset,
     }
@@ -90,10 +89,11 @@ async def get_all_adsets_data(date_preset: str = Query("last_7d")):
                         "adset_name": adset['name'],
                         "campaign_name": adset.get('campaign', {}).get('name'),
                         "status": adset['effective_status'],
-                        "objective": adset['objective'],
+                        "objective": adset.get("objective", "N/A"), # THE FIX IS HERE
                         "spend": spend, "leads": leads, "cpl": cpl, "cpa": cpa,
                         "cpm": float(adset_insight.get("cpm", 0)),
                         "ctr_all": float(adset_insight.get("ctr", 0)),
+                        "ctr_link_click": float(adset_insight.get("inline_link_ctr", 0)),
                         "clicks": int(adset_insight.get("clicks", 0)),
                     })
         return all_data
