@@ -1,4 +1,4 @@
-# --- main_backend.py (Версия для проверки токена) ---
+# --- main_backend.py (Final Version with CORS Fix) ---
 
 import os
 import asyncio
@@ -20,13 +20,22 @@ LEAD_ACTION_TYPE = "onsite_conversion.messaging_conversation_started_7d"
 
 app = FastAPI()
 
+# --- THE FIX IS HERE ---
+# We are explicitly listing the frontend's URL to allow it.
+# This is more secure and reliable than a wildcard ("*").
+origins = [
+    "https://ad-dash-frontend-production.up.railway.app", # Your frontend's domain
+    "http://localhost:3000", # For local testing
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins, # Use our specific list of origins
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# --- END OF FIX ---
 
 async def fb_get(session: aiohttp.ClientSession, url: str, params: dict = None):
     params = params or {}
@@ -55,41 +64,32 @@ async def get_insights_for_account(session: aiohttp.ClientSession, account_id: s
 
 @app.get("/api/active-campaigns")
 async def get_all_active_campaigns():
-    # --- ИЗМЕНЕНИЕ ЗДЕСЬ ---
-    # ⚠️ Важно по безопасности: Мы никогда не выводим в лог полный токен.
-    # Только его части для проверки.
-    if META_TOKEN:
-        logging.info(f"--- Проверка токена. Начало: {META_TOKEN[:5]}, Конец: {META_TOKEN[-5:]} ---")
-    else:
-        logging.error("!!! Токен META_ACCESS_TOKEN не найден !!!")
+    if not META_TOKEN:
+        logging.error("!!! Token META_ACCESS_TOKEN not found !!!")
         return {"error": "Token not configured on the server"}
-    # --- КОНЕЦ ИЗМЕНЕНИЯ ---
 
     all_campaigns_data = []
     timeout = aiohttp.ClientTimeout(total=180)
-
+    
     try:
-        logging.info("--- Начинаю сбор данных с Meta API ---")
+        logging.info("--- Starting data collection from Meta API ---")
         async with aiohttp.ClientSession(timeout=timeout) as session:
             accounts = await get_ad_accounts(session)
             if not accounts:
-                logging.info("--- Рекламные аккаунты не найдены ---")
+                logging.info("--- No ad accounts found ---")
                 return []
 
-            logging.info(f"--- Найдено аккаунтов: {len(accounts)} ---")
-
             for acc in accounts:
-                logging.info(f"--- Обрабатываю аккаунт: {acc['name']} ---")
                 insights = await get_insights_for_account(session, acc['account_id'])
 
                 for campaign in insights:
                     spend = float(campaign.get("spend", 0))
                     if spend == 0:
                         continue
-
+                    
                     leads = sum(int(a["value"]) for a in campaign.get("actions", []) if a.get("action_type") == LEAD_ACTION_TYPE)
                     cpl = (spend / leads) if leads > 0 else 0
-
+                    
                     all_campaigns_data.append({
                         "account_name": acc['name'],
                         "campaign_name": campaign.get('campaign_name', 'N/A'),
@@ -99,10 +99,10 @@ async def get_all_active_campaigns():
                         "leads": leads,
                         "cpl": cpl
                     })
-
-        logging.info(f"--- Успешно собрано данных по {len(all_campaigns_data)} кампаниям ---")
+        
+        logging.info(f"--- Successfully collected data for {len(all_campaigns_data)} campaigns ---")
         return all_campaigns_data
-
+    
     except Exception as e:
-        logging.error(f"!!! КРИТИЧЕСКАЯ ОШИБКА ВНУТРИ API: {e} !!!", exc_info=True)
+        logging.error(f"!!! CRITICAL ERROR INSIDE API: {e} !!!", exc_info=True)
         return {"error": f"Internal Server Error: {e}"}
