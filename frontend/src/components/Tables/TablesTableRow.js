@@ -3,7 +3,7 @@ import { Avatar, Flex, Td, Text, Tr, Switch, useColorModeValue, Spinner } from "
 
 function TablesTableRow(props) {
   const { adset, onStatusChange, isUpdating } = props;
-  const textColor = useColorModeValue("white", "white"); // Яркий белый цвет
+  const textColor = useColorModeValue("white", "white");
 
   const formatCurrency = (value) => (typeof value !== 'number' || !isFinite(value)) ? "$0.00" : `$${value.toFixed(2)}`;
   const formatPercentage = (value) => (typeof value !== 'number' || !isFinite(value)) ? "0.00%" : `${value.toFixed(2)}%`;
@@ -22,7 +22,8 @@ function TablesTableRow(props) {
       </Td>
       {/* Metrics */}
       <Td><Text fontSize="md" color={textColor}>{formatCurrency(adset.spend)}</Text></Td>
-      <Td><Text fontSize="md" color={textColor}>{`${adset.leads} (${formatCurrency(adset.cpa)})`}</Text></Td>
+      {/* ИЗМЕНЕНИЕ: Показываем CPA только если он больше нуля */}
+      <Td><Text fontSize="md" color={textColor}>{`${adset.leads} ${adset.cpa > 0 ? `(${formatCurrency(adset.cpa)})` : ''}`}</Text></Td>
       <Td><Text fontSize="md" color={textColor}>{formatCurrency(adset.cpl)}</Text></Td>
       <Td><Text fontSize="md" color={textColor}>{formatCurrency(adset.cpm)}</Text></Td>
       <Td><Text fontSize="md" color={textColor}>{formatPercentage(adset.ctr_all)}</Text></Td>
