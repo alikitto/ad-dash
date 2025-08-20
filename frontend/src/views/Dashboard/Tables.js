@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Box, Flex, Select, Table, Tbody, Td, Text, Th, Thead, Tr, useToast, Button, HStack } from "@chakra-ui/react";
+import { Box, Flex, Select, Table, Tbody, Td, Text, Th, Thead, Tr, useToast, Button, HStack, Spacer } from "@chakra-ui/react";
 import Card from "components/Card/Card.js";
 import CardHeader from "components/Card/CardHeader.js";
 import CardBody from "components/Card/CardBody.js";
@@ -12,17 +12,17 @@ function Tables() {
   const [updatingId, setUpdatingId] = useState(null);
   const toast = useToast();
 
-  // Состояния для фильтров и сортировки
   const [datePreset, setDatePreset] = useState("last_7d");
   const [selectedAccount, setSelectedAccount] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("ACTIVE"); // По умолчанию показываем активные
   const [sortConfig, setSortConfig] = useState({ key: 'spend', direction: 'descending' });
 
-  // Получение данных с бэкенда
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
+      setError(null);
       try {
-        const response = await fetch(`https://ad-dash-backend-production.up.railway.app/api/adsets?date_preset=${datePreset}`); // ЗАМЕНИТЕ НА ВАШ URL
+        const response = await fetch(`https://YOUR-BACKEND-URL/api/adsets?date_preset=${datePreset}&status=${statusFilter}`); // ЗАМЕНИТЕ НА ВАШ URL
         const data = await response.json();
         if (data.detail) throw new Error(data.detail);
         setAllAdsets(data);
@@ -33,9 +33,8 @@ function Tables() {
       }
     };
     fetchData();
-  }, [datePreset]); // Перезагружаем данные при смене даты
+  }, [datePreset, statusFilter]); // Перезагружаем данные при смене даты или статуса
 
-  // Обработчик смены статуса
   const handleStatusChange = async (adsetId, newStatus) => {
     setUpdatingId(adsetId);
     try {
@@ -44,8 +43,11 @@ function Tables() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus })
       });
-      if (!response.ok) throw new Error("Failed to update status");
-      
+      if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.detail || "Failed to update status");
+      }
+      // Обновляем только измененный элемент, чтобы не сбрасывать сортировку
       setAllAdsets(allAdsets.map(a => a.adset_id === adsetId ? { ...a, status: newStatus } : a));
       toast({ title: "Status updated successfully!", status: "success", duration: 2000, isClosable: true });
     } catch (e) {
@@ -55,8 +57,8 @@ function Tables() {
     }
   };
 
-  // Логика фильтрации и сортировки
   const processedAdsets = useMemo(() => {
+    // ... (логика фильтрации и сортировки остается без изменений) ...
     let filtered = [...allAdsets];
     if (selectedAccount !== "all") {
       filtered = filtered.filter(adset => adset.account_name === selectedAccount);
@@ -69,11 +71,10 @@ function Tables() {
     return filtered;
   }, [allAdsets, selectedAccount, sortConfig]);
 
-  // Уникальные аккаунты для фильтра
   const accounts = useMemo(() => ['all', ...new Set(allAdsets.map(a => a.account_name))], [allAdsets]);
 
-  // Обработчик клика по заголовку для сортировки
   const requestSort = (key) => {
+    // ... (логика сортировки остается без изменений) ...
     let direction = 'ascending';
     if (sortConfig.key === key && sortConfig.direction === 'ascending') {
       direction = 'descending';
@@ -81,8 +82,8 @@ function Tables() {
     setSortConfig({ key, direction });
   };
   
-  // Рендер тела таблицы
   const renderTableBody = () => {
+    // ... (логика рендера остается без изменений) ...
     if (loading) return <Tr><Td colSpan="9" textAlign="center">Loading ad sets...</Td></Tr>;
     if (error) return <Tr><Td colSpan="9" textAlign="center">Error: {error}</Td></Tr>;
     if (!processedAdsets.length) return <Tr><Td colSpan="9" textAlign="center">No ad sets found matching your criteria.</Td></Tr>;
@@ -101,17 +102,23 @@ function Tables() {
     <Flex direction='column' pt={{ base: "120px", md: "75px" }}>
       <Card>
         <CardHeader p='6px 0px 22px 0px'>
-          <Flex justify="space-between" align="center">
+          <Flex direction="column">
             <Text fontSize='xl' color='#fff' fontWeight='bold'>Active Ad Sets</Text>
-            <HStack>
-              <Select value={selectedAccount} onChange={(e) => setSelectedAccount(e.target.value)} color="white" bg="#0F1535" borderColor="gray.600">
-                {accounts.map(acc => <option key={acc} value={acc} style={{backgroundColor: "#0F1535"}}>{acc === 'all' ? 'All Accounts' : acc}</option>)}
+            {/* ИЗМЕНЕНИЕ: Добавляем отступ и все фильтры */}
+            <HStack mt="20px">
+              <Select value={selectedAccount} onChange={(e) => setSelectedAccount(e.target.value)} size="sm" borderRadius="md">
+                {accounts.map(acc => <option key={acc} value={acc}>{acc === 'all' ? 'All Accounts' : acc}</option>)}
               </Select>
-              <Select value={datePreset} onChange={(e) => setDatePreset(e.target.value)} color="white" bg="#0F1535" borderColor="gray.600">
-                <option value="today" style={{backgroundColor: "#0F1535"}}>Today</option>
-                <option value="yesterday" style={{backgroundColor: "#0F1535"}}>Yesterday</option>
-                <option value="last_7d" style={{backgroundColor: "#0F1535"}}>Last 7 Days</option>
-                <option value="last_30d" style={{backgroundColor: "#0F1535"}}>Last 30 Days</option>
+              <Select value={datePreset} onChange={(e) => setDatePreset(e.target.value)} size="sm" borderRadius="md">
+                <option value="today">Today</option>
+                <option value="yesterday">Yesterday</option>
+                <option value="last_7d">Last 7 Days</option>
+                <option value="last_30d">Last 30 Days</option>
+              </Select>
+              <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} size="sm" borderRadius="md">
+                <option value="ACTIVE">Active</option>
+                <option value="PAUSED">Paused</option>
+                <option value="ALL">All</option>
               </Select>
             </HStack>
           </Flex>
