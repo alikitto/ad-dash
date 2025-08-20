@@ -1,10 +1,23 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { Flex, Select, Table, Tbody, Td, Text, Th, Thead, Tr, useToast, HStack, Icon } from "@chakra-ui/react";
-import { TriangleDownIcon, TriangleUpIcon } from "@chakra-ui/icons";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { Flex, Select, Table, Tbody, Td, Text, Th, Thead, Tr, useToast, HStack, Icon, IconButton } from "@chakra-ui/react";
+import { TriangleDownIcon, TriangleUpIcon, RepeatIcon } from "@chakra-ui/icons";
+import { FaSave } from "react-icons/fa";
 import Card from "components/Card/Card.js";
 import CardHeader from "components/Card/CardHeader.js";
 import CardBody from "components/Card/CardBody.js";
 import TablesTableRow from "components/Tables/TablesTableRow";
+
+// Custom hook to sync state with localStorage
+function useStickyState(defaultValue, key) {
+  const [value, setValue] = useState(() => {
+    const stickyValue = window.localStorage.getItem(key);
+    return stickyValue !== null ? JSON.parse(stickyValue) : defaultValue;
+  });
+  useEffect(() => {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  }, [key, value]);
+  return [value, setValue];
+}
 
 function Tables() {
   const [allAdsets, setAllAdsets] = useState([]);
@@ -13,26 +26,30 @@ function Tables() {
   const [updatingId, setUpdatingId] = useState(null);
   const toast = useToast();
 
-  const [datePreset, setDatePreset] = useState("last_7d");
-  const [selectedAccount, setSelectedAccount] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("ACTIVE");
-  const [objectiveFilter, setObjectiveFilter] = useState("all");
-  const [sortConfig, setSortConfig] = useState({ key: 'spend', direction: 'descending' });
+  const [datePreset, setDatePreset] = useStickyState("last_7d", "datePreset");
+  const [selectedAccount, setSelectedAccount] = useStickyState("all", "selectedAccount");
+  const [statusFilter, setStatusFilter] = useStickyState("ACTIVE", "statusFilter");
+  const [objectiveFilter, setObjectiveFilter] = useStickyState("all", "objectiveFilter");
+  const [sortConfig, setSortConfig] = useStickyState({ key: 'spend', direction: 'descending' }, "sortConfig");
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const response = await fetch(`https://ad-dash-backend-production.up.railway.app/api/adsets?date_preset=${datePreset}`);
-        const data = await response.json();
-        if (data.detail) throw new Error(data.detail);
-        setAllAdsets(data);
-      } catch (e) { setError(e.message); } 
-      finally { setLoading(false); }
-    };
-    fetchData();
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`https://ad-dash-backend-production.up.railway.app/api/adsets?date_preset=${datePreset}`);
+      const data = await response.json();
+      if (data.detail) throw new Error(data.detail);
+      setAllAdsets(data);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
   }, [datePreset]);
+  
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleStatusChange = async (adsetId, newStatus) => {
     setUpdatingId(adsetId);
@@ -43,8 +60,8 @@ function Tables() {
         body: JSON.stringify({ status: newStatus })
       });
       if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.detail || "Failed to update status");
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "Failed to update status");
       }
       setAllAdsets(allAdsets.map(a => a.adset_id === adsetId ? { ...a, status: newStatus } : a));
       toast({ title: "Status updated successfully!", status: "success", duration: 2000, isClosable: true, position: "top" });
@@ -97,9 +114,9 @@ function Tables() {
   );
   
   const renderTableBody = () => {
-    if (loading) return <Tr><Td colSpan="11" textAlign="center">Loading ad sets...</Td></Tr>;
-    if (error) return <Tr><Td colSpan="11" textAlign="center">Error: {error}</Td></Tr>;
-    if (!processedAdsets.length) return <Tr><Td colSpan="11" textAlign="center">No ad sets found matching your criteria.</Td></Tr>;
+    if (loading) return <Tr><Td colSpan="12" textAlign="center">Loading ad sets...</Td></Tr>;
+    if (error) return <Tr><Td colSpan="12" textAlign="center">Error: {error}</Td></Tr>;
+    if (!processedAdsets.length) return <Tr><Td colSpan="12" textAlign="center">No ad sets found matching your criteria.</Td></Tr>;
     
     return processedAdsets.map((adset) => (
       <TablesTableRow key={adset.adset_id} adset={adset} onStatusChange={handleStatusChange} isUpdating={updatingId === adset.adset_id} />
@@ -112,7 +129,7 @@ function Tables() {
         <CardHeader>
           <Flex direction="column">
             <Text fontSize='xl' color='#fff' fontWeight='bold'>Active Ad Sets</Text>
-            <HStack mt="20px" spacing={4}>
+            <HStack mt="20px" spacing={3}>
               <Select value={selectedAccount} onChange={(e) => setSelectedAccount(e.target.value)} size="sm" borderRadius="md"  borderColor="gray.600" color="white" sx={{ "> option": { background: "#0F1535" }}}>
                 {accounts.map(acc => <option key={acc} value={acc}>{acc === 'all' ? 'All Accounts' : acc}</option>)}
               </Select>
@@ -130,6 +147,8 @@ function Tables() {
                 <option value="PAUSED">Paused</option>
                 <option value="ALL">All</option>
               </Select>
+              <IconButton aria-label="Refresh Data" icon={<RepeatIcon />} size="sm" onClick={fetchData} isLoading={loading} />
+              <IconButton aria-label="Save Filters" icon={<Icon as={FaSave} />} size="sm" onClick={() => toast({ title: "Filters saved!", description: "Your current filter and sort settings are saved automatically.", status: "info", duration: 3000, isClosable: true, position: "top" })} />
             </HStack>
           </Flex>
         </CardHeader>
@@ -146,7 +165,8 @@ function Tables() {
                 <SortableTh sortKey="cpl">CPL</SortableTh>
                 <Th color="gray.400">CPM</Th>
                 <Th color="gray.400">CTR (All)</Th>
-                <Th color="gray.400">Clicks</Th>
+                <Th color="gray.400">CTR (Link Click)</Th>
+                <Th color="gray.400">Link Clicks</Th>
                 <Th color="gray.400">Status</Th>
               </Tr>
             </Thead>
