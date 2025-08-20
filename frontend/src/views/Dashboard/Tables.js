@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { Flex, Select, Table, Tbody, Td, Text, Th, Thead, Tr, useToast, HStack, Icon, IconButton } from "@chakra-ui/react";
+import { Box, Flex, Select, Table, Tbody, Td, Text, Th, Thead, Tr, useToast, HStack, Icon, IconButton } from "@chakra-ui/react";
 import { TriangleDownIcon, TriangleUpIcon, RepeatIcon } from "@chakra-ui/icons";
 import { FaSave } from "react-icons/fa";
 import Card from "components/Card/Card.js";
@@ -51,21 +51,75 @@ function Tables() {
   }, [fetchData]);
 
   const handleStatusChange = async (adsetId, newStatus) => {
-    // ... (этот код без изменений)
+    setUpdatingId(adsetId);
+    try {
+      const response = await fetch(`https://ad-dash-backend-production.up.railway.app/api/adsets/${adsetId}/update-status`, { // ЗАМЕНИТЕ НА ВАШ URL
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      });
+      if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.detail || "Failed to update status");
+      }
+      setAllAdsets(allAdsets.map(a => a.adset_id === adsetId ? { ...a, status: newStatus } : a));
+      toast({ title: "Status updated successfully!", status: "success", duration: 2000, isClosable: true, position: "top" });
+    } catch (e) {
+      toast({ title: "Error updating status.", description: e.message, status: "error", duration: 3000, isClosable: true, position: "top" });
+    } finally {
+      setUpdatingId(null);
+    }
   };
+
   const processedAdsets = useMemo(() => {
-    // ... (этот код без изменений)
+    let filtered = [...allAdsets];
+    if (statusFilter !== "ALL") {
+      filtered = filtered.filter(adset => adset.status === statusFilter);
+    }
+    if (selectedAccount !== "all") {
+      filtered = filtered.filter(adset => adset.account_name === selectedAccount);
+    }
+    if (objectiveFilter !== "all") {
+        filtered = filtered.filter(adset => adset.objective === objectiveFilter);
+    }
+    filtered.sort((a, b) => {
+      if (a[sortConfig.key] < b[sortConfig.key]) return sortConfig.direction === 'ascending' ? -1 : 1;
+      if (a[sortConfig.key] > b[sortConfig.key]) return sortConfig.direction === 'ascending' ? 1 : -1;
+      return 0;
+    });
+    return filtered;
   }, [allAdsets, selectedAccount, objectiveFilter, statusFilter, sortConfig]);
+
   const accounts = useMemo(() => ['all', ...new Set(allAdsets.map(a => a.account_name))], [allAdsets]);
   const objectives = useMemo(() => ['all', ...new Set(allAdsets.map(a => a.objective || "N/A"))], [allAdsets]);
+
   const requestSort = (key) => {
-    // ... (этот код без изменений)
+    let direction = 'ascending';
+    if (sortConfig.key === key && sortConfig.direction === 'ascending') {
+      direction = 'descending';
+    }
+    setSortConfig({ key, direction });
   };
+  
   const SortableTh = ({ children, sortKey }) => (
-    // ... (этот код без изменений)
+    <Th cursor="pointer" onClick={() => requestSort(sortKey)} color="gray.400">
+      <Flex align="center">
+        {children}
+        {sortConfig.key === sortKey && (
+          <Icon as={sortConfig.direction === 'ascending' ? TriangleUpIcon : TriangleDownIcon} w={3} h={3} ml={2} />
+        )}
+      </Flex>
+    </Th>
   );
+  
   const renderTableBody = () => {
-    // ... (этот код без изменений)
+    if (loading) return <Tr><Td colSpan="12" textAlign="center">Loading ad sets...</Td></Tr>;
+    if (error) return <Tr><Td colSpan="12" textAlign="center">Error: {error}</Td></Tr>;
+    if (!processedAdsets.length) return <Tr><Td colSpan="12" textAlign="center">No ad sets found matching your criteria.</Td></Tr>;
+    
+    return processedAdsets.map((adset) => (
+      <TablesTableRow key={adset.adset_id} adset={adset} onStatusChange={handleStatusChange} isUpdating={updatingId === adset.adset_id} />
+    ));
   };
   
   return (
