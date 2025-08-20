@@ -1,26 +1,38 @@
-# --- main_backend.py (Версия 4.0 с фильтром по статусу) ---
+# --- main_backend.py (Version 4.1 with json import fix) ---
 import os
 import asyncio
 import aiohttp
+import json # <--- THE FIX IS HERE
 import logging
 from dotenv import load_dotenv
 from fastapi import FastAPI, Body, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, List, Optional
 
-# ... (конфигурация, CORS, client_avatars остаются без изменений) ...
+# --- Configuration ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 load_dotenv()
 META_TOKEN = os.getenv("META_ACCESS_TOKEN")
 API_VERSION = "v19.0"
 LEAD_ACTION_TYPE = "onsite_conversion.messaging_conversation_started_7d"
-client_avatars = {}
+client_avatars = {} # Add your client avatars here
+
 app = FastAPI()
-origins = ["https://ad-dash-frontend-production.up.railway.app", "http://localhost:3000"] # ЗАМЕНИТЕ НА ВАШ URL
-app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
+# --- CORS Configuration ---
+origins = [
+    "https://ad-dash-frontend-production.up.railway.app", # REPLACE WITH YOUR FRONTEND URL
+    "http://localhost:3000",
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-# ... (fb_request, get_ad_accounts остаются без изменений) ...
+# --- Meta API Functions ---
 async def fb_request(session: aiohttp.ClientSession, method: str, url: str, params: dict = None, data: dict = None):
     if params is None: params = {}
     params["access_token"] = META_TOKEN
@@ -34,11 +46,9 @@ async def get_ad_accounts(session: aiohttp.ClientSession):
     response = await fb_request(session, "get", url, params=params)
     return response.get("data", [])
 
-
 async def get_adset_insights_for_account(session: aiohttp.ClientSession, account_id: str, date_preset: str, status: str):
     url = f"https://graph.facebook.com/{API_VERSION}/act_{account_id}/insights"
     
-    # ИЗМЕНЕНИЕ: Формируем фильтр по статусу
     filtering = []
     if status in ['ACTIVE', 'PAUSED']:
         filtering.append({'field': 'adset.effective_status', 'operator': 'IN', 'value': [status]})
@@ -47,13 +57,13 @@ async def get_adset_insights_for_account(session: aiohttp.ClientSession, account
         "fields": "adset_id,adset_name,campaign_name,spend,actions,objective,cpm,ctr,inline_link_ctr,clicks,effective_status",
         "level": "adset",
         "date_preset": date_preset,
-        "filtering": json.dumps(filtering), # Передаем фильтр
+        "filtering": json.dumps(filtering),
         "limit": 500
     }
     response = await fb_request(session, "get", url, params=params)
     return response.get("data", [])
 
-# ... (POST эндпоинт для обновления статуса остается без изменений) ...
+# --- API Endpoints ---
 @app.post("/api/adsets/{adset_id}/update-status")
 async def update_adset_status(adset_id: str, payload: Dict = Body(...)):
     new_status = payload.get("status")
@@ -69,9 +79,10 @@ async def update_adset_status(adset_id: str, payload: Dict = Body(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/adsets")
-async def get_all_adsets(date_preset: str = Query("last_7d"), status: str = Query("ALL")): # ИЗМЕНЕНИЕ: Принимаем статус
-    # ... (код остается почти таким же, но передает 'status' в get_adset_insights_for_account) ...
-    if not META_TOKEN: raise HTTPException(status_code=500, detail="Token not configured")
+async def get_all_adsets(date_preset: str = Query("last_7d"), status: str = Query("ALL")):
+    if not META_TOKEN:
+        raise HTTPException(status_code=500, detail="Token not configured")
+
     all_adsets_data = []
     try:
         async with aiohttp.ClientSession() as session:
@@ -82,7 +93,8 @@ async def get_all_adsets(date_preset: str = Query("last_7d"), status: str = Quer
                 insights = await get_adset_insights_for_account(session, acc['account_id'], date_preset, status)
                 for adset in insights:
                     spend = float(adset.get("spend", 0))
-                    # Условие "spend == 0" убрано, т.к. Meta API уже фильтрует по активности
+                    
+                    if spend == 0 and date_preset == 'today': continue
                     
                     leads = sum(int(a["value"]) for a in adset.get("actions", []) if LEAD_ACTION_TYPE in a.get("action_type", ""))
                     purchases = sum(int(a["value"]) for a in adset.get("actions", []) if "purchase" in a.get("action_type", ""))
