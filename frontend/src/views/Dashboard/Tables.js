@@ -177,7 +177,7 @@ function Tables() {
               <Thead>
                 <Tr my='.8rem' ps='0px'>
                   <Th
-                    color="gray.400"
+                    color="black"
                     position="sticky"
                     left="0"
                     zIndex="1"
