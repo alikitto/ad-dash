@@ -8,6 +8,9 @@ function TablesTableRow(props) {
   const formatCurrency = (value) => (typeof value !== 'number' || !isFinite(value)) ? "$0.00" : `$${value.toFixed(2)}`;
   const formatPercentage = (value) => (typeof value !== 'number' || !isFinite(value)) ? "0.00%" : `${value.toFixed(2)}%`;
   const formatNumber = (value) => (typeof value !== 'number' || !isFinite(value)) ? "0" : value.toLocaleString('en-US');
+  
+  // THE CHANGE IS HERE: Calculate CTR (Link Click)
+  const ctrLinkClick = adset.impressions > 0 ? (adset.link_clicks / adset.impressions) * 100 : 0;
 
   return (
     <Tr>
@@ -28,7 +31,8 @@ function TablesTableRow(props) {
       <Td><Text fontSize="md" color={textColor}>{formatCurrency(adset.cpl)}</Text></Td>
       <Td><Text fontSize="md" color={textColor}>{formatCurrency(adset.cpm)}</Text></Td>
       <Td><Text fontSize="md" color={textColor}>{formatPercentage(adset.ctr_all)}</Text></Td>
-      <Td><Text fontSize="md" color={textColor}>{adset.clicks}</Text></Td>
+      <Td><Text fontSize="md" color={textColor}>{formatPercentage(ctrLinkClick)}</Text></Td>
+      <Td><Text fontSize="md" color={textColor}>{adset.link_clicks}</Text></Td>
       <Td>
         {isUpdating ? <Spinner size="sm" color="white" /> : 
           <Switch colorScheme="teal" isChecked={adset.status === "ACTIVE"} onChange={() => onStatusChange(adset.adset_id, adset.status === "ACTIVE" ? "PAUSED" : "ACTIVE")} />
