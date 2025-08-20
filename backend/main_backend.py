@@ -45,11 +45,9 @@ async def get_all_adsets_from_account(session: aiohttp.ClientSession, account_id
 
 async def get_insights_for_adsets(session: aiohttp.ClientSession, account_id: str, adset_ids: list, date_preset: str):
     url = f"https://graph.facebook.com/{API_VERSION}/act_{account_id}/insights"
-    
-    # ИСПРАВЛЕНИЕ: Используем надежный набор полей, убрав 'effective_status' из этого запроса
     params = {
         "level": "adset",
-        "fields": "adset_id,adset_name,campaign_name,objective,spend,actions,cpm,ctr,inline_link_ctr,clicks,impressions,frequency",
+        "fields": "adset_id,spend,actions,cpm,ctr,clicks,impressions,frequency,inline_link_clicks",
         "filtering": f'[{{"field":"adset.id","operator":"IN","value":{json.dumps(adset_ids)}}}]',
     }
     
