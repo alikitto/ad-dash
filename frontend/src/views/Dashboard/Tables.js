@@ -136,12 +136,13 @@ function Tables() {
               <Select value={objectiveFilter} onChange={(e) => setObjectiveFilter(e.target.value)} size="sm" borderRadius="md" borderColor="gray.600" color="white" sx={{ "> option": { background: "#0F1535" }}}>
                 {objectives.map(obj => <option key={obj} value={obj}>{obj === 'all' ? 'All Objectives' : obj}</option>)}
               </Select>
-              <Select value={datePreset} onChange={(e) => setDatePreset(e.target.value)} size="sm" borderRadius="md" borderColor="gray.600" color="white" sx={{ "> option": { background: "#0F1535" }}}>
-                <option value="today">Today</option>
-                <option value="yesterday">Yesterday</option>
-                <option value="last_7d">Last 7 Days</option>
-                <option value="last_30d">Last 30 Days</option>
-              </Select>
+            <Select value={datePreset} onChange={(e) => setDatePreset(e.target.value)} size="sm" borderRadius="md" borderColor="gray.600" color="white" sx={{ "> option": { background: "#0F1535" }}}>
+              <option value="today">Today</option>
+              <option value="yesterday">Yesterday</option>
+              <option value="last_7d">Last 7 Days</option>
+              <option value="last_30d">Last 30 Days</option>
+              <option value="maximum">Maximum</option> {/* <-- ДОБАВЬТЕ ЭТУ СТРОКУ */}
+</Select>
               <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} size="sm" borderRadius="md" borderColor="gray.600" color="white" sx={{ "> option": { background: "#0F1535" }}}>
                 <option value="ACTIVE">Active</option>
                 <option value="PAUSED">Paused</option>
