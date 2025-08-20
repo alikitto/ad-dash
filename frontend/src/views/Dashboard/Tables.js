@@ -11,10 +11,11 @@ function Tables() {
   const [error, setError] = useState(null);
 
   const fetchData = async () => {
+    setLoading(true);
     try {
-      const response = await fetch("https://YOUR-BACKEND-URL/api/active-campaigns");
+      const response = await fetch("https://ad-dash-backend-production.up.railway.app/api/active-campaigns"); // REPLACE WITH YOUR URL
       const data = await response.json();
-      if (data.error) throw new Error(data.error);
+      if (data.detail) throw new Error(data.detail);
       setCampaigns(data);
     } catch (e) {
       setError(e.message);
@@ -28,23 +29,28 @@ function Tables() {
   }, []);
 
   const handleStatusChange = async (campaignId, newStatus) => {
-    // Optimistically update UI
+    // Optimistically update UI for instant feedback
     setCampaigns(campaigns.map(c => c.campaign_id === campaignId ? { ...c, status: newStatus } : c));
     
     try {
-      await fetch(`https://ad-dash-backend-production.up.railway.app/api/campaigns/${campaignId}/update-status`, {
+      await fetch(`https://ad-dash-backend-production.up.railway.app/api/campaigns/${campaignId}/update-status`, { // REPLACE WITH YOUR URL
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ new_status: newStatus })
+        body: JSON.stringify({ status: newStatus })
       });
     } catch (e) {
-      // Revert UI on failure
+      // Revert UI on failure and show error
+      setError("Failed to update status. Please refresh.");
+      setTimeout(() => setError(null), 3000); // Clear error after 3 seconds
       fetchData(); 
     }
   };
 
   const renderTableBody = () => {
-    // ... (код для loading, error, empty state) ...
+    if (loading) return <Tr><Td colSpan="9" textAlign="center">Loading data...</Td></Tr>;
+    if (error) return <Tr><Td colSpan="9" textAlign="center">Error: {error}</Td></Tr>;
+    if (!campaigns.length) return <Tr><Td colSpan="9" textAlign="center">No campaigns with spend found in the last 7 days.</Td></Tr>;
+    
     return campaigns.map((campaign) => (
       <TablesTableRow
         key={campaign.campaign_id}
