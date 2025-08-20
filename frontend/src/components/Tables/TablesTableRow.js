@@ -23,19 +23,12 @@ function TablesTableRow(props) {
       <Td><Text fontSize="md" color={textColor}>{`${adset.leads} ${adset.cpa > 0 ? `(${formatCurrency(adset.cpa)})` : ''}`}</Text></Td>
       <Td><Text fontSize="md" color={textColor}>{formatCurrency(adset.cpl)}</Text></Td>
       <Td><Text fontSize="md" color={textColor}>{formatCurrency(adset.cpm)}</Text></Td>
-      <Td><Text fontSize="md" color={textColor}>{formatPercentage(adset.ctr_all)}</Text></Td>
-      <Td><Text fontSize="md" color={textColor}>{formatPercentage(adset.ctr_link_click)}</Text></Td>
+      <Td><Text fontSize="md" color={textColor}>{formatPercentage(adset.ctr)}</Text></Td>
       <Td><Text fontSize="md" color={textColor}>{adset.clicks}</Text></Td>
       <Td>
-        {isUpdating ? (
-          <Spinner size="sm" color="white" />
-        ) : (
-          <Switch
-            colorScheme="teal"
-            isChecked={adset.status === "ACTIVE"}
-            onChange={() => onStatusChange(adset.adset_id, adset.status === "ACTIVE" ? "PAUSED" : "ACTIVE")}
-          />
-        )}
+        {isUpdating ? <Spinner size="sm" color="white" /> : 
+          <Switch colorScheme="teal" isChecked={adset.status === "ACTIVE"} onChange={() => onStatusChange(adset.adset_id, adset.status === "ACTIVE" ? "PAUSED" : "ACTIVE")} />
+        }
       </Td>
     </Tr>
   );
