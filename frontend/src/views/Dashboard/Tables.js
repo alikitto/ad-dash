@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { Flex, Select, Table, Tbody, Td, Text, Th, Thead, Tr, useToast, HStack, Icon, IconButton } from "@chakra-ui/react";
+// --- THE FIX IS HERE ---
+import { Box, Flex, Select, Table, Tbody, Td, Text, Th, Thead, Tr, useToast, HStack, Icon, IconButton } from "@chakra-ui/react";
+// --- END OF FIX ---
 import { TriangleDownIcon, TriangleUpIcon, RepeatIcon } from "@chakra-ui/icons";
-import { FaSave } from "react-icons/fa"; 
+import { FaSave } from "react-icons/fa";
 import Card from "components/Card/Card.js";
 import CardHeader from "components/Card/CardHeader.js";
 import CardBody from "components/Card/CardBody.js";
 import TablesTableRow from "components/Tables/TablesTableRow";
 
-// Кастомный хук для сохранения состояния в localStorage
+// Custom hook to sync state with localStorage
 function useStickyState(defaultValue, key) {
   const [value, setValue] = useState(() => {
     try {
@@ -31,19 +33,17 @@ function Tables() {
   const [updatingId, setUpdatingId] = useState(null);
   const toast = useToast();
 
-  // Используем useStickyState для сохранения фильтров
   const [datePreset, setDatePreset] = useStickyState("last_7d", "datePreset");
   const [selectedAccount, setSelectedAccount] = useStickyState("all", "selectedAccount");
   const [statusFilter, setStatusFilter] = useStickyState("ACTIVE", "statusFilter");
   const [objectiveFilter, setObjectiveFilter] = useStickyState("all", "objectiveFilter");
   const [sortConfig, setSortConfig] = useStickyState({ key: 'spend', direction: 'descending' }, "sortConfig");
 
-  // Функция загрузки данных
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`https://ad-dash-backend-production.up.railway.app/api/adsets?date_preset=${datePreset}`); // ЗАМЕНИТЕ НА ВАШ URL
+      const response = await fetch(`https://ad-dash-backend-production.up.railway.app/api/adsets?date_preset=${datePreset}`); // REPLACE WITH YOUR URL
       const data = await response.json();
       if (data.detail) throw new Error(data.detail);
       setAllAdsets(data);
@@ -58,18 +58,17 @@ function Tables() {
     fetchData();
   }, [fetchData]);
 
-  // Функция смены статуса
   const handleStatusChange = async (adsetId, newStatus) => {
     setUpdatingId(adsetId);
     try {
-      const response = await fetch(`https://ad-dash-backend-production.up.railway.app/api/adsets/${adsetId}/update-status`, { // ЗАМЕНИТЕ НА ВАШ URL
+      const response = await fetch(`https://ad-dash-backend-production.up.railway.app/api/adsets/${adsetId}/update-status`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus })
       });
       if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.detail || "Failed to update status");
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "Failed to update status");
       }
       setAllAdsets(allAdsets.map(a => a.adset_id === adsetId ? { ...a, status: newStatus } : a));
       toast({ title: "Status updated successfully!", status: "success", duration: 2000, isClosable: true, position: "top" });
@@ -80,7 +79,6 @@ function Tables() {
     }
   };
 
-  // Логика фильтрации и сортировки на фронтенде
   const processedAdsets = useMemo(() => {
     let filtered = [...allAdsets];
     if (statusFilter !== "ALL") {
