@@ -1,4 +1,4 @@
-# --- main_backend.py (Final Corrected Version) ---
+# --- main_backend.py (Final Version with Impressions & Frequency) ---
 
 import os
 import asyncio
@@ -10,6 +10,7 @@ from fastapi import FastAPI, Body, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, List
 
+# --- Configuration ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 load_dotenv()
 META_TOKEN = os.getenv("META_ACCESS_TOKEN")
@@ -24,6 +25,7 @@ origins = [
 ]
 app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
+# --- Meta API Functions ---
 async def fb_request(session: aiohttp.ClientSession, method: str, url: str, params: dict = None, data: dict = None):
     if params is None: params = {}
     params["access_token"] = META_TOKEN
@@ -45,15 +47,18 @@ async def get_all_adsets_from_account(session: aiohttp.ClientSession, account_id
 
 async def get_insights_for_adsets(session: aiohttp.ClientSession, account_id: str, adset_ids: list, date_preset: str):
     url = f"https://graph.facebook.com/{API_VERSION}/act_{account_id}/insights"
+    # --- THE CHANGE IS HERE ---
     params = {
         "level": "adset",
-        "fields": "adset_id,spend,actions,cpm,ctr,clicks",
+        "fields": "adset_id,spend,actions,cpm,ctr,inline_link_ctr,clicks,impressions,frequency",
         "filtering": f'[{{"field":"adset.id","operator":"IN","value":{json.dumps(adset_ids)}}}]',
         "date_preset": date_preset,
     }
+    # --- END OF CHANGE ---
     response = await fb_request(session, "get", url, params=params)
     return response.get("data", [])
 
+# --- API Endpoints ---
 @app.get("/api/adsets")
 async def get_all_adsets_data(date_preset: str = Query("last_7d")):
     if not META_TOKEN: raise HTTPException(status_code=500, detail="Token not configured")
@@ -74,7 +79,7 @@ async def get_all_adsets_data(date_preset: str = Query("last_7d")):
 
                 for adset in adsets:
                     adset_insight = insights_map.get(adset['id'])
-                    if not adset_insight or float(adset_insight.get("spend", 0)) == 0: continue
+                    if not adset_insight: continue
 
                     spend = float(adset_insight.get("spend", 0))
                     leads = sum(int(a["value"]) for a in adset_insight.get("actions", []) if LEAD_ACTION_TYPE in a.get("action_type", ""))
@@ -93,7 +98,10 @@ async def get_all_adsets_data(date_preset: str = Query("last_7d")):
                         "spend": spend, "leads": leads, "cpl": cpl, "cpa": cpa,
                         "cpm": float(adset_insight.get("cpm", 0)),
                         "ctr_all": float(adset_insight.get("ctr", 0)),
+                        "ctr_link_click": float(adset_insight.get("inline_link_ctr", 0)),
                         "clicks": int(adset_insight.get("clicks", 0)),
+                        "impressions": int(adset_insight.get("impressions", 0)),
+                        "frequency": float(adset_insight.get("frequency", 0)),
                     })
         return all_data
     except Exception as e:
