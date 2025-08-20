@@ -7,6 +7,7 @@ function TablesTableRow(props) {
 
   const formatCurrency = (value) => (typeof value !== 'number' || !isFinite(value)) ? "$0.00" : `$${value.toFixed(2)}`;
   const formatPercentage = (value) => (typeof value !== 'number' || !isFinite(value)) ? "0.00%" : `${value.toFixed(2)}%`;
+  const formatNumber = (value) => (typeof value !== 'number' || !isFinite(value)) ? "0" : value.toLocaleString('en-US');
 
   return (
     <Tr>
@@ -21,10 +22,13 @@ function TablesTableRow(props) {
       </Td>
       <Td><Text fontSize="md" color={textColor}>{adset.objective}</Text></Td>
       <Td><Text fontSize="md" color={textColor}>{formatCurrency(adset.spend)}</Text></Td>
+      <Td><Text fontSize="md" color={textColor}>{formatNumber(adset.impressions)}</Text></Td>
+      <Td><Text fontSize="md" color={textColor}>{formatNumber(adset.frequency)}</Text></Td>
       <Td><Text fontSize="md" color={textColor}>{`${adset.leads} ${adset.cpa > 0 ? `(${formatCurrency(adset.cpa)})` : ''}`}</Text></Td>
       <Td><Text fontSize="md" color={textColor}>{formatCurrency(adset.cpl)}</Text></Td>
       <Td><Text fontSize="md" color={textColor}>{formatCurrency(adset.cpm)}</Text></Td>
       <Td><Text fontSize="md" color={textColor}>{formatPercentage(adset.ctr_all)}</Text></Td>
+      <Td><Text fontSize="md" color={textColor}>{formatPercentage(adset.ctr_link_click)}</Text></Td>
       <Td><Text fontSize="md" color={textColor}>{adset.clicks}</Text></Td>
       <Td>
         {isUpdating ? <Spinner size="sm" color="white" /> : 
