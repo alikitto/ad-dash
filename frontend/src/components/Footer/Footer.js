@@ -46,12 +46,12 @@ export default function Footer(props) {
         <Text as='span'>
           {document.documentElement.dir === "rtl"
             ? " مصنوع من ❤️ بواسطة"
-            : "Made with ❤️ by "}
+            : "Made by Alasgarov Aliakbar"}
         </Text>
         <Link href='https://www.simmmple.com' target='_blank'>
           {document.documentElement.dir === "rtl"
             ? " توقيت الإبداعية"
-            : "Simmmple "}
+            : ""}
         </Link>
         &
         <Link href='https://www.creative-tim.com' target='_blank'>
@@ -59,7 +59,7 @@ export default function Footer(props) {
         </Link>
         {document.documentElement.dir === "rtl"
           ? "للحصول على ويب أفضل"
-          : " for a better web"}
+          : " "}
       </Text>
       <List display='flex'>
         <ListItem
@@ -70,7 +70,7 @@ export default function Footer(props) {
           <Link color='white' fontSize='sm' href='https://www.simmmple.com'>
             {document.documentElement.dir === "rtl"
               ? "توقيت الإبداعية"
-              : "Simmmple"}
+              : ""}
           </Link>
         </ListItem>
         <ListItem
