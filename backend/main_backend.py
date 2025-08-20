@@ -1,32 +1,41 @@
-# --- main_backend.py (Финальная версия с разделением запросов) ---
+# --- main_backend.py (Final Corrected Version) ---
 
 import os
 import asyncio
 import aiohttp
 import logging
 from dotenv import load_dotenv
-from fastapi import FastAPI, Body, HTTPException, Query
+from fastapi import FastAPI, Body, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from typing import Dict
+from typing import Dict, List
 
+# --- Configuration ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 load_dotenv()
 META_TOKEN = os.getenv("META_ACCESS_TOKEN")
 API_VERSION = "v19.0"
 LEAD_ACTION_TYPE = "onsite_conversion.messaging_conversation_started_7d"
-client_avatars = {} # Добавьте сюда ваши аватарки
 
 app = FastAPI()
 
+# --- CORS Configuration ---
 origins = [
-    "https://ad-dash-frontend-production.up.railway.app", # ЗАМЕНИТЕ НА ВАШ URL
+    "https://ad-dash-frontend-production.up.railway.app", # REPLACE WITH YOUR FRONTEND URL
     "http://localhost:3000",
 ]
-app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
+# --- Meta API Functions ---
 async def fb_request(session: aiohttp.ClientSession, method: str, url: str, params: dict = None, data: dict = None):
     if params is None: params = {}
     params["access_token"] = META_TOKEN
+    
     async with session.request(method, url, params=params, json=data) as response:
         response.raise_for_status()
         return await response.json()
@@ -45,23 +54,30 @@ async def get_all_adsets_from_account(session: aiohttp.ClientSession, account_id
 
 async def get_insights_for_adsets(session: aiohttp.ClientSession, account_id: str, adset_ids: list):
     url = f"https://graph.facebook.com/{API_VERSION}/act_{account_id}/insights"
+    # --- THE FIX IS HERE ---
+    # Removed problematic fields. This is a reliable set of fields.
     params = {
         "level": "adset",
-        "fields": "adset_id,spend,actions,cpm,ctr,inline_link_ctr,clicks",
+        "fields": "adset_id,spend,actions,cpm,ctr,clicks",
         "filtering": f'[{{"field":"adset.id","operator":"IN","value":{adset_ids}}}]',
         "date_preset": "last_7d",
     }
+    # --- END OF FIX ---
     response = await fb_request(session, "get", url, params=params)
     return response.get("data", [])
 
+# --- API Endpoints ---
 @app.get("/api/adsets")
 async def get_all_adsets_data():
-    if not META_TOKEN: raise HTTPException(status_code=500, detail="Token not configured")
+    if not META_TOKEN:
+        raise HTTPException(status_code=500, detail="Token not configured")
 
     all_data = []
     try:
         async with aiohttp.ClientSession() as session:
             accounts = await get_ad_accounts(session)
+            if not accounts: return []
+
             for acc in accounts:
                 adsets = await get_all_adsets_from_account(session, acc['account_id'])
                 if not adsets: continue
@@ -72,7 +88,8 @@ async def get_all_adsets_data():
 
                 for adset in adsets:
                     adset_insight = insights_map.get(adset['id'])
-                    if not adset_insight or float(adset_insight.get("spend", 0)) == 0: continue
+                    if not adset_insight or float(adset_insight.get("spend", 0)) == 0:
+                        continue
 
                     spend = float(adset_insight.get("spend", 0))
                     leads = sum(int(a["value"]) for a in adset_insight.get("actions", []) if LEAD_ACTION_TYPE in a.get("action_type", ""))
@@ -82,15 +99,16 @@ async def get_all_adsets_data():
 
                     all_data.append({
                         "account_name": acc['name'],
-                        "avatarUrl": client_avatars.get(acc['account_id'].replace('act_', ''), ""),
                         "adset_id": adset['id'],
                         "adset_name": adset['name'],
                         "campaign_name": adset.get('campaign', {}).get('name'),
                         "status": adset['effective_status'],
-                        "spend": spend, "leads": leads, "cpl": cpl, "cpa": cpa,
+                        "spend": spend,
+                        "leads": leads,
+                        "cpl": cpl,
+                        "cpa": cpa,
                         "cpm": float(adset_insight.get("cpm", 0)),
-                        "ctr_all": float(adset_insight.get("ctr", 0)),
-                        "ctr_link_click": float(adset_insight.get("inline_link_ctr", 0)),
+                        "ctr": float(adset_insight.get("ctr", 0)),
                         "clicks": int(adset_insight.get("clicks", 0)),
                     })
         return all_data
@@ -99,7 +117,6 @@ async def get_all_adsets_data():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/adsets/{adset_id}/update-status")
-# ... (этот эндпоинт остается без изменений) ...
 async def update_adset_status(adset_id: str, payload: Dict = Body(...)):
     new_status = payload.get("status")
     if new_status not in ["ACTIVE", "PAUSED"]:
