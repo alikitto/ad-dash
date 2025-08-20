@@ -1,55 +1,30 @@
-# --- main_backend.py (Версия 5.0 с базой данных) ---
+# --- main_backend.py (Final Corrected Version) ---
+
 import os
 import asyncio
 import aiohttp
 import json
-import logging 
+import logging
+from datetime import datetime
 from dotenv import load_dotenv
-from fastapi import FastAPI, Body, HTTPException, Query, Depends
+from fastapi import FastAPI, Body, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from typing import Dict, List, Optional
+from typing import Dict, List
 
-# --- НОВЫЕ ИМПОРТЫ ДЛЯ БАЗЫ ДАННЫХ ---
-from sqlalchemy import create_engine, Column, Integer, String
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, Session
-
-# --- Конфигурация ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 load_dotenv()
 META_TOKEN = os.getenv("META_ACCESS_TOKEN")
-DATABASE_URL = os.getenv("DATABASE_URL") # Railway добавит эту переменную автоматически
 API_VERSION = "v19.0"
-
-# --- НАСТРОЙКА БАЗЫ ДАННЫХ ---
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
-
-# --- Модель таблицы для аватарок ---
-class AvatarSetting(Base):
-    __tablename__ = "avatar_settings"
-    id = Column(Integer, primary_key=True, index=True)
-    account_id = Column(String, unique=True, index=True, nullable=False)
-    image_url = Column(String, nullable=False)
-
-# Создаем таблицу при запуске приложения, если ее нет
-Base.metadata.create_all(bind=engine)
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+LEAD_ACTION_TYPE = "onsite_conversion.messaging_conversation_started_7d"
+client_avatars = {}
 
 app = FastAPI()
-# ... (CORS middleware остается без изменений) ...
-origins = ["https://ad-dash-frontend-production.up.railway.app", "http://localhost:3000"] # ЗАМЕНИТЕ НА ВАШ URL
+origins = [
+    "https://ad-dash-frontend-production.up.railway.app", # REPLACE WITH YOUR FRONTEND URL
+    "http://localhost:3000",
+]
 app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
-
-# ... (fb_request, get_ad_accounts, и другие функции для Meta API остаются без изменений) ...
 async def fb_request(session: aiohttp.ClientSession, method: str, url: str, params: dict = None, data: dict = None):
     if params is None: params = {}
     params["access_token"] = META_TOKEN
@@ -63,76 +38,81 @@ async def get_ad_accounts(session: aiohttp.ClientSession):
     response = await fb_request(session, "get", url, params=params)
     return response.get("data", [])
 
-async def get_adset_insights_for_account(session: aiohttp.ClientSession, account_id: str, date_preset: str):
-    # ... (код этой функции без изменений) ...
-    url = f"https://graph.facebook.com/{API_VERSION}/act_{account_id}/insights"
-    params = {"fields": "adset_id,adset_name,campaign_name,objective,spend,actions,cpm,ctr,inline_link_ctr,clicks,impressions,frequency,effective_status", "level": "adset", "limit": 500}
-    if date_preset != 'maximum': params['date_preset'] = date_preset
+async def get_all_adsets_from_account(session: aiohttp.ClientSession, account_id: str):
+    url = f"https://graph.facebook.com/{API_VERSION}/act_{account_id}/adsets"
+    params = {"fields": "id,name,campaign{name,objective},effective_status", "limit": 500}
     response = await fb_request(session, "get", url, params=params)
     return response.get("data", [])
 
-# --- НОВЫЕ ЭНДПОИНТЫ ДЛЯ НАСТРОЕК ---
-@app.get("/api/settings/avatars")
-def get_avatars(db: Session = Depends(get_db)):
-    avatars = db.query(AvatarSetting).all()
-    return {avatar.account_id: avatar.image_url for avatar in avatars}
+async def get_insights_for_adsets(session: aiohttp.ClientSession, account_id: str, adset_ids: list, date_preset: str):
+    url = f"https://graph.facebook.com/{API_VERSION}/act_{account_id}/insights"
+    # --- THE FIX IS HERE ---
+    params = {
+        "level": "adset",
+        "fields": "adset_id,spend,actions,cpm,ctr,clicks,impressions,frequency",
+        "filtering": f'[{{"field":"adset.id","operator":"IN","value":{json.dumps(adset_ids)}}}]',
+        "date_preset": date_preset,
+    }
+    # --- END OF FIX ---
+    response = await fb_request(session, "get", url, params=params)
+    return response.get("data", [])
 
-@app.post("/api/settings/avatars")
-def save_avatar(payload: Dict = Body(...), db: Session = Depends(get_db)):
-    account_id = payload.get("accountId")
-    image_url = payload.get("imageUrl")
-    if not account_id or not image_url:
-        raise HTTPException(status_code=400, detail="accountId and imageUrl are required")
-
-    # Проверяем, есть ли уже настройка для этого ID
-    db_avatar = db.query(AvatarSetting).filter(AvatarSetting.account_id == account_id).first()
-    if db_avatar:
-        db_avatar.image_url = image_url
-    else:
-        db_avatar = AvatarSetting(account_id=account_id, image_url=image_url)
-        db.add(db_avatar)
-
-    db.commit()
-    db.refresh(db_avatar)
-    return {"status": "success", "account_id": db_avatar.account_id, "image_url": db_avatar.image_url}
-
-# --- Основной эндпоинт для данных ---
 @app.get("/api/adsets")
-async def get_all_adsets_data(date_preset: str = Query("last_7d"), db: Session = Depends(get_db)):
-    client_avatars = {avatar.account_id: avatar.image_url for avatar in db.query(AvatarSetting).all()}
-    # ... (остальной код эндпоинта остается без изменений, но теперь он берет аватарки из client_avatars) ...
+async def get_all_adsets_data(date_preset: str = Query("last_7d")):
     if not META_TOKEN: raise HTTPException(status_code=500, detail="Token not configured")
-    all_adsets_data = []
+
+    all_data = []
     try:
         async with aiohttp.ClientSession() as session:
             accounts = await get_ad_accounts(session)
             if not accounts: return []
 
             for acc in accounts:
-                insights = await get_adset_insights_for_account(session, acc['account_id'], date_preset)
-                for adset in insights:
-                    # ... (вся логика обработки данных) ...
-                    spend = float(adset.get("spend", 0))
-                    leads = sum(int(a["value"]) for a in adset.get("actions", []) if LEAD_ACTION_TYPE in a.get("action_type", ""))
-                    purchases = sum(int(a["value"]) for a in adset.get("actions", []) if "purchase" in a.get("action_type", ""))
+                adsets = await get_all_adsets_from_account(session, acc['account_id'])
+                if not adsets: continue
+
+                adset_ids = [adset['id'] for adset in adsets]
+                insights = await get_insights_for_adsets(session, acc['account_id'], adset_ids, date_preset)
+                insights_map = {item['adset_id']: item for item in insights}
+
+                for adset in adsets:
+                    adset_insight = insights_map.get(adset['id'])
+                    if not adset_insight: continue
+
+                    spend = float(adset_insight.get("spend", 0))
+                    leads = sum(int(a["value"]) for a in adset_insight.get("actions", []) if LEAD_ACTION_TYPE in a.get("action_type", ""))
+                    purchases = sum(int(a["value"]) for a in adset_insight.get("actions", []) if "purchase" in a.get("action_type", ""))
                     cpl = (spend / leads) if leads > 0 else 0
                     cpa = (spend / purchases) if purchases > 0 else 0
-                    all_adsets_data.append({
+
+                    all_data.append({
                         "account_name": acc['name'],
                         "avatarUrl": client_avatars.get(acc['account_id'].replace('act_', ''), ""),
-                        "adset_id": adset.get('adset_id'),
-                        "adset_name": adset.get('adset_name'),
-                        "campaign_name": adset.get('campaign_name'),
-                        "status": adset.get('effective_status'),
+                        "adset_id": adset['id'],
+                        "adset_name": adset['name'],
+                        "campaign_name": adset.get('campaign', {}).get('name'),
+                        "status": adset['effective_status'],
                         "objective": adset.get("objective", "N/A"),
                         "spend": spend, "leads": leads, "cpl": cpl, "cpa": cpa,
-                        "cpm": float(adset.get("cpm", 0)),
-                        "ctr_all": float(adset.get("ctr", 0)),
-                        "ctr_link_click": float(adset.get("inline_link_ctr", 0)),
-                        "clicks": int(adset.get("clicks", 0)),
-                        "impressions": int(adset.get("impressions", 0)),
-                        "frequency": float(adset.get("frequency", 0)),
+                        "cpm": float(adset_insight.get("cpm", 0)),
+                        "ctr_all": float(adset_insight.get("ctr", 0)),
+                        "clicks": int(adset_insight.get("clicks", 0)),
+                        "impressions": int(adset_insight.get("impressions", 0)),
+                        "frequency": float(adset_insight.get("frequency", 0)),
                     })
-        return all_adsets_data
+        return all_data
+    except Exception as e:
+        logging.error(f"!!! API ERROR: {e} !!!", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/adsets/{adset_id}/update-status")
+async def update_adset_status(adset_id: str, payload: Dict = Body(...)):
+    new_status = payload.get("status")
+    if new_status not in ["ACTIVE", "PAUSED"]: raise HTTPException(status_code=400, detail="Invalid status")
+    url = f"https://graph.facebook.com/{API_VERSION}/{adset_id}"
+    data = {"status": new_status}
+    try:
+        async with aiohttp.ClientSession() as session:
+            return await fb_request(session, "post", url, data=data)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
