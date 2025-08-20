@@ -1,5 +1,3 @@
-// --- Файл: frontend/src/views/Dashboard/Tables.js ---
-
 import React, { useState, useEffect } from "react";
 import { Flex, Table, Tbody, Td, Text, Th, Thead, Tr } from "@chakra-ui/react";
 import Card from "components/Card/Card.js";
@@ -12,103 +10,76 @@ function Tables() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    async function fetchCampaigns() {
-      try {
-        // УБЕДИТЕСЬ, ЧТО ЗДЕСЬ ВАШ ПРАВИЛЬНЫЙ URL БЭКЕНДА
-        const response = await fetch("https://ad-dash-backend-production.up.railway.app/api/active-campaigns"); // <-- ЗАМЕНИТЕ НА ВАШ URL
-        const data = await response.json();
-        
-        // Проверяем, не вернул ли бэкенд объект с ошибкой
-        if (data.error) {
-          throw new Error(data.error);
-        }
-
-        setCampaigns(data);
-      } catch (e) {
-        setError(e.message);
-      } finally {
-        setLoading(false);
-      }
+  const fetchData = async () => {
+    try {
+      const response = await fetch("https://YOUR-BACKEND-URL/api/active-campaigns");
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+      setCampaigns(data);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
     }
-
-    fetchCampaigns();
+  };
+  
+  useEffect(() => {
+    fetchData();
   }, []);
 
-  const renderTableBody = () => {
-    if (loading) {
-      return (
-        <Tr>
-          <Td colSpan="6" textAlign="center">Загрузка данных...</Td>
-        </Tr>
-      );
-    }
+  const handleStatusChange = async (campaignId, newStatus) => {
+    // Optimistically update UI
+    setCampaigns(campaigns.map(c => c.campaign_id === campaignId ? { ...c, status: newStatus } : c));
     
-    if (error) {
-      return (
-        <Tr>
-          <Td colSpan="6" textAlign="center">Ошибка загрузки: {error}</Td>
-        </Tr>
-      );
+    try {
+      await fetch(`https://YOUR-BACKEND-URL/api/campaigns/${campaignId}/update-status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ new_status: newStatus })
+      });
+    } catch (e) {
+      // Revert UI on failure
+      fetchData(); 
     }
-    
-    if (!Array.isArray(campaigns) || campaigns.length === 0) {
-        return (
-            <Tr>
-                <Td colSpan="6" textAlign="center">Активные кампании не найдены.</Td>
-            </Tr>
-        )
-    }
+  };
 
-    // Используем TablesTableRow и передаем в него данные в правильные поля
-    return campaigns.map((campaign, index) => (
+  const renderTableBody = () => {
+    // ... (код для loading, error, empty state) ...
+    return campaigns.map((campaign) => (
       <TablesTableRow
-        key={campaign.campaign_id || index} // Используем ID кампании для ключа, если он есть
-        name={campaign.campaign_name}
-        email={campaign.account_name}
-        domain={campaign.objective} // "domain" теперь используется для Цели
-        status={campaign.status}
-        date={`$${campaign.spend.toFixed(2)} / ${campaign.leads} / $${campaign.cpl.toFixed(2)}`} // "date" для метрик
-        logo={''} // Оставляем лого пустым, можно будет добавить позже
+        key={campaign.campaign_id}
+        campaign={campaign}
+        onStatusChange={handleStatusChange}
       />
     ));
   };
-
+  
   return (
     <Flex direction='column' pt={{ base: "120px", md: "75px" }}>
       <Card overflowX={{ sm: "scroll", xl: "hidden" }} pb='0px'>
         <CardHeader p='6px 0px 22px 0px'>
-          <Text fontSize='lg' color='#fff' fontWeight='bold'>
-            Active Campaigns Table
-          </Text>
+          <Text fontSize='lg' color='#fff' fontWeight='bold'>Active Campaigns</Text>
         </CardHeader>
         <CardBody>
           <Table variant='simple' color='#fff'>
             <Thead>
               <Tr my='.8rem' ps='0px' color='gray.400'>
-                <Th ps='0px' color='gray.400' fontFamily='Plus Jakarta Display' borderBottomColor='#56577A'>
-                  Кампания / Кабинет
-                </Th>
-                <Th color='gray.400' fontFamily='Plus Jakarta Display' borderBottomColor='#56577A'>
-                  Цель
-                </Th>
-                <Th color='gray.400' fontFamily='Plus Jakarta Display' borderBottomColor='#56577A'>
-                  Статус
-                </Th>
-                <Th color='gray.400' fontFamily='Plus Jakarta Display' borderBottomColor='#56577A'>
-                  Расход / Лиды / CPL
-                </Th>
-                <Th borderBottomColor='#56577A'></Th>
+                <Th>Campaign / Client</Th>
+                <Th>Spent</Th>
+                <Th>Leads (CPA)</Th>
+                <Th>CPL</Th>
+                <Th>CPM</Th>
+                <Th>CTR (All)</Th>
+                <Th>CTR (Link Click)</Th>
+                <Th>Clicks</Th>
+                <Th>Status</Th>
               </Tr>
             </Thead>
-            <Tbody>
-              {renderTableBody()}
-            </Tbody>
+            <Tbody>{renderTableBody()}</Tbody>
           </Table>
         </CardBody>
       </Card>
     </Flex>
   );
 }
-
 export default Tables;
