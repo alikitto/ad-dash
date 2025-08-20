@@ -5,7 +5,7 @@ function TablesTableRow(props) {
   const { adset, onStatusChange, isUpdating } = props;
   const textColor = useColorModeValue("white", "white");
   // ИЗМЕНЕНИЕ: Устанавливаем правильный темно-синий фон для "замороженной" ячейки
-  const stickyBg = useColorModeValue("#1A202C", "#1A202C"); // Правильный темный фон карточки
+  const stickyBg = useColorModeValue("#d6e7ff", "#1A202C"); // Правильный темный фон карточки
 
   // ... (все функции форматирования остаются без изменений) ...
   const formatCurrency = (value) => (typeof value !== 'number' || !isFinite(value)) ? "$0.00" : `$${value.toFixed(2)}`;
