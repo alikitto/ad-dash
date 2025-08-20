@@ -4,14 +4,15 @@ import { Avatar, Flex, Td, Text, Tr, Switch, useColorModeValue, Spinner } from "
 function TablesTableRow(props) {
   const { adset, onStatusChange, isUpdating } = props;
   const textColor = useColorModeValue("white", "white");
-  // ИЗМЕНЕНИЕ: Определяем цвет фона для "замороженной" ячейки, чтобы он совпадал с фоном карточки
-  const stickyBg = useColorModeValue("white", "#1A202C");
+  // ИЗМЕНЕНИЕ: Устанавливаем правильный темно-синий фон для "замороженной" ячейки
+  const stickyBg = useColorModeValue("white", "#0F1535"); // Цвет фона карточки
 
+  // ... (все функции форматирования остаются без изменений) ...
   const formatCurrency = (value) => (typeof value !== 'number' || !isFinite(value)) ? "$0.00" : `$${value.toFixed(2)}`;
   const formatPercentage = (value) => (typeof value !== 'number' || !isFinite(value)) ? "0.00%" : `${value.toFixed(2)}%`;
   const formatNumber = (value) => (typeof value !== 'number' || !isFinite(value)) ? "0" : value.toLocaleString('en-US');
-  
   const ctrLinkClick = adset.impressions > 0 ? (adset.link_clicks / adset.impressions) * 100 : 0;
+
 
   return (
     <Tr>
@@ -19,12 +20,10 @@ function TablesTableRow(props) {
       <Td
         minWidth={{ sm: "250px" }}
         pl="0px"
-        // --- ИЗМЕНЕНИЕ ЗДЕСЬ ---
         position="sticky"
         left="0"
         zIndex="1"
-        bg={stickyBg} // Устанавливаем фон, чтобы другие ячейки не "просвечивали" при скролле
-        // --- КОНЕЦ ИЗМЕНЕНИЯ ---
+        bg={stickyBg} // Используем правильный фон
       >
         <Flex align="center" py=".8rem" minWidth="100%" flexWrap="nowrap">
           <Avatar src={adset.avatarUrl} w="50px" borderRadius="12px" me="18px" />
@@ -34,9 +33,8 @@ function TablesTableRow(props) {
           </Flex>
         </Flex>
       </Td>
-      {/* Objective */}
+      {/* ... (остальные ячейки <Td> остаются без изменений) ... */}
       <Td><Text fontSize="md" color={textColor}>{adset.objective}</Text></Td>
-      {/* Metrics */}
       <Td><Text fontSize="md" color={textColor}>{formatCurrency(adset.spend)}</Text></Td>
       <Td><Text fontSize="md" color={textColor}>{formatNumber(adset.impressions)}</Text></Td>
       <Td><Text fontSize="md" color={textColor}>{adset.frequency.toFixed(2)}</Text></Td>
@@ -46,7 +44,6 @@ function TablesTableRow(props) {
       <Td><Text fontSize="md" color={textColor}>{formatPercentage(adset.ctr_all)}</Text></Td>
       <Td><Text fontSize="md" color={textColor}>{formatPercentage(ctrLinkClick)}</Text></Td>
       <Td><Text fontSize="md" color={textColor}>{formatNumber(adset.link_clicks)}</Text></Td>
-      {/* Status Switch */}
       <Td>
         {isUpdating ? <Spinner size="sm" color="white" /> : 
           <Switch colorScheme="teal" isChecked={adset.status === "ACTIVE"} onChange={() => onStatusChange(adset.adset_id, adset.status === "ACTIVE" ? "PAUSED" : "ACTIVE")} />
