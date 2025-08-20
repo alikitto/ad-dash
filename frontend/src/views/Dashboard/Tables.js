@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Flex, Select, Table, Tbody, Td, Text, Th, Thead, Tr, useToast, HStack, Icon } from "@chakra-ui/react";
-import { TriangleDownIcon, TriangleUpIcon } from "@chakra-ui/icons";
+import { Flex, Select, Table, Tbody, Td, Text, Th, Thead, Tr, useToast, HStack } from "@chakra-ui/react";
 import Card from "components/Card/Card.js";
 import CardHeader from "components/Card/CardHeader.js";
 import CardBody from "components/Card/CardBody.js";
@@ -12,11 +11,8 @@ function Tables() {
   const [error, setError] = useState(null);
   const [updatingId, setUpdatingId] = useState(null);
   const toast = useToast();
-
   const [datePreset, setDatePreset] = useState("last_7d");
   const [selectedAccount, setSelectedAccount] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("ACTIVE");
-  const [objectiveFilter, setObjectiveFilter] = useState("all");
   const [sortConfig, setSortConfig] = useState({ key: 'spend', direction: 'descending' });
 
   useEffect(() => {
@@ -24,7 +20,7 @@ function Tables() {
       setLoading(true);
       setError(null);
       try {
-        const response = await fetch(`https://ad-dash-backend-production.up.railway.app/api/adsets?date_preset=${datePreset}&status=${statusFilter}`); // ЗАМЕНИТЕ НА ВАШ URL
+        const response = await fetch(`https://ad-dash-backend-production.up.railway.app/api/adsets?date_preset=${datePreset}`); // REPLACE WITH YOUR URL
         const data = await response.json();
         if (data.detail) throw new Error(data.detail);
         setAllAdsets(data);
@@ -32,12 +28,12 @@ function Tables() {
       finally { setLoading(false); }
     };
     fetchData();
-  }, [datePreset, statusFilter]);
+  }, [datePreset]);
 
   const handleStatusChange = async (adsetId, newStatus) => {
     setUpdatingId(adsetId);
     try {
-      const response = await fetch(`https://ad-dash-backend-production.up.railway.app/api/adsets/${adsetId}/update-status`, { // ЗАМЕНИТЕ НА ВАШ URL
+      const response = await fetch(`https://ad-dash-backend-production.up.railway.app/api/adsets/${adsetId}/update-status`, { // REPLACE WITH YOUR URL
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus })
@@ -47,9 +43,9 @@ function Tables() {
           throw new Error(errorData.detail || "Failed to update status");
       }
       setAllAdsets(allAdsets.map(a => a.adset_id === adsetId ? { ...a, status: newStatus } : a));
-      toast({ title: "Status updated successfully!", status: "success", duration: 2000, isClosable: true, position: "top" });
+      toast({ title: "Status updated successfully!", status: "success", duration: 2000, isClosable: true });
     } catch (e) {
-      toast({ title: "Error updating status.", description: e.message, status: "error", duration: 3000, isClosable: true, position: "top" });
+      toast({ title: "Error updating status.", description: e.message, status: "error", duration: 3000, isClosable: true });
     } finally {
       setUpdatingId(null);
     }
@@ -60,20 +56,15 @@ function Tables() {
     if (selectedAccount !== "all") {
       filtered = filtered.filter(adset => adset.account_name === selectedAccount);
     }
-    if (objectiveFilter !== "all") {
-        filtered = filtered.filter(adset => adset.objective === objectiveFilter);
-    }
     filtered.sort((a, b) => {
       if (a[sortConfig.key] < b[sortConfig.key]) return sortConfig.direction === 'ascending' ? -1 : 1;
       if (a[sortConfig.key] > b[sortConfig.key]) return sortConfig.direction === 'ascending' ? 1 : -1;
       return 0;
     });
     return filtered;
-  }, [allAdsets, selectedAccount, objectiveFilter, sortConfig]);
+  }, [allAdsets, selectedAccount, sortConfig]);
 
   const accounts = useMemo(() => ['all', ...new Set(allAdsets.map(a => a.account_name))], [allAdsets]);
-  const objectives = useMemo(() => ['all', ...new Set(allAdsets.map(a => a.objective))], [allAdsets]);
-
   const requestSort = (key) => {
     let direction = 'ascending';
     if (sortConfig.key === key && sortConfig.direction === 'ascending') {
@@ -82,21 +73,10 @@ function Tables() {
     setSortConfig({ key, direction });
   };
   
-  const SortableTh = ({ children, sortKey }) => (
-    <Th cursor="pointer" onClick={() => requestSort(sortKey)}>
-      <Flex align="center">
-        {children}
-        {sortConfig.key === sortKey && (
-          <Icon as={sortConfig.direction === 'ascending' ? TriangleUpIcon : TriangleDownIcon} w={3} h={3} ml={2} />
-        )}
-      </Flex>
-    </Th>
-  );
-
   const renderTableBody = () => {
-    if (loading) return <Tr><Td colSpan="10" textAlign="center">Loading ad sets...</Td></Tr>;
-    if (error) return <Tr><Td colSpan="10" textAlign="center">Error: {error}</Td></Tr>;
-    if (!processedAdsets.length) return <Tr><Td colSpan="10" textAlign="center">No ad sets found matching your criteria.</Td></Tr>;
+    if (loading) return <Tr><Td colSpan="8" textAlign="center">Loading ad sets...</Td></Tr>;
+    if (error) return <Tr><Td colSpan="8" textAlign="center">Error: {error}</Td></Tr>;
+    if (!processedAdsets.length) return <Tr><Td colSpan="8" textAlign="center">No ad sets found matching your criteria.</Td></Tr>;
     
     return processedAdsets.map((adset) => (
       <TablesTableRow key={adset.adset_id} adset={adset} onStatusChange={handleStatusChange} isUpdating={updatingId === adset.adset_id} />
@@ -106,26 +86,18 @@ function Tables() {
   return (
     <Flex direction='column' pt={{ base: "120px", md: "75px" }}>
       <Card>
-        <CardHeader>
-          <Flex direction="column">
-            <Text fontSize='xl' color='#fff' fontWeight='bold'>Active Ad Sets</Text>
-            <HStack mt="20px" spacing={4}>
-              <Select value={selectedAccount} onChange={(e) => setSelectedAccount(e.target.value)} size="sm" borderRadius="md"  borderColor="gray.600" color="white" sx={{ "> option": { background: "#0F1535" }}}>
-                {accounts.map(acc => <option key={acc} value={acc}>{acc === 'all' ? 'All Accounts' : acc}</option>)}
+        <CardHeader p='6px 0px 22px 0px'>
+          <Flex justify="space-between" align="center" direction={{ base: "column", md: "row" }}>
+            <Text fontSize='xl' color='#fff' fontWeight='bold' mb={{ base: "10px", md: "0" }}>Active Ad Sets</Text>
+            <HStack>
+              <Select value={selectedAccount} onChange={(e) => setSelectedAccount(e.target.value)} size="sm" borderRadius="md" bg="#0F1535" borderColor="gray.600">
+                {accounts.map(acc => <option key={acc} value={acc} style={{backgroundColor: "#0F1535"}}>{acc === 'all' ? 'All Accounts' : acc}</option>)}
               </Select>
-              <Select value={objectiveFilter} onChange={(e) => setObjectiveFilter(e.target.value)} size="sm" borderRadius="md" borderColor="gray.600" color="white" sx={{ "> option": { background: "#0F1535" }}}>
-                {objectives.map(obj => <option key={obj} value={obj}>{obj === 'all' ? 'All Objectives' : obj}</option>)}
-              </Select>
-              <Select value={datePreset} onChange={(e) => setDatePreset(e.target.value)} size="sm" borderRadius="md" borderColor="gray.600" color="white" sx={{ "> option": { background: "#0F1535" }}}>
-                <option value="today">Today</option>
-                <option value="yesterday">Yesterday</option>
-                <option value="last_7d">Last 7 Days</option>
-                <option value="last_30d">Last 30 Days</option>
-              </Select>
-              <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} size="sm" borderRadius="md" borderColor="gray.600" color="white" sx={{ "> option": { background: "#0F1535" }}}>
-                <option value="ACTIVE">Active</option>
-                <option value="PAUSED">Paused</option>
-                <option value="ALL">All</option>
+              <Select value={datePreset} onChange={(e) => setDatePreset(e.target.value)} size="sm" borderRadius="md" bg="#0F1535" borderColor="gray.600">
+                <option value="today" style={{backgroundColor: "#0F1535"}}>Today</option>
+                <option value="yesterday" style={{backgroundColor: "#0F1535"}}>Yesterday</option>
+                <option value="last_7d" style={{backgroundColor: "#0F1535"}}>Last 7 Days</option>
+                <option value="last_30d" style={{backgroundColor: "#0F1535"}}>Last 30 Days</option>
               </Select>
             </HStack>
           </Flex>
@@ -135,13 +107,11 @@ function Tables() {
             <Thead>
               <Tr my='.8rem' ps='0px' color='gray.400'>
                 <Th>Ad Set / Campaign</Th>
-                <Th>Objective</Th>
-                <SortableTh sortKey="spend">Spent</SortableTh>
+                <Th cursor="pointer" onClick={() => requestSort('spend')}>Spent</Th>
                 <Th>Leads (CPA)</Th>
-                <SortableTh sortKey="cpl">CPL</SortableTh>
+                <Th cursor="pointer" onClick={() => requestSort('cpl')}>CPL</Th>
                 <Th>CPM</Th>
                 <Th>CTR (All)</Th>
-                <Th>CTR (Link Click)</Th>
                 <Th>Clicks</Th>
                 <Th>Status</Th>
               </Tr>
