@@ -1,4 +1,4 @@
-# --- main_backend.py (Рабочая версия с реальными данными) ---
+# --- main_backend.py (Версия для проверки токена) ---
 
 import os
 import asyncio
@@ -11,16 +11,13 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# Настраиваем логирование
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# --- 1. Конфигурация ---
 load_dotenv()
 META_TOKEN = os.getenv("META_ACCESS_TOKEN")
 API_VERSION = "v19.0"
 LEAD_ACTION_TYPE = "onsite_conversion.messaging_conversation_started_7d"
 
-# --- 2. Инициализация FastAPI ---
 app = FastAPI()
 
 app.add_middleware(
@@ -31,7 +28,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- 3. Функции для работы с Meta API ---
 async def fb_get(session: aiohttp.ClientSession, url: str, params: dict = None):
     params = params or {}
     params["access_token"] = META_TOKEN
@@ -57,9 +53,18 @@ async def get_insights_for_account(session: aiohttp.ClientSession, account_id: s
     data = await fb_get(session, url, params=params)
     return data.get("data", [])
 
-# --- 4. ГЛАВНАЯ ТОЧКА ДОСТУПА С ЛОГИРОВАНИЕМ ---
 @app.get("/api/active-campaigns")
 async def get_all_active_campaigns():
+    # --- ИЗМЕНЕНИЕ ЗДЕСЬ ---
+    # ⚠️ Важно по безопасности: Мы никогда не выводим в лог полный токен.
+    # Только его части для проверки.
+    if META_TOKEN:
+        logging.info(f"--- Проверка токена. Начало: {META_TOKEN[:5]}, Конец: {META_TOKEN[-5:]} ---")
+    else:
+        logging.error("!!! Токен META_ACCESS_TOKEN не найден !!!")
+        return {"error": "Token not configured on the server"}
+    # --- КОНЕЦ ИЗМЕНЕНИЯ ---
+
     all_campaigns_data = []
     timeout = aiohttp.ClientTimeout(total=180)
 
@@ -81,10 +86,10 @@ async def get_all_active_campaigns():
                     spend = float(campaign.get("spend", 0))
                     if spend == 0:
                         continue
-                    
+
                     leads = sum(int(a["value"]) for a in campaign.get("actions", []) if a.get("action_type") == LEAD_ACTION_TYPE)
                     cpl = (spend / leads) if leads > 0 else 0
-                    
+
                     all_campaigns_data.append({
                         "account_name": acc['name'],
                         "campaign_name": campaign.get('campaign_name', 'N/A'),
@@ -94,7 +99,7 @@ async def get_all_active_campaigns():
                         "leads": leads,
                         "cpl": cpl
                     })
-        
+
         logging.info(f"--- Успешно собрано данных по {len(all_campaigns_data)} кампаниям ---")
         return all_campaigns_data
 
