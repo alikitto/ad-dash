@@ -28,7 +28,6 @@ function TablesTableRow(props) {
       <Td><Text fontSize="md" color={textColor}>{formatCurrency(adset.cpl)}</Text></Td>
       <Td><Text fontSize="md" color={textColor}>{formatCurrency(adset.cpm)}</Text></Td>
       <Td><Text fontSize="md" color={textColor}>{formatPercentage(adset.ctr_all)}</Text></Td>
-      <Td><Text fontSize="md" color={textColor}>{formatPercentage(adset.ctr_link_click)}</Text></Td>
       <Td><Text fontSize="md" color={textColor}>{adset.clicks}</Text></Td>
       <Td>
         {isUpdating ? <Spinner size="sm" color="white" /> : 
