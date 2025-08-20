@@ -13,39 +13,31 @@ function Tables() {
   const [updatingId, setUpdatingId] = useState(null);
   const toast = useToast();
 
-  // Состояния для фильтров и сортировки
   const [datePreset, setDatePreset] = useState("last_7d");
   const [selectedAccount, setSelectedAccount] = useState("all");
   const [statusFilter, setStatusFilter] = useState("ACTIVE");
   const [objectiveFilter, setObjectiveFilter] = useState("all");
   const [sortConfig, setSortConfig] = useState({ key: 'spend', direction: 'descending' });
 
-  // Загрузка данных с бэкенда
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       setError(null);
       try {
-        // Убедитесь, что здесь ваш правильный URL
-        const response = await fetch(`https://ad-dash-backend-production.up.railway.app/api/adsets?date_preset=${datePreset}&status=${statusFilter}`);
+        const response = await fetch(`https://ad-dash-backend-production.up.railway.app/api/adsets?date_preset=${datePreset}&status=${statusFilter}`); // REPLACE WITH YOUR URL
         const data = await response.json();
         if (data.detail) throw new Error(data.detail);
         setAllAdsets(data);
-      } catch (e) {
-        setError(e.message);
-      } finally {
-        setLoading(false);
-      }
+      } catch (e) { setError(e.message); } 
+      finally { setLoading(false); }
     };
     fetchData();
   }, [datePreset, statusFilter]);
 
-  // Обработчик смены статуса
   const handleStatusChange = async (adsetId, newStatus) => {
     setUpdatingId(adsetId);
     try {
-      // Убедитесь, что здесь ваш правильный URL
-      const response = await fetch(`https://ad-dash-backend-production.up.railway.app/api/adsets/${adsetId}/update-status`, {
+      const response = await fetch(`https://ad-dash-backend-production.up.railway.app/api/adsets/${adsetId}/update-status`, { // REPLACE WITH YOUR URL
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus })
@@ -63,7 +55,6 @@ function Tables() {
     }
   };
 
-  // Логика фильтрации и сортировки
   const processedAdsets = useMemo(() => {
     let filtered = [...allAdsets];
     if (selectedAccount !== "all") {
@@ -80,11 +71,9 @@ function Tables() {
     return filtered;
   }, [allAdsets, selectedAccount, objectiveFilter, sortConfig]);
 
-  // Списки для фильтров
   const accounts = useMemo(() => ['all', ...new Set(allAdsets.map(a => a.account_name))], [allAdsets]);
   const objectives = useMemo(() => ['all', ...new Set(allAdsets.map(a => a.objective))], [allAdsets]);
 
-  // Функция для сортировки
   const requestSort = (key) => {
     let direction = 'ascending';
     if (sortConfig.key === key && sortConfig.direction === 'ascending') {
@@ -93,6 +82,75 @@ function Tables() {
     setSortConfig({ key, direction });
   };
   
-  // Компонент для сортируемого заголовка
   const SortableTh = ({ children, sortKey }) => (
     <Th cursor="pointer" onClick={() => requestSort(sortKey)} color="gray.400">
+      <Flex align="center">
+        {children}
+        {sortConfig.key === sortKey && (
+          <Icon as={sortConfig.direction === 'ascending' ? TriangleUpIcon : TriangleDownIcon} w={3} h={3} ml={2} />
+        )}
+      </Flex>
+    </Th>
+  );
+  
+  const renderTableBody = () => {
+    if (loading) return <Tr><Td colSpan="10" textAlign="center">Loading ad sets...</Td></Tr>;
+    if (error) return <Tr><Td colSpan="10" textAlign="center">Error: {error}</Td></Tr>;
+    if (!processedAdsets.length) return <Tr><Td colSpan="10" textAlign="center">No ad sets found matching your criteria.</Td></Tr>;
+    
+    return processedAdsets.map((adset) => (
+      <TablesTableRow key={adset.adset_id} adset={adset} onStatusChange={handleStatusChange} isUpdating={updatingId === adset.adset_id} />
+    ));
+  };
+  
+  return (
+    <Flex direction='column' pt={{ base: "120px", md: "75px" }}>
+      <Card>
+        <CardHeader>
+          <Flex direction="column">
+            <Text fontSize='xl' color='#fff' fontWeight='bold'>Active Ad Sets</Text>
+            <HStack mt="20px" spacing={4}>
+              <Select value={selectedAccount} onChange={(e) => setSelectedAccount(e.target.value)} size="sm" borderRadius="md"  borderColor="gray.600" color="white" sx={{ "> option": { background: "#0F1535" }}}>
+                {accounts.map(acc => <option key={acc} value={acc}>{acc === 'all' ? 'All Accounts' : acc}</option>)}
+              </Select>
+              <Select value={objectiveFilter} onChange={(e) => setObjectiveFilter(e.target.value)} size="sm" borderRadius="md" borderColor="gray.600" color="white" sx={{ "> option": { background: "#0F1535" }}}>
+                {objectives.map(obj => <option key={obj} value={obj}>{obj === 'all' ? 'All Objectives' : obj}</option>)}
+              </Select>
+              <Select value={datePreset} onChange={(e) => setDatePreset(e.target.value)} size="sm" borderRadius="md" borderColor="gray.600" color="white" sx={{ "> option": { background: "#0F1535" }}}>
+                <option value="today">Today</option>
+                <option value="yesterday">Yesterday</option>
+                <option value="last_7d">Last 7 Days</option>
+                <option value="last_30d">Last 30 Days</option>
+              </Select>
+              <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} size="sm" borderRadius="md" borderColor="gray.600" color="white" sx={{ "> option": { background: "#0F1535" }}}>
+                <option value="ACTIVE">Active</option>
+                <option value="PAUSED">Paused</option>
+                <option value="ALL">All</option>
+              </Select>
+            </HStack>
+          </Flex>
+        </CardHeader>
+        <CardBody>
+          <Table variant='simple' color='#fff'>
+            <Thead>
+              <Tr my='.8rem' ps='0px'>
+                <Th color="gray.400">Ad Set / Campaign</Th>
+                <Th color="gray.400">Objective</Th>
+                <SortableTh sortKey="spend">Spent</SortableTh>
+                <Th color="gray.400">Leads (CPA)</Th>
+                <SortableTh sortKey="cpl">CPL</SortableTh>
+                <Th color="gray.400">CPM</Th>
+                <Th color="gray.400">CTR (All)</Th>
+                <Th color="gray.400">CTR (Link Click)</Th>
+                <Th color="gray.400">Clicks</Th>
+                <Th color="gray.400">Status</Th>
+              </Tr>
+            </Thead>
+            <Tbody>{renderTableBody()}</Tbody>
+          </Table>
+        </CardBody>
+      </Card>
+    </Flex>
+  );
+}
+export default Tables;
