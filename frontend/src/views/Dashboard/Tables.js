@@ -5,7 +5,7 @@ import { Box, Flex, Select, Table, Tbody, Td, Text, Th, Thead, Tr, useToast, HSt
 import { TriangleDownIcon, TriangleUpIcon, RepeatIcon } from "@chakra-ui/icons";
 import { FaSave } from "react-icons/fa";
 import Card from "components/Card/Card.js";
-import CardHeader from "components/Card/CardHeader.js";
+import CardHeader from "components/Card/CardHeader.js"; 
 import CardBody from "components/Card/CardBody.js";
 import TablesTableRow from "components/Tables/TablesTableRow";
 
