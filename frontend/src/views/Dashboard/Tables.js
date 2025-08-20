@@ -12,6 +12,7 @@ function Tables() {
   const [error, setError] = useState(null);
   const [updatingId, setUpdatingId] = useState(null);
   const toast = useToast();
+
   const [datePreset, setDatePreset] = useState("last_7d");
   const [selectedAccount, setSelectedAccount] = useState("all");
   const [statusFilter, setStatusFilter] = useState("ACTIVE");
@@ -23,7 +24,7 @@ function Tables() {
       setLoading(true);
       setError(null);
       try {
-        const response = await fetch(`https://ad-dash-frontend-production.up.railway.app/api/adsets?date_preset=${datePreset}`); // ЗАМЕНИТЕ НА ВАШ URL
+        const response = await fetch(`https://ad-dash-backend-production.up.railway.app/api/adsets?date_preset=${datePreset}&status=${statusFilter}`); // REPLACE WITH YOUR URL
         const data = await response.json();
         if (data.detail) throw new Error(data.detail);
         setAllAdsets(data);
@@ -31,12 +32,12 @@ function Tables() {
       finally { setLoading(false); }
     };
     fetchData();
-  }, [datePreset]);
+  }, [datePreset, statusFilter]);
 
   const handleStatusChange = async (adsetId, newStatus) => {
     setUpdatingId(adsetId);
     try {
-      const response = await fetch(`https://ad-dash-frontend-production.up.railway.app/api/adsets/${adsetId}/update-status`, { // ЗАМЕНИТЕ НА ВАШ URL
+      const response = await fetch(`https://ad-dash-backend-production.up.railway.app/api/adsets/${adsetId}/update-status`, { // REPLACE WITH YOUR URL
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus })
@@ -56,24 +57,19 @@ function Tables() {
 
   const processedAdsets = useMemo(() => {
     let filtered = [...allAdsets];
-    // Frontend filtering logic
-    if (statusFilter !== "ALL") {
-      filtered = filtered.filter(adset => adset.status === statusFilter);
-    }
     if (selectedAccount !== "all") {
       filtered = filtered.filter(adset => adset.account_name === selectedAccount);
     }
     if (objectiveFilter !== "all") {
         filtered = filtered.filter(adset => adset.objective === objectiveFilter);
     }
-    // Sorting logic
     filtered.sort((a, b) => {
       if (a[sortConfig.key] < b[sortConfig.key]) return sortConfig.direction === 'ascending' ? -1 : 1;
       if (a[sortConfig.key] > b[sortConfig.key]) return sortConfig.direction === 'ascending' ? 1 : -1;
       return 0;
     });
     return filtered;
-  }, [allAdsets, selectedAccount, objectiveFilter, statusFilter, sortConfig]);
+  }, [allAdsets, selectedAccount, objectiveFilter, sortConfig]);
 
   const accounts = useMemo(() => ['all', ...new Set(allAdsets.map(a => a.account_name))], [allAdsets]);
   const objectives = useMemo(() => ['all', ...new Set(allAdsets.map(a => a.objective))], [allAdsets]);
@@ -98,9 +94,9 @@ function Tables() {
   );
   
   const renderTableBody = () => {
-    if (loading) return <Tr><Td colSpan="9" textAlign="center">Loading ad sets...</Td></Tr>;
-    if (error) return <Tr><Td colSpan="9" textAlign="center">Error: {error}</Td></Tr>;
-    if (!processedAdsets.length) return <Tr><Td colSpan="9" textAlign="center">No ad sets found matching your criteria.</Td></Tr>;
+    if (loading) return <Tr><Td colSpan="10" textAlign="center">Loading ad sets...</Td></Tr>;
+    if (error) return <Tr><Td colSpan="10" textAlign="center">Error: {error}</Td></Tr>;
+    if (!processedAdsets.length) return <Tr><Td colSpan="10" textAlign="center">No ad sets found matching your criteria.</Td></Tr>;
     
     return processedAdsets.map((adset) => (
       <TablesTableRow key={adset.adset_id} adset={adset} onStatusChange={handleStatusChange} isUpdating={updatingId === adset.adset_id} />
@@ -145,6 +141,7 @@ function Tables() {
                 <SortableTh sortKey="cpl">CPL</SortableTh>
                 <Th color="gray.400">CPM</Th>
                 <Th color="gray.400">CTR (All)</Th>
+                <Th color="gray.400">CTR (Link Click)</Th>
                 <Th color="gray.400">Clicks</Th>
                 <Th color="gray.400">Status</Th>
               </Tr>
