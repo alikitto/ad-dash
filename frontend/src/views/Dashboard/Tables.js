@@ -32,7 +32,7 @@ function Tables() {
     setCampaigns(campaigns.map(c => c.campaign_id === campaignId ? { ...c, status: newStatus } : c));
     
     try {
-      await fetch(`https://YOUR-BACKEND-URL/api/campaigns/${campaignId}/update-status`, {
+      await fetch(`https://ad-dash-backend-production.up.railway.app/api/campaigns/${campaignId}/update-status`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ new_status: newStatus })
