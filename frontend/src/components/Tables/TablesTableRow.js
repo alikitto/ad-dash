@@ -28,8 +28,8 @@ function TablesTableRow(props) {
         <Flex align="center" py=".8rem" minWidth="100%" flexWrap="nowrap">
           <Avatar src={adset.avatarUrl} w="50px" borderRadius="12px" me="18px" />
           <Flex direction="column">
-            <Text fontSize="md" color={textColor} fontWeight="bold">{adset.adset_name}</Text>
-            <Text fontSize="sm" color="gray.400" fontWeight="normal">{adset.campaign_name}</Text>
+            <Text fontSize="md" color="gray.300" fontWeight="bold">{adset.adset_name}</Text>
+            <Text fontSize="sm" color="gray.500" fontWeight="normal">{adset.campaign_name}</Text>
           </Flex>
         </Flex>
       </Td>
