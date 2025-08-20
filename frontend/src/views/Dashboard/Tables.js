@@ -11,7 +11,6 @@ function Tables() {
   const [error, setError] = useState(null);
   const [updatingId, setUpdatingId] = useState(null);
   const toast = useToast();
-
   const [datePreset, setDatePreset] = useState("last_7d");
   const [selectedAccount, setSelectedAccount] = useState("all");
   const [sortConfig, setSortConfig] = useState({ key: 'spend', direction: 'descending' });
@@ -21,23 +20,21 @@ function Tables() {
       setLoading(true);
       setError(null);
       try {
-        const response = await fetch(`https://ad-dash-backend-production.up.railway.app/api/adsets?date_preset=${datePreset}`); // REPLACE WITH YOUR URL
+        const response = await fetch(`https://ad-dash-backend-production.up.railway.app/api/adsets?date_preset=${datePreset}`); // ЗАМЕНИТЕ НА ВАШ URL
         const data = await response.json();
         if (data.detail) throw new Error(data.detail);
         setAllAdsets(data);
-      } catch (e) {
-        setError(e.message);
-      } finally {
-        setLoading(false);
-      }
+      } catch (e) { setError(e.message); } 
+      finally { setLoading(false); }
     };
     fetchData();
   }, [datePreset]);
 
   const handleStatusChange = async (adsetId, newStatus) => {
+    // ... (код остается без изменений) ...
     setUpdatingId(adsetId);
     try {
-      const response = await fetch(`https://ad-dash-backend-production.up.railway.app/api/adsets/${adsetId}/update-status`, { // REPLACE WITH YOUR URL
+      const response = await fetch(`https://ad-dash-backend-production.up.railway.app/api/adsets/${adsetId}/update-status`, { // ЗАМЕНИТЕ НА ВАШ URL
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus })
@@ -56,6 +53,7 @@ function Tables() {
   };
 
   const processedAdsets = useMemo(() => {
+    // ... (код остается без изменений) ...
     let filtered = [...allAdsets];
     if (selectedAccount !== "all") {
       filtered = filtered.filter(adset => adset.account_name === selectedAccount);
@@ -69,8 +67,8 @@ function Tables() {
   }, [allAdsets, selectedAccount, sortConfig]);
 
   const accounts = useMemo(() => ['all', ...new Set(allAdsets.map(a => a.account_name))], [allAdsets]);
-
   const requestSort = (key) => {
+    // ... (код остается без изменений) ...
     let direction = 'ascending';
     if (sortConfig.key === key && sortConfig.direction === 'ascending') {
       direction = 'descending';
@@ -79,17 +77,13 @@ function Tables() {
   };
   
   const renderTableBody = () => {
-    if (loading) return <Tr><Td colSpan="9" textAlign="center">Loading ad sets...</Td></Tr>;
-    if (error) return <Tr><Td colSpan="9" textAlign="center">Error: {error}</Td></Tr>;
-    if (!processedAdsets.length) return <Tr><Td colSpan="9" textAlign="center">No ad sets found matching your criteria.</Td></Tr>;
+    // ... (код остается без изменений) ...
+    if (loading) return <Tr><Td colSpan="8" textAlign="center">Loading ad sets...</Td></Tr>;
+    if (error) return <Tr><Td colSpan="8" textAlign="center">Error: {error}</Td></Tr>;
+    if (!processedAdsets.length) return <Tr><Td colSpan="8" textAlign="center">No ad sets found matching your criteria.</Td></Tr>;
     
     return processedAdsets.map((adset) => (
-      <TablesTableRow
-        key={adset.adset_id}
-        adset={adset}
-        onStatusChange={handleStatusChange}
-        isUpdating={updatingId === adset.adset_id}
-      />
+      <TablesTableRow key={adset.adset_id} adset={adset} onStatusChange={handleStatusChange} isUpdating={updatingId === adset.adset_id} />
     ));
   };
   
@@ -122,7 +116,6 @@ function Tables() {
                 <Th cursor="pointer" onClick={() => requestSort('cpl')}>CPL</Th>
                 <Th>CPM</Th>
                 <Th>CTR (All)</Th>
-                <Th>CTR (Link Click)</Th>
                 <Th>Clicks</Th>
                 <Th>Status</Th>
               </Tr>
