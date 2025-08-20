@@ -16,7 +16,7 @@ function Tables() {
     async function fetchCampaigns() {
       try {
         // УБЕДИТЕСЬ, ЧТО ЗДЕСЬ ВАШ ПРАВИЛЬНЫЙ URL БЭКЕНДА
-        const response = await fetch("https://ad-dash-backend-production-....up.railway.app/api/active-campaigns"); // <-- ЗАМЕНИТЕ НА ВАШ URL
+        const response = await fetch("https://ad-dash-backend-production-a1b2c3d4.up.railway.app/api/active-campaigns"); // <-- ЗАМЕНИТЕ НА ВАШ URL
         const data = await response.json();
         
         // Проверяем, не вернул ли бэкенд объект с ошибкой
