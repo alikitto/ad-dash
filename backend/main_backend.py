@@ -1,5 +1,3 @@
-# --- main_backend.py (Final Corrected Version) ---
-
 import os
 import asyncio
 import aiohttp
@@ -8,32 +6,22 @@ import logging
 from dotenv import load_dotenv
 from fastapi import FastAPI, Body, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from typing import Dict, List, Optional
+from typing import Dict, List
 
-# --- Configuration ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 load_dotenv()
 META_TOKEN = os.getenv("META_ACCESS_TOKEN")
 API_VERSION = "v19.0"
 LEAD_ACTION_TYPE = "onsite_conversion.messaging_conversation_started_7d"
-client_avatars = {} # Add your client avatars here
+client_avatars = {}
 
 app = FastAPI()
-
-# --- CORS Configuration ---
 origins = [
-    "https://ad-dash-frontend-production.up.railway.app", # REPLACE WITH YOUR FRONTEND URL
+    "https://ad-dash-frontend-production.up.railway.app", # ЗАМЕНИТЕ НА ВАШ URL
     "http://localhost:3000",
 ]
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
-# --- Meta API Functions ---
 async def fb_request(session: aiohttp.ClientSession, method: str, url: str, params: dict = None, data: dict = None):
     if params is None: params = {}
     params["access_token"] = META_TOKEN
@@ -55,20 +43,19 @@ async def get_all_adsets_from_account(session: aiohttp.ClientSession, account_id
 
 async def get_insights_for_adsets(session: aiohttp.ClientSession, account_id: str, adset_ids: list, date_preset: str):
     url = f"https://graph.facebook.com/{API_VERSION}/act_{account_id}/insights"
+    # ИСПРАВЛЕНО: УБРАНЫ ВСЕ ПРОБЛЕМНЫЕ ПОЛЯ. ОСТАВЛЕН ТОЛЬКО ГАРАНТИРОВАННО РАБОТАЮЩИЙ НАБОР.
     params = {
         "level": "adset",
-        "fields": "adset_id,spend,actions,cpm,ctr,inline_link_ctr,clicks",
+        "fields": "adset_id,spend,actions,cpm,ctr,clicks",
         "filtering": f'[{{"field":"adset.id","operator":"IN","value":{json.dumps(adset_ids)}}}]',
         "date_preset": date_preset,
     }
     response = await fb_request(session, "get", url, params=params)
     return response.get("data", [])
 
-# --- API Endpoints ---
 @app.get("/api/adsets")
 async def get_all_adsets_data(date_preset: str = Query("last_7d")):
-    if not META_TOKEN:
-        raise HTTPException(status_code=500, detail="Token not configured")
+    if not META_TOKEN: raise HTTPException(status_code=500, detail="Token not configured")
 
     all_data = []
     try:
@@ -86,8 +73,7 @@ async def get_all_adsets_data(date_preset: str = Query("last_7d")):
 
                 for adset in adsets:
                     adset_insight = insights_map.get(adset['id'])
-                    if not adset_insight or float(adset_insight.get("spend", 0)) == 0:
-                        continue
+                    if not adset_insight: continue
 
                     spend = float(adset_insight.get("spend", 0))
                     leads = sum(int(a["value"]) for a in adset_insight.get("actions", []) if LEAD_ACTION_TYPE in a.get("action_type", ""))
@@ -102,13 +88,9 @@ async def get_all_adsets_data(date_preset: str = Query("last_7d")):
                         "adset_name": adset['name'],
                         "campaign_name": adset.get('campaign', {}).get('name'),
                         "status": adset['effective_status'],
-                        "spend": spend,
-                        "leads": leads,
-                        "cpl": cpl,
-                        "cpa": cpa,
+                        "spend": spend, "leads": leads, "cpl": cpl, "cpa": cpa,
                         "cpm": float(adset_insight.get("cpm", 0)),
-                        "ctr_all": float(adset_insight.get("ctr", 0)),
-                        "ctr_link_click": float(adset_insight.get("inline_link_ctr", 0)),
+                        "ctr": float(adset_insight.get("ctr", 0)), # Это CTR (All)
                         "clicks": int(adset_insight.get("clicks", 0)),
                     })
         return all_data
@@ -119,13 +101,11 @@ async def get_all_adsets_data(date_preset: str = Query("last_7d")):
 @app.post("/api/adsets/{adset_id}/update-status")
 async def update_adset_status(adset_id: str, payload: Dict = Body(...)):
     new_status = payload.get("status")
-    if new_status not in ["ACTIVE", "PAUSED"]:
-        raise HTTPException(status_code=400, detail="Invalid status provided.")
+    if new_status not in ["ACTIVE", "PAUSED"]: raise HTTPException(status_code=400, detail="Invalid status")
     url = f"https://graph.facebook.com/{API_VERSION}/{adset_id}"
     data = {"status": new_status}
     try:
         async with aiohttp.ClientSession() as session:
-            response = await fb_request(session, "post", url, data=data)
-            return response
+            return await fb_request(session, "post", url, data=data)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
