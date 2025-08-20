@@ -1,13 +1,15 @@
-# --- main_backend.py (Финальная надежная версия) ---
+# --- main_backend.py (Final Version) ---
 
 import os
 import asyncio
 import aiohttp
 import logging
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Body, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from typing import Dict
 
+# --- Configuration ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 load_dotenv()
 META_TOKEN = os.getenv("META_ACCESS_TOKEN")
@@ -16,8 +18,9 @@ LEAD_ACTION_TYPE = "onsite_conversion.messaging_conversation_started_7d"
 
 app = FastAPI()
 
+# --- CORS Configuration ---
 origins = [
-    "https://ad-dash-frontend-production.up.railway.app", # ЗАМЕНИТЕ НА ВАШ URL ФРОНТЕНДА
+    "https://ad-dash-frontend-production.up.railway.app", # REPLACE WITH YOUR FRONTEND URL
     "http://localhost:3000",
 ]
 app.add_middleware(
@@ -28,31 +31,33 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-async def fb_get(session: aiohttp.ClientSession, url: str, params: dict = None):
-    params = params or {}
+# --- Meta API Functions ---
+async def fb_request(session: aiohttp.ClientSession, method: str, url: str, params: dict = None, data: dict = None):
+    if params is None: params = {}
     params["access_token"] = META_TOKEN
-    async with session.get(url, params=params) as response:
+    
+    async with session.request(method, url, params=params, json=data) as response:
         response.raise_for_status()
         return await response.json()
 
 async def get_ad_accounts(session: aiohttp.ClientSession):
     url = f"https://graph.facebook.com/{API_VERSION}/me/adaccounts"
     params = {"fields": "name,account_id"}
-    data = await fb_get(session, url, params)
-    return data.get("data", [])
+    response = await fb_request(session, "get", url, params=params)
+    return response.get("data", [])
 
 async def get_insights_for_account(session: aiohttp.ClientSession, account_id: str):
     url = f"https://graph.facebook.com/{API_VERSION}/act_{account_id}/insights"
-    # ИСПОЛЬЗУЕМ ПРОСТОЙ И НАДЕЖНЫЙ НАБОР ПОЛЕЙ
     params = {
-        "fields": "campaign_id,campaign_name,spend,actions,objective,status",
+        "fields": "campaign_id,campaign_name,spend,actions,objective,cpm,ctr,inline_link_ctr,clicks,cpc,effective_status",
         "level": "campaign",
         "date_preset": "last_7d",
         "limit": 500
     }
-    data = await fb_get(session, url, params)
-    return data.get("data", [])
+    response = await fb_request(session, "get", url, params=params)
+    return response.get("data", [])
 
+# --- API Endpoints ---
 @app.get("/api/active-campaigns")
 async def get_all_active_campaigns():
     if not META_TOKEN:
@@ -71,20 +76,45 @@ async def get_all_active_campaigns():
                     if spend == 0: continue
                     
                     leads = sum(int(a["value"]) for a in campaign.get("actions", []) if a.get("action_type") == LEAD_ACTION_TYPE)
-                    cpl = (spend / leads) if leads > 0 else 0
+                    purchases = sum(int(a["value"]) for a in campaign.get("actions", []) if "purchase" in a.get("action_type", ""))
                     
+                    cpl = (spend / leads) if leads > 0 else 0
+                    cpa = (spend / purchases) if purchases > 0 else 0
+
                     all_campaigns_data.append({
                         "account_name": acc['name'],
                         "campaign_id": campaign.get('campaign_id'),
                         "campaign_name": campaign.get('campaign_name'),
+                        "status": campaign.get('effective_status'),
                         "objective": campaign.get('objective'),
-                        "status": campaign.get('status'),
                         "spend": spend,
                         "leads": leads,
-                        "cpl": cpl
+                        "cpl": cpl,
+                        "cpa": cpa,
+                        "cpm": float(campaign.get("cpm", 0)),
+                        "ctr_all": float(campaign.get("ctr", 0)),
+                        "ctr_link_click": float(campaign.get("inline_link_ctr", 0)),
+                        "clicks": int(campaign.get("clicks", 0)),
                     })
-        logging.info(f"--- Successfully collected data for {len(all_campaigns_data)} campaigns ---")
+        
         return all_campaigns_data
     except Exception as e:
         logging.error(f"!!! API ERROR: {e} !!!", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/campaigns/{campaign_id}/update-status")
+async def update_campaign_status(campaign_id: str, payload: Dict = Body(...)):
+    new_status = payload.get("status")
+    if new_status not in ["ACTIVE", "PAUSED"]:
+        raise HTTPException(status_code=400, detail="Invalid status provided.")
+
+    url = f"https://graph.facebook.com/{API_VERSION}/{campaign_id}"
+    data = {"status": new_status}
+    
+    try:
+        async with aiohttp.ClientSession() as session:
+            response = await fb_request(session, "post", url, data=data)
+            return response
+    except Exception as e:
+        logging.error(f"!!! Status Update Error: {e} !!!", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
