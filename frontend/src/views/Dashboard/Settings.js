@@ -1,12 +1,9 @@
-// Settings.js
+// Settings.js (fixed)
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Avatar,
   Box,
   Button,
-  Card,
-  CardBody,
-  CardHeader,
   Flex,
   HStack,
   IconButton,
@@ -21,6 +18,11 @@ import {
   useToast,
 } from "@chakra-ui/react";
 import { RepeatIcon, DeleteIcon } from "@chakra-ui/icons";
+
+// ВАЖНО: Card из локальных компонентов Vision UI
+import Card from "components/Card/Card.js";
+import CardHeader from "components/Card/CardHeader.js";
+import CardBody from "components/Card/CardBody.js";
 
 const BACKEND =
   process.env.REACT_APP_BACKEND_BASE ||
@@ -45,7 +47,7 @@ export default function Settings() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
 
-      // dict или array — без разницы
+      // Поддержка и array, и dict форматов
       const map = {};
       if (Array.isArray(data)) {
         data.forEach((row) => {
@@ -196,17 +198,13 @@ export default function Settings() {
                         <Text fontWeight="semibold">{acc.account_name}</Text>
                       </Td>
                       <Td>
-                        <Text fontSize="xs" color="gray.300">
-                          {key}
-                        </Text>
+                        <Text fontSize="xs" color="gray.300">{key}</Text>
                       </Td>
                       <Td>
                         <Input
                           placeholder="https://..."
                           value={value}
-                          onChange={(e) =>
-                            setDraft((d) => ({ ...d, [key]: e.target.value }))
-                          }
+                          onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))}
                           size="sm"
                           color="white"
                           borderColor="gray.600"
@@ -214,12 +212,7 @@ export default function Settings() {
                       </Td>
                       <Td>
                         <HStack>
-                          <Button
-                            size="sm"
-                            colorScheme="teal"
-                            onClick={() => saveAvatar(key)}
-                            isLoading={loading}
-                          >
+                          <Button size="sm" colorScheme="teal" onClick={() => saveAvatar(key)} isLoading={loading}>
                             Save
                           </Button>
                           <IconButton
