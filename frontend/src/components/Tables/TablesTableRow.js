@@ -13,7 +13,7 @@ import {
 } from "@chakra-ui/react";
 import { CLIENT_AVATARS } from "../../variables/clientAvatars";
 
-// ─── helpers ────────────────────────────────────────────────────────────────
+// helpers
 function shortObjective(obj) {
   if (!obj) return "—";
   let s = String(obj).toUpperCase().trim();
@@ -28,10 +28,8 @@ const fmtPct = (v) =>
 const fmtNum = (v) =>
   typeof v !== "number" || !isFinite(v) ? "0" : Number(v).toLocaleString("en-US");
 
-// найти аватар по id/имени аккаунта
 function resolveAvatar(adset) {
   if (adset?.avatarUrl) return adset.avatarUrl;
-
   const id =
     adset?.account_id ??
     adset?.accountId ??
@@ -41,7 +39,6 @@ function resolveAvatar(adset) {
     "";
   const name =
     adset?.account_name ?? adset?.accountName ?? adset?.account?.name ?? "";
-
   const candidates = [];
   if (id) {
     candidates.push(String(id));
@@ -49,20 +46,13 @@ function resolveAvatar(adset) {
     candidates.push(String(id).replace(/^act_/, ""));
   }
   if (name) candidates.push(String(name));
-
-  for (const k of candidates) {
-    if (Object.prototype.hasOwnProperty.call(CLIENT_AVATARS, k))
-      return CLIENT_AVATARS[k];
-  }
-  // case-insensitive по имени
+  for (const k of candidates) if (CLIENT_AVATARS[k]) return CLIENT_AVATARS[k];
   const lower = (name || "").toLowerCase();
-  for (const k of Object.keys(CLIENT_AVATARS)) {
+  for (const k of Object.keys(CLIENT_AVATARS))
     if (k.toLowerCase() === lower) return CLIENT_AVATARS[k];
-  }
   return undefined;
 }
 
-// ─── component ──────────────────────────────────────────────────────────────
 function TablesTableRow(props) {
   const { adset, onStatusChange, isUpdating, datePreset } = props;
   const textColor = useColorModeValue("white", "white");
@@ -100,9 +90,7 @@ function TablesTableRow(props) {
   };
 
   const toggleExpanded = async () => {
-    if (!expanded && ads.length === 0) {
-      await fetchAds();
-    }
+    if (!expanded && ads.length === 0) await fetchAds();
     setExpanded((v) => !v);
   };
 
@@ -114,9 +102,7 @@ function TablesTableRow(props) {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            status: curr === "ACTIVE" ? "PAUSED" : "ACTIVE",
-          }),
+          body: JSON.stringify({ status: curr === "ACTIVE" ? "PAUSED" : "ACTIVE" }),
         }
       );
       if (!res.ok) throw new Error("Update failed");
@@ -136,10 +122,9 @@ function TablesTableRow(props) {
     <>
       {/* основная строка ad set */}
       <Tr>
-        {/* 1-я колонка (липкая): стрелка + аватар + тексты */}
+        {/* 1: стрелка + аватар + текст (липкая колонка) */}
         <Td position="sticky" left="0" zIndex="1" bg={stickyBg} py={3}>
           <Flex align="flex-start" gap={3}>
-            {/* стрелка — белые символы, точно видимые */}
             <Box
               as="button"
               onClick={toggleExpanded}
@@ -154,16 +139,9 @@ function TablesTableRow(props) {
             >
               {expanded ? "▾" : "▸"}
             </Box>
-
             <Avatar size="sm" name={account} src={avatarSrc} bg="gray.500" />
             <Flex direction="column" minW={0}>
-              <Text
-                fontSize="10px"
-                textTransform="uppercase"
-                letterSpacing="0.6px"
-                color="gray.300"
-                noOfLines={1}
-              >
+              <Text fontSize="10px" textTransform="uppercase" letterSpacing="0.6px" color="gray.300" noOfLines={1}>
                 {account}
               </Text>
               <Text fontSize="sm" fontWeight="semibold" color={textColor} noOfLines={1} mt="1px">
@@ -185,23 +163,16 @@ function TablesTableRow(props) {
               colorScheme="teal"
               isChecked={adset.status === "ACTIVE"}
               onChange={() =>
-                onStatusChange(
-                  adset.adset_id,
-                  adset.status === "ACTIVE" ? "PAUSED" : "ACTIVE"
-                )
+                onStatusChange(adset.adset_id, adset.status === "ACTIVE" ? "PAUSED" : "ACTIVE")
               }
             />
           )}
         </Td>
 
         {/* 3: objective */}
-        <Td>
-          <Text fontSize="xs" color={textColor} noOfLines={1}>
-            {shortObjective(adset.objective)}
-          </Text>
-        </Td>
+        <Td><Text fontSize="xs" color={textColor} noOfLines={1}>{shortObjective(adset.objective)}</Text></Td>
 
-        {/* остальные метрики ad set */}
+        {/* метрики ad set */}
         <Td><Text fontSize="sm" color={textColor}>{fmtMoney(adset.spend)}</Text></Td>
         <Td><Text fontSize="sm" color={textColor}>{fmtNum(adset.impressions)}</Text></Td>
         <Td><Text fontSize="sm" color={textColor}>{fmtNum(adset.frequency)}</Text></Td>
@@ -213,27 +184,31 @@ function TablesTableRow(props) {
         <Td><Text fontSize="sm" color={textColor}>{fmtNum(adset.link_clicks)}</Text></Td>
       </Tr>
 
-      {/* строки объявлений — без заголовков, в те же колонки */}
-      {expanded && (
-        adsLoading ? (
-          <Tr><Td colSpan={12}><Flex py={3} justify="center" align="center"><Spinner size="sm" mr={2}/><Text color="gray.200">Loading ads…</Text></Flex></Td></Tr>
+      {/* строки объявлений: БЕЗ заголовков, выровнены по тем же колонкам */}
+      {expanded &&
+        (adsLoading ? (
+          <Tr>
+            <Td colSpan={12}>
+              <Flex py={3} justify="center" align="center">
+                <Spinner size="sm" mr={2} />
+                <Text color="gray.200">Loading ads…</Text>
+              </Flex>
+            </Td>
+          </Tr>
         ) : ads.length === 0 ? (
-          <Tr><Td colSpan={12}><Text color="gray.300" fontSize="sm" py={2}>No ads for this ad set.</Text></Td></Tr>
+          <Tr>
+            <Td colSpan={12}>
+              <Text color="gray.300" fontSize="sm" py={2}>No ads for this ad set.</Text>
+            </Td>
+          </Tr>
         ) : (
           ads.map((ad) => (
             <Tr key={ad.ad_id}>
-              {/* 1-я колонка для объявления: миниатюра + имя, с отступом чтобы не перекрывать место стрелки */}
+              {/* 1: миниатюра + имя объявления, с отступом, чтобы не конфликтовать со стрелкой */}
               <Td position="sticky" left="0" zIndex="1" bg={stickyBg} py={2}>
                 <Flex align="center" gap={3} pl="34px">
                   {ad.thumbnail_url ? (
-                    <Image
-                      src={ad.thumbnail_url}
-                      alt=""
-                      boxSize="24px"
-                      borderRadius="md"
-                      objectFit="cover"
-                      flex="0 0 auto"
-                    />
+                    <Image src={ad.thumbnail_url} alt="" boxSize="24px" borderRadius="md" objectFit="cover" />
                   ) : (
                     <Avatar size="xs" name={ad.ad_name} />
                   )}
@@ -241,7 +216,7 @@ function TablesTableRow(props) {
                 </Flex>
               </Td>
 
-              {/* 2: статус объявления — свитч */}
+              {/* 2: статус ad */}
               <Td>
                 {updatingAdId === ad.ad_id ? (
                   <Spinner size="xs" />
@@ -258,7 +233,7 @@ function TablesTableRow(props) {
               {/* 3: objective для ads не показываем */}
               <Td><Text fontSize="xs">—</Text></Td>
 
-              {/* те же метрики, та же последовательность колонок */}
+              {/* метрики — те же колонки, та же последовательность */}
               <Td>{fmtMoney(ad.spend)}</Td>
               <Td>{fmtNum(ad.impressions)}</Td>
               <Td>{fmtNum(ad.frequency)}</Td>
@@ -270,8 +245,7 @@ function TablesTableRow(props) {
               <Td>{fmtNum(ad.link_clicks)}</Td>
             </Tr>
           ))
-        )
-      )}
+        ))}
     </>
   );
 }
