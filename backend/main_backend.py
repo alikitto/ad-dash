@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Body, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, List, Optional
+import openai
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Setup
@@ -18,6 +19,9 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 load_dotenv()
 
 META_TOKEN = os.getenv("META_ACCESS_TOKEN")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY") # <--- ДОБАВИТЬ
+if OPENAI_API_KEY:                         # <--- ДОБАВИТЬ
+    openai.api_key = OPENAI_API_KEY        # <--- ДОБАВИТЬ
 if not META_TOKEN:
     logging.warning("META_ACCESS_TOKEN is not set in environment!")
 
@@ -322,3 +326,64 @@ async def update_ad_status(ad_id: str, payload: Dict = Body(...)):
     except Exception as e:
         logging.error(f"update_ad_status error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+# ── AI Analysis ───────────────────────────────────────────────────────────────
+
+async def get_ai_analysis(adsets: List[dict]) -> Dict:
+    if not OPENAI_API_KEY:
+        raise HTTPException(status_code=500, detail="OpenAI API key is not configured.")
+
+    # Упрощаем данные для промпта, чтобы не превышать лимит токенов
+    simplified_adsets = [
+        {
+            "name": f"{d.get('account_name', '')[:15]} / {d.get('adset_name', 'N/A')[:25]}",
+            "status": d.get("status"),
+            "spend": d.get("spend", 0),
+            "leads": d.get("leads", 0),
+            "cpl": d.get("cpl", 0),
+            "ctr_link": (d.get("link_clicks", 0) / d.get("impressions", 1)) * 100,
+            "impressions": d.get("impressions", 0),
+        }
+        for d in adsets
+    ]
+
+    # Системный промпт - наша инструкция для AI
+    system_prompt = """
+You are an expert Meta Ads analyst. Your task is to analyze a list of ad sets provided in JSON format.
+Provide a concise, data-driven analysis in Russian.
+Your response MUST be a valid JSON object with three keys: "summary", "insights", and "recommendations".
+
+1.  `summary`: A short, 2-3 sentence executive summary of the overall performance in Markdown format. Mention total spend and total leads.
+2.  `insights`: A list of 2-4 key bullet-point observations. Identify the best and worst performers.
+3.  `recommendations`: A list of actionable recommendations. Each recommendation must be an object with two keys: `priority` ("high", "medium", or "low") and `text` (the recommendation itself).
+
+Analyze based on Spend, Leads, CPL (Cost Per Lead), and CTR (Link Click). A good CPL is a low CPL. A good CTR is a high CTR.
+"""
+
+    try:
+        client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY)
+        response = await client.chat.completions.create(
+            model="gpt-4o", # или gpt-3.5-turbo для скорости и экономии
+            response_format={"type": "json_object"},
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": json.dumps(simplified_adsets, indent=2)},
+            ],
+            temperature=0.5,
+            max_tokens=1000,
+        )
+        analysis_content = response.choices[0].message.content
+        return json.loads(analysis_content)
+
+    except Exception as e:
+        logging.error(f"OpenAI API error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to get AI analysis: {e}")
+
+
+@app.post("/api/analyze-adsets")
+async def analyze_adsets_endpoint(adsets: List[dict] = Body(...)):
+    if not adsets:
+        raise HTTPException(status_code=400, detail="Adset data is required.")
+    
+    # Запускаем анализ асинхронно
+    analysis_result = await get_ai_analysis(adsets)
+    return analysis_result
