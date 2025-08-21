@@ -12,7 +12,7 @@ import {
 
 // словарь аватарок, который ты положил в src/variables/clientAvatars.js
 // пример содержимого: export const CLIENT_AVATARS = { "act_123": "https://...", "Account Name": "https://..." }
-import { CLIENT_AVATARS } from "variables/clientAvatars";
+import { CLIENT_AVATARS } from "../../variables/clientAvatars";
 
 // shorten objective for the Objective column
 function shortObjective(obj) {
