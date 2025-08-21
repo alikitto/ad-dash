@@ -13,7 +13,6 @@ import {
 import { ChevronRightIcon, ChevronDownIcon } from "@chakra-ui/icons";
 import { CLIENT_AVATARS } from "../../variables/clientAvatars";
 
-// shorten objective for the Objective column
 function shortObjective(obj) {
   if (!obj) return "—";
   let s = String(obj).toUpperCase().trim();
