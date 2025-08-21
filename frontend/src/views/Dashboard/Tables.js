@@ -384,78 +384,118 @@ function Tables() {
   return (
     <Flex direction="column" pt={{ base: "120px", md: "75px" }}>
       <Card>
-        <CardHeader>
-          <Flex direction="column" w="100%">
-            <Text fontSize="xl" color="#fff" fontWeight="bold">Active Ad Sets</Text>
+        <<CardHeader>
+  <Flex direction="column" w="100%">
+    <Text fontSize="xl" color="#fff" fontWeight="bold">
+      Active Ad Sets
+    </Text>
 
-            {/* фильтры: одна строка, без переноса */}
-            <HStack mt="16px" spacing={3} align="center" flexWrap="nowrap" w="100%">
-              <Select minW="220px" flex="0 0 auto"
-                value={selectedAccount} onChange={(e) => setSelectedAccount(e.target.value)}
-                size="sm" borderRadius="md" borderColor="gray.600" color="white"
-                sx={{ "> option": { background: "#0F1535" } }}
-              >
-                {["all", ...new Set(accounts)].map((acc) => (
-                  <option key={acc} value={acc}>{acc === "all" ? "All Accounts" : acc}</option>
-                ))}
-              </Select>
+    {/* Фильтры: одна строка + горизонтальный скролл при нехватке места */}
+    <Box mt="16px" overflowX="auto">
+      <Flex align="center" gap={3} minW="max-content" pr={1}>
+        <Select
+          minW="220px"
+          flexShrink={0}
+          value={selectedAccount}
+          onChange={(e) => setSelectedAccount(e.target.value)}
+          size="sm"
+          borderRadius="md"
+          borderColor="gray.600"
+          color="white"
+          sx={{ "> option": { background: "#0F1535" } }}
+        >
+          {accounts.map((acc) => (
+            <option key={acc} value={acc}>
+              {acc === "all" ? "All Accounts" : acc}
+            </option>
+          ))}
+        </Select>
 
-              <Select minW="220px" flex="0 0 auto"
-                value={objectiveFilter} onChange={(e) => setObjectiveFilter(e.target.value)}
-                size="sm" borderRadius="md" borderColor="gray.600" color="white"
-                sx={{ "> option": { background: "#0F1535" } }}
-              >
-                {["all", ...new Set(objectives)].map((obj) => (
-                  <option key={obj} value={obj}>{obj === "all" ? "All Objectives" : obj}</option>
-                ))}
-              </Select>
+        <Select
+          minW="220px"
+          flexShrink={0}
+          value={objectiveFilter}
+          onChange={(e) => setObjectiveFilter(e.target.value)}
+          size="sm"
+          borderRadius="md"
+          borderColor="gray.600"
+          color="white"
+          sx={{ "> option": { background: "#0F1535" } }}
+        >
+          {objectives.map((obj) => (
+            <option key={obj} value={obj}>
+              {obj === "all" ? "All Objectives" : obj}
+            </option>
+          ))}
+        </Select>
 
-              <Select minW="180px" flex="0 0 auto"
-                value={datePreset} onChange={(e) => setDatePreset(e.target.value)}
-                size="sm" borderRadius="md" borderColor="gray.600" color="white"
-                sx={{ "> option": { background: "#0F1535" } }}
-              >
-                <option value="today">Today</option>
-                <option value="yesterday">Yesterday</option>
-                <option value="last_7d">Last 7 Days</option>
-                <option value="last_30d">Last 30 Days</option>
-                <option value="maximum">Maximum</option>
-              </Select>
+        <Select
+          minW="180px"
+          flexShrink={0}
+          value={datePreset}
+          onChange={(e) => setDatePreset(e.target.value)}
+          size="sm"
+          borderRadius="md"
+          borderColor="gray.600"
+          color="white"
+          sx={{ "> option": { background: "#0F1535" } }}
+        >
+          <option value="today">Today</option>
+          <option value="yesterday">Yesterday</option>
+          <option value="last_7d">Last 7 Days</option>
+          <option value="last_30d">Last 30 Days</option>
+          <option value="maximum">Maximum</option>
+        </Select>
 
-              <Select minW="160px" flex="0 0 auto"
-                value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
-                size="sm" borderRadius="md" borderColor="gray.600" color="white"
-                sx={{ "> option": { background: "#0F1535" } }}
-              >
-                <option value="ACTIVE">Active</option>
-                <option value="PAUSED">Paused</option>
-                <option value="ALL">All</option>
-              </Select>
+        <Select
+          minW="160px"
+          flexShrink={0}
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          size="sm"
+          borderRadius="md"
+          borderColor="gray.600"
+          color="white"
+          sx={{ "> option": { background: "#0F1535" } }}
+        >
+          <option value="ACTIVE">Active</option>
+          <option value="PAUSED">Paused</option>
+          <option value="ALL">All</option>
+        </Select>
 
-              <Spacer />
-
-              <HStack spacing={2} flex="0 0 auto">
-                <IconButton
-                  aria-label="Save view"
-                  icon={<Icon as={FaSave} />}
-                  size="sm"
-                  onClick={() =>
-                    toast({
-                      title: "View saved",
-                      description: "Filters and sort are stored locally.",
-                      status: "info",
-                      duration: 2000,
-                      isClosable: true,
-                      position: "top",
-                    })
-                  }
-                />
-                <IconButton aria-label="Refresh" icon={<RepeatIcon />} size="sm" onClick={fetchData} isLoading={loading}/>
-                <Text fontSize="xs" color="gray.400">Updated: {updatedLabel}</Text>
-              </HStack>
-            </HStack>
-          </Flex>
-        </CardHeader>
+        {/* actions справа */}
+        <IconButton
+          aria-label="Save view"
+          icon={<Icon as={FaSave} />}
+          size="sm"
+          flexShrink={0}
+          onClick={() =>
+            toast({
+              title: "View saved",
+              description: "Filters and sort are stored locally.",
+              status: "info",
+              duration: 2000,
+              isClosable: true,
+              position: "top",
+            })
+          }
+        />
+        <HStack spacing={2} flexShrink={0}>
+          <IconButton
+            aria-label="Refresh"
+            icon={<RepeatIcon />}
+            size="sm"
+            onClick={fetchData}
+            isLoading={loading}
+          />
+          <Text fontSize="xs" color="gray.400" whiteSpace="nowrap">
+            Updated: {lastUpdatedLabel}
+          </Text>
+        </HStack>
+      </Flex>
+    </Box>
+  </Flex>
+</CardHeader>
 
         <CardBody>
           <Box
