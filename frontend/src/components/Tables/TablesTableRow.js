@@ -10,6 +10,7 @@ import {
   Spinner,
 } from "@chakra-ui/react";
 
+// shorten objective for the Objective column
 function shortObjective(obj) {
   if (!obj) return "—";
   let s = String(obj).toUpperCase().trim();
@@ -19,7 +20,7 @@ function shortObjective(obj) {
 }
 
 function TablesTableRow(props) {
-  const { adset, avatarUrl, onStatusChange, isUpdating } = props;
+  const { adset, onStatusChange, isUpdating } = props;
   const textColor = useColorModeValue("white", "white");
   const stickyBg = useColorModeValue("#273b66", "#273b66");
 
@@ -41,11 +42,18 @@ function TablesTableRow(props) {
 
   return (
     <Tr>
+      {/* LEFT sticky cell: Account → Campaign → Ad Set */}
       <Td position="sticky" left="0" zIndex="1" bg={stickyBg} py={3}>
         <Flex align="flex-start" gap={3}>
-          <Avatar size="sm" name={account} src={avatarUrl || undefined} bg="gray.500" />
+          <Avatar size="sm" name={account} bg="gray.500" />
           <Flex direction="column" minW={0}>
-            <Text fontSize="10px" textTransform="uppercase" letterSpacing="0.6px" color="gray.300" noOfLines={1}>
+            <Text
+              fontSize="10px"
+              textTransform="uppercase"
+              letterSpacing="0.6px"
+              color="gray.300"
+              noOfLines={1}
+            >
               {account}
             </Text>
             <Text fontSize="sm" fontWeight="semibold" color={textColor} noOfLines={1} mt="1px">
@@ -58,6 +66,7 @@ function TablesTableRow(props) {
         </Flex>
       </Td>
 
+      {/* STATUS right after left cell */}
       <Td>
         {isUpdating ? (
           <Spinner size="sm" color="white" />
@@ -72,7 +81,13 @@ function TablesTableRow(props) {
         )}
       </Td>
 
-      <Td><Text fontSize="xs" color={textColor} noOfLines={1}>{shortObjective(adset.objective)}</Text></Td>
+      {/* Objective (short & compact) */}
+      <Td>
+        <Text fontSize="xs" color={textColor} noOfLines={1}>
+          {shortObjective(adset.objective)}
+        </Text>
+      </Td>
+
       <Td><Text fontSize="sm" color={textColor}>{formatCurrency(adset.spend)}</Text></Td>
       <Td><Text fontSize="sm" color={textColor}>{formatNumber(adset.impressions)}</Text></Td>
       <Td><Text fontSize="sm" color={textColor}>{formatNumber(adset.frequency)}</Text></Td>
