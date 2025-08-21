@@ -14,9 +14,6 @@ import {
   HStack,
   Icon,
   IconButton,
-  Switch as ChSwitch,
-  FormControl,
-  FormLabel,
 } from "@chakra-ui/react";
 import { TriangleDownIcon, TriangleUpIcon, RepeatIcon } from "@chakra-ui/icons";
 import { FaSave } from "react-icons/fa";
@@ -53,10 +50,6 @@ function Tables() {
     "sortConfig"
   );
 
-  // New: layout toggles
-  const [wideMode, setWideMode] = useStickyState(false, "wideMode");
-  const [compact, setCompact] = useStickyState(true, "compactRows"); // compact by default
-
   // Updated: now / N mins ago
   const [lastUpdated, setLastUpdated] = useState(null);
   const [tick, setTick] = useState(0);
@@ -87,7 +80,6 @@ function Tables() {
       if (data.detail) throw new Error(data.detail);
       setAllAdsets(data);
       setLastUpdated(new Date());
-      // window.__lastAdsets = data; // для дебага при желании
     } catch (e) {
       setError(e.message || "Failed to load data");
     } finally {
@@ -150,8 +142,8 @@ function Tables() {
 
   const SortableTh = ({ children, sortKey }) => (
     <Th cursor="pointer" onClick={() => requestSort(sortKey)} color="gray.200">
-      <Flex align="center" justify="space-between">
-        <span>{children}</span>
+      <Flex align="center">
+        {children}
         {sortConfig.key === sortKey && (
           <Icon as={sortConfig.direction === "ascending" ? TriangleUpIcon : TriangleDownIcon} w={3} h={3} ml={2} />
         )}
@@ -176,32 +168,14 @@ function Tables() {
 
   // нейтральный цвет разделителей (под темную тему)
   const SEPARATOR = "rgba(255,255,255,0.10)";
-  // таблица: плотность строк
-  const rowPy = compact ? "10px" : "14px";
-  const headerPy = compact ? "10px" : "14px";
 
   return (
     <Flex direction="column" pt={{ base: "120px", md: "75px" }}>
-      <Card w="100%" maxW={wideMode ? "100%" : "1440px"} mx="auto">
+      <Card>
         <CardHeader>
-          <Flex direction="column" w="100%">
-            <HStack justify="space-between" align="center">
-              <Text fontSize="xl" color="#fff" fontWeight="bold">Active Ad Sets</Text>
-
-              {/* Layout toggles */}
-              <HStack spacing={6}>
-                <FormControl display="flex" alignItems="center" w="auto">
-                  <FormLabel htmlFor="compact" mb="0" color="gray.300" fontSize="sm">Compact</FormLabel>
-                  <ChSwitch id="compact" colorScheme="purple" isChecked={compact} onChange={(e) => setCompact(e.target.checked)} />
-                </FormControl>
-                <FormControl display="flex" alignItems="center" w="auto">
-                  <FormLabel htmlFor="wide" mb="0" color="gray.300" fontSize="sm">Wide mode</FormLabel>
-                  <ChSwitch id="wide" colorScheme="purple" isChecked={wideMode} onChange={(e) => setWideMode(e.target.checked)} />
-                </FormControl>
-              </HStack>
-            </HStack>
-
-            <HStack mt="20px" spacing={3} align="center" flexWrap="wrap">
+          <Flex direction="column">
+            <Text fontSize="xl" color="#fff" fontWeight="bold">Active Ad Sets</Text>
+            <HStack mt="20px" spacing={3} align="center">
               <Select value={selectedAccount} onChange={(e) => setSelectedAccount(e.target.value)} size="sm" borderRadius="md" borderColor="gray.600" color="white" sx={{ "> option": { background: "#0F1535" } }}>
                 {accounts.map((acc) => (<option key={acc} value={acc}>{acc === "all" ? "All Accounts" : acc}</option>))}
               </Select>
@@ -234,7 +208,7 @@ function Tables() {
         <CardBody>
           {/* СКРОЛЛ-КОНТЕЙНЕР С ЛИПКИМ ХЕДЕРОМ + ВЕРТИКАЛЬНЫЕ ЛИНИИ */}
           <Box
-            maxH="calc(100vh - 240px)"
+            maxH="70vh"
             overflow="auto"
             sx={{
               "&::-webkit-scrollbar": { height: "8px", width: "8px" },
@@ -248,48 +222,46 @@ function Tables() {
                 top: 0,
                 zIndex: 3,
                 background: "#2a406e",
-                py: headerPy,
               },
+              // липкая первая колонка в шапке
               "& thead th:first-of-type": {
                 left: 0,
                 zIndex: 5,
-                boxShadow: `inset -1px 0 0 ${SEPARATOR}`,
+                boxShadow: `inset -1px 0 0 ${SEPARATOR}`, // вертикальный разделитель справа от первой колонки хедера
               },
+              // липкая первая колонка в теле
               "& tbody td:first-of-type": {
                 position: "sticky",
                 left: 0,
                 zIndex: 4,
                 background: "#273b66",
-                boxShadow: `inset -1px 0 0 ${SEPARATOR}`,
+                boxShadow: `inset -1px 0 0 ${SEPARATOR}`, // разделитель справа
               },
 
-              // вертикальные линии + плотность строк
+              // === ВЕРТИКАЛЬНЫЕ ЛИНИИ ДЛЯ ВСЕХ ЯЧЕЕК ===
               "& th, & td": {
                 borderRight: `1px solid ${SEPARATOR}`,
               },
               "& th:last-of-type, & td:last-of-type": {
                 borderRight: "none",
               },
-              "& tbody td": {
-                py: rowPy,
-              },
             }}
           >
-            <Table variant="simple" color="#fff" sx={{ tableLayout: "fixed", minWidth: "1200px" }}>
+            <Table variant="simple" color="#fff">
               <Thead>
                 <Tr my=".8rem" ps="0px">
-                  <Th color="white" w="420px">Account / Campaign / Ad Set</Th>
-                  <Th color="gray.200" w="110px">Status</Th>
-                  <Th color="gray.200" w="140px">Objective</Th>
-                  <SortableTh sortKey="spend"><span style={{display:"inline-block", minWidth: 90}}>Spent</span></SortableTh>
-                  <Th color="gray.200" w="130px">Impressions</Th>
-                  <Th color="gray.200" w="120px">Frequency</Th>
-                  <Th color="gray.200" w="120px">Leads (CPA)</Th>
-                  <SortableTh sortKey="cpl"><span style={{display:"inline-block", minWidth: 80}}>CPL</span></SortableTh>
-                  <Th color="gray.200" w="110px">CPM</Th>
-                  <Th color="gray.200" w="120px">CTR (All)</Th>
-                  <Th color="gray.200" w="140px">CTR (Link Click)</Th>
-                  <Th color="gray.200" w="120px">Link Clicks</Th>
+                  <Th color="white">Account / Campaign / Ad Set</Th>
+                  <Th color="gray.200">Status</Th>
+                  <Th color="gray.200">Objective</Th>
+                  <SortableTh sortKey="spend">Spent</SortableTh>
+                  <Th color="gray.200">Impressions</Th>
+                  <Th color="gray.200">Frequency</Th>
+                  <Th color="gray.200">Leads (CPA)</Th>
+                  <SortableTh sortKey="cpl">CPL</SortableTh>
+                  <Th color="gray.200">CPM</Th>
+                  <Th color="gray.200">CTR (All)</Th>
+                  <Th color="gray.200">CTR (Link Click)</Th>
+                  <Th color="gray.200">Link Clicks</Th>
                 </Tr>
               </Thead>
               <Tbody>{renderTableBody()}</Tbody>
