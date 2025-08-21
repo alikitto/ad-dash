@@ -8,11 +8,13 @@ import {
   Switch,
   useColorModeValue,
   Spinner,
-  IconButton,
 } from "@chakra-ui/react";
-import { ChevronRightIcon, ChevronDownIcon } from "@chakra-ui/icons";
+
+// твой словарь: src/variables/clientAvatars.js
+// export const CLIENT_AVATARS = { "act_284902192299330": "https://..." , ... }
 import { CLIENT_AVATARS } from "../../variables/clientAvatars";
 
+// --- utils ---
 function shortObjective(obj) {
   if (!obj) return "—";
   let s = String(obj).toUpperCase().trim();
@@ -21,34 +23,64 @@ function shortObjective(obj) {
   return s;
 }
 
+// строим список возможных ключей для словаря
 function candidateKeysFromAdset(adset) {
   const keys = new Set();
-  const idStr = adset?.account_id ? String(adset.account_id) : "";
-  const nameStr = adset?.account_name ? String(adset.account_name) : "";
+
+  const rawId =
+    adset?.account_id ??
+    adset?.accountId ??
+    adset?.ad_account_id ??
+    adset?.account?.id ??
+    adset?.account?.account_id ??
+    "";
+
+  const rawName =
+    adset?.account_name ??
+    adset?.accountName ??
+    adset?.account?.name ??
+    "";
+
+  const idStr = rawId != null ? String(rawId) : "";
+  const nameStr = rawName != null ? String(rawName) : "";
+
   if (idStr) {
-    keys.add(idStr);
-    if (!idStr.startsWith("act_")) keys.add(`act_${idStr}`);
-    keys.add(idStr.replace(/^act_/, ""));
+    keys.add(idStr);                       // "2849..."
+    if (!idStr.startsWith("act_")) keys.add(`act_${idStr}`); // "act_2849..."
+    keys.add(idStr.replace(/^act_/, ""));  // "2849..." если пришло с act_
   }
-  if (nameStr) keys.add(nameStr);
+  if (nameStr) {
+    keys.add(nameStr);                     // точное имя
+  }
+
   return Array.from(keys).filter(Boolean);
 }
+
 function resolveAvatar(adset) {
-  if (adset?.avatarUrl) return adset.avatarUrl;
-  for (const k of candidateKeysFromAdset(adset)) {
+  // приоритет: прямой URL из бэка -> словарь по ключам -> словарь по имени (без регистра)
+  if (adset?.avatarUrl) return { src: adset.avatarUrl, hit: "adset.avatarUrl" };
+
+  const candidates = candidateKeysFromAdset(adset);
+  for (const k of candidates) {
     if (Object.prototype.hasOwnProperty.call(CLIENT_AVATARS, k)) {
-      return CLIENT_AVATARS[k];
+      return { src: CLIENT_AVATARS[k], hit: k };
     }
   }
-  const name = (adset?.account_name || "").toLowerCase();
-  for (const key of Object.keys(CLIENT_AVATARS)) {
-    if (key.toLowerCase() === name) return CLIENT_AVATARS[key];
+
+  // case-insensitive по имени
+  const name = (adset?.account_name ?? adset?.accountName ?? "").toLowerCase();
+  if (name) {
+    for (const k of Object.keys(CLIENT_AVATARS)) {
+      if (k.toLowerCase() === name) {
+        return { src: CLIENT_AVATARS[k], hit: `${k} (ci)` };
+      }
+    }
   }
-  return undefined;
+  return { src: undefined, hit: "not-found" };
 }
 
 function TablesTableRow(props) {
-  const { adset, onStatusChange, isUpdating, expanded, onToggleExpand } = props;
+  const { adset, onStatusChange, isUpdating } = props;
   const textColor = useColorModeValue("white", "white");
   const stickyBg = useColorModeValue("#273b66", "#273b66");
 
@@ -67,23 +99,36 @@ function TablesTableRow(props) {
   const account = adset.account_name || "—";
   const campaign = adset.campaign_name || "—";
   const adsetName = adset.adset_name || adset.name || "Untitled Ad Set";
-  const avatarSrc = resolveAvatar(adset);
+
+  const { src: avatarSrc, hit } = resolveAvatar(adset);
+
+  // дебаг в консоль — посмотри что реально подставилось
+  /* eslint-disable no-console */
+  console.debug("[avatar]", {
+    account_id: adset?.account_id,
+    account_name: adset?.account_name,
+    used_key: hit,
+    src: avatarSrc,
+  });
+  /* eslint-enable no-console */
 
   return (
     <Tr>
-      {/* LEFT sticky cell: expand chevron + Account → Campaign → Ad Set */}
+      {/* LEFT sticky cell: Account → Campaign → Ad Set */}
       <Td position="sticky" left="0" zIndex="1" bg={stickyBg} py={3}>
         <Flex align="flex-start" gap={3}>
-          <IconButton
-            aria-label={expanded ? "Collapse ads" : "Expand ads"}
-            icon={expanded ? <ChevronDownIcon /> : <ChevronRightIcon />}
+          <Avatar
             size="sm"
-            variant="ghost"
-            color="gray.200"
-            onClick={onToggleExpand}
-            minW="28px"
+            name={account}
+            src={avatarSrc}
+            bg="gray.500"
+            title={`avatar: ${hit}`}
+            onError={(e) => {
+              // покажем в консоли, если картинка не загрузилась (404/403 и т.д.)
+              console.debug("avatar load error:", e?.currentTarget?.src);
+              e.currentTarget.src = ""; // вернётся к инициалам
+            }}
           />
-          <Avatar size="sm" name={account} src={avatarSrc} bg="gray.500" />
           <Flex direction="column" minW={0}>
             <Text
               fontSize="10px"
