@@ -1,49 +1,30 @@
-# settings_backend.py
+# --- Файл: backend/settings_backend.py ---
+
 import os
+import json
 import logging
 from dotenv import load_dotenv
 from fastapi import FastAPI, Body, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, List
 from sqlalchemy import create_engine, Column, Integer, String
-from sqlalchemy.orm import sessionmaker, declarative_base, Session
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, Session
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+# --- Конфигурация ---
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 load_dotenv()
-
-# DB url: Railway sets DATABASE_URL or POSTGRES_URL; normalize scheme
-_DB = (
-    os.getenv("DATABASE_URL")
-    or os.getenv("POSTGRES_URL")
-    or os.getenv("POSTGRESQL_URL")
-)
-if _DB and _DB.startswith("postgres://"):
-    _DB = _DB.replace("postgres://", "postgresql://", 1)
-
-# Fallback to SQLite for local dev if not set
-if not _DB:
-    logging.warning("DATABASE_URL not set. Falling back to SQLite ./avatars.db")
-    _DB = "sqlite:///./avatars.db"
-    _CONNECT_ARGS = {"check_same_thread": False}
-else:
-    _CONNECT_ARGS = {}
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 app = FastAPI()
+origins = ["https://ad-dash-frontend-production.up.railway.app", "http://localhost:3000"] # ЗАМЕНИТЕ НА ВАШ URL
+app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
-origins = [
-    os.getenv("FRONTEND_ORIGIN") or "http://localhost:3000",
-    "http://localhost:3000",
-    "https://ad-dash-frontend-production.up.railway.app",
-]
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# --- Настройка Базы Данных ---
+if not DATABASE_URL:
+    raise RuntimeError("DATABASE_URL is not set. Please connect a database service.")
 
-engine = create_engine(_DB, connect_args=_CONNECT_ARGS)
+engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
@@ -62,33 +43,35 @@ def get_db():
     finally:
         db.close()
 
+# --- Эндпоинты для Настроек Аватарок ---
 @app.get("/api/settings/avatars")
-def get_avatars(db: Session = Depends(get_db)) -> List[Dict]:
-    rows = db.query(AvatarSetting).all()
-    # Возвращаем ARRAY для единообразия
-    return [{"account_id": r.account_id, "image_url": r.image_url} for r in rows]
+def get_avatars(db: Session = Depends(get_db)):
+    avatars = db.query(AvatarSetting).all()
+    return {avatar.account_id: avatar.image_url for avatar in avatars}
 
 @app.post("/api/settings/avatars")
-def upsert_avatar(payload: Dict = Body(...), db: Session = Depends(get_db)) -> Dict:
-    account_id = (payload.get("accountId") or "").strip()
-    image_url = (payload.get("imageUrl") or "").strip()
+def save_avatar(payload: Dict = Body(...), db: Session = Depends(get_db)):
+    account_id = payload.get("accountId")
+    image_url = payload.get("imageUrl")
     if not account_id or not image_url:
         raise HTTPException(status_code=400, detail="accountId and imageUrl are required")
 
-    row = db.query(AvatarSetting).filter(AvatarSetting.account_id == account_id).first()
-    if row:
-        row.image_url = image_url
+    db_avatar = db.query(AvatarSetting).filter(AvatarSetting.account_id == account_id).first()
+    if db_avatar:
+        db_avatar.image_url = image_url
     else:
-        row = AvatarSetting(account_id=account_id, image_url=image_url)
-        db.add(row)
+        db_avatar = AvatarSetting(account_id=account_id, image_url=image_url)
+        db.add(db_avatar)
+
     db.commit()
-    return {"status": "success", "account_id": account_id}
+    db.refresh(db_avatar)
+    return {"status": "success", "account_id": db_avatar.account_id}
 
 @app.delete("/api/settings/avatars/{account_id}")
-def delete_avatar(account_id: str, db: Session = Depends(get_db)) -> Dict:
-    row = db.query(AvatarSetting).filter(AvatarSetting.account_id == account_id).first()
-    if not row:
-        raise HTTPException(status_code=404, detail="Avatar not found")
-    db.delete(row)
-    db.commit()
-    return {"status": "success"}
+def delete_avatar(account_id: str, db: Session = Depends(get_db)):
+    db_avatar = db.query(AvatarSetting).filter(AvatarSetting.account_id == account_id).first()
+    if db_avatar:
+        db.delete(db_avatar)
+        db.commit()
+        return {"status": "success"}
+    raise HTTPException(status_code=404, detail="Avatar not found")
