@@ -1,11 +1,25 @@
 import React, { useState } from "react";
 import {
-  Avatar, Flex, Td, Text, Tr, Switch, useColorModeValue, Spinner, Box, Table, Tbody, Th, Thead, IconButton, Image
+  Avatar,
+  Flex,
+  Td,
+  Text,
+  Tr,
+  Switch,
+  useColorModeValue,
+  Spinner,
+  Box,
+  Table,
+  Tbody,
+  Th,
+  Thead,
+  IconButton,
+  Image,
 } from "@chakra-ui/react";
 import { ChevronRightIcon, ChevronDownIcon } from "@chakra-ui/icons";
 import { CLIENT_AVATARS } from "../../variables/clientAvatars";
 
-// --- utils (из твоего файла) ---
+// shorten objective for the Objective column
 function shortObjective(obj) {
   if (!obj) return "—";
   let s = String(obj).toUpperCase().trim();
@@ -13,10 +27,27 @@ function shortObjective(obj) {
   s = s.replace(/_/g, " ");
   return s;
 }
+
+// helpers
+const fmtMoney = (v) =>
+  typeof v !== "number" || !isFinite(v) ? "$0.00" : `$${v.toFixed(2)}`;
+const fmtPct = (v) =>
+  typeof v !== "number" || !isFinite(v) ? "0.00%" : `${v.toFixed(2)}%`;
+const fmtNum = (v) =>
+  typeof v !== "number" || !isFinite(v) ? "0" : Number(v).toLocaleString("en-US");
+
+// аватар по account_id / account_name
 function candidateKeysFromAdset(adset) {
   const keys = new Set();
-  const rawId = adset?.account_id ?? adset?.accountId ?? adset?.ad_account_id ?? adset?.account?.id ?? adset?.account?.account_id ?? "";
-  const rawName = adset?.account_name ?? adset?.accountName ?? adset?.account?.name ?? "";
+  const rawId =
+    adset?.account_id ??
+    adset?.accountId ??
+    adset?.ad_account_id ??
+    adset?.account?.id ??
+    adset?.account?.account_id ??
+    "";
+  const rawName =
+    adset?.account_name ?? adset?.accountName ?? adset?.account?.name ?? "";
   const idStr = rawId != null ? String(rawId) : "";
   const nameStr = rawName != null ? String(rawName) : "";
   if (idStr) {
@@ -44,21 +75,23 @@ function resolveAvatar(adset) {
   return { src: undefined, hit: "not-found" };
 }
 
-const fmt$ = (v) => (typeof v !== "number" || !isFinite(v) ? "$0.00" : `$${v.toFixed(2)}`);
-const fmt% = (v) => (typeof v !== "number" || !isFinite(v) ? "0.00%" : `${v.toFixed(2)}%`);
-const fmtN = (v) => (typeof v !== "number" || !isFinite(v) ? "0" : Number(v).toLocaleString("en-US"));
-
 function TablesTableRow(props) {
   const { adset, onStatusChange, isUpdating, datePreset } = props;
   const textColor = useColorModeValue("white", "white");
   const stickyBg = useColorModeValue("#273b66", "#273b66");
+
   const [expanded, setExpanded] = useState(false);
   const [adsLoading, setAdsLoading] = useState(false);
   const [ads, setAds] = useState([]);
   const [updatingAdId, setUpdatingAdId] = useState(null);
 
-  const ctrLinkClick = adset && adset.impressions > 0 ? (Number(adset.link_clicks || 0) / adset.impressions) * 100 : 0;
+  const ctrLinkClick =
+    adset && adset.impressions > 0
+      ? (Number(adset.link_clicks || 0) / adset.impressions) * 100
+      : 0;
+
   const leadsCount = adset.leads ?? adset.results ?? 0;
+
   const account = adset.account_name || "—";
   const campaign = adset.campaign_name || "—";
   const adsetName = adset.adset_name || adset.name || "Untitled Ad Set";
@@ -90,11 +123,19 @@ function TablesTableRow(props) {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: current === "ACTIVE" ? "PAUSED" : "ACTIVE" }),
+          body: JSON.stringify({
+            status: current === "ACTIVE" ? "PAUSED" : "ACTIVE",
+          }),
         }
       );
       if (!res.ok) throw new Error("Update failed");
-      setAds((prev) => prev.map(a => a.ad_id === ad_id ? { ...a, status: current === "ACTIVE" ? "PAUSED" : "ACTIVE" } : a));
+      setAds((prev) =>
+        prev.map((a) =>
+          a.ad_id === ad_id
+            ? { ...a, status: current === "ACTIVE" ? "PAUSED" : "ACTIVE" }
+            : a
+        )
+      );
     } catch (e) {
       console.error(e);
     } finally {
@@ -119,7 +160,13 @@ function TablesTableRow(props) {
             />
             <Avatar size="sm" name={account} src={avatarSrc} bg="gray.500" />
             <Flex direction="column" minW={0}>
-              <Text fontSize="10px" textTransform="uppercase" letterSpacing="0.6px" color="gray.300" noOfLines={1}>
+              <Text
+                fontSize="10px"
+                textTransform="uppercase"
+                letterSpacing="0.6px"
+                color="gray.300"
+                noOfLines={1}
+              >
                 {account}
               </Text>
               <Text fontSize="sm" fontWeight="semibold" color={textColor} noOfLines={1} mt="1px">
@@ -141,28 +188,31 @@ function TablesTableRow(props) {
               colorScheme="teal"
               isChecked={adset.status === "ACTIVE"}
               onChange={() =>
-                onStatusChange(adset.adset_id, adset.status === "ACTIVE" ? "PAUSED" : "ACTIVE")
+                onStatusChange(
+                  adset.adset_id,
+                  adset.status === "ACTIVE" ? "PAUSED" : "ACTIVE"
+                )
               }
             />
           )}
         </Td>
 
-        {/* Objective (short) */}
+        {/* Objective (short & compact) */}
         <Td>
           <Text fontSize="xs" color={textColor} noOfLines={1}>
             {shortObjective(adset.objective)}
           </Text>
         </Td>
 
-        <Td><Text fontSize="sm" color={textColor}>{fmt$(adset.spend)}</Text></Td>
-        <Td><Text fontSize="sm" color={textColor}>{fmtN(adset.impressions)}</Text></Td>
-        <Td><Text fontSize="sm" color={textColor}>{fmtN(adset.frequency)}</Text></Td>
-        <Td><Text fontSize="sm" color={textColor}>{fmtN(leadsCount)}</Text></Td>
-        <Td><Text fontSize="sm" color={textColor}>{fmt$(adset.cpl)}</Text></Td>
-        <Td><Text fontSize="sm" color={textColor}>{fmt$(adset.cpm)}</Text></Td>
-        <Td><Text fontSize="sm" color={textColor}>{fmt%(adset.ctr_all)}</Text></Td>
-        <Td><Text fontSize="sm" color={textColor}>{fmt%(ctrLinkClick)}</Text></Td>
-        <Td><Text fontSize="sm" color={textColor}>{fmtN(adset.link_clicks)}</Text></Td>
+        <Td><Text fontSize="sm" color={textColor}>{fmtMoney(adset.spend)}</Text></Td>
+        <Td><Text fontSize="sm" color={textColor}>{fmtNum(adset.impressions)}</Text></Td>
+        <Td><Text fontSize="sm" color={textColor}>{fmtNum(adset.frequency)}</Text></Td>
+        <Td><Text fontSize="sm" color={textColor}>{fmtNum(leadsCount)}</Text></Td>
+        <Td><Text fontSize="sm" color={textColor}>{fmtMoney(adset.cpl)}</Text></Td>
+        <Td><Text fontSize="sm" color={textColor}>{fmtMoney(adset.cpm)}</Text></Td>
+        <Td><Text fontSize="sm" color={textColor}>{fmtPct(adset.ctr_all)}</Text></Td>
+        <Td><Text fontSize="sm" color={textColor}>{fmtPct(ctrLinkClick)}</Text></Td>
+        <Td><Text fontSize="sm" color={textColor}>{fmtNum(adset.link_clicks)}</Text></Td>
       </Tr>
 
       {/* EXPANDED ADS */}
@@ -172,16 +222,25 @@ function TablesTableRow(props) {
             <Box px={4} py={3}>
               {adsLoading ? (
                 <Flex align="center" justify="center" py={4}>
-                  <Spinner size="sm" mr={2}/> <Text fontSize="sm" color="gray.200">Loading ads...</Text>
+                  <Spinner size="sm" mr={2} />
+                  <Text fontSize="sm" color="gray.200">Loading ads...</Text>
                 </Flex>
               ) : ads.length === 0 ? (
                 <Text fontSize="sm" color="gray.300">No ads for this ad set.</Text>
               ) : (
-                <Table variant="simple" color="#fff" size="sm" w="full" sx={{
-                  tableLayout: "fixed",
-                  "& th, & td": { borderRight: "1px solid rgba(255,255,255,0.10)" },
-                  "& th:last-of-type, & td:last-of-type": { borderRight: "none" },
-                }}>
+                <Table
+                  variant="simple"
+                  color="#fff"
+                  size="sm"
+                  w="full"
+                  sx={{
+                    tableLayout: "fixed",
+                    "& th, & td": {
+                      borderRight: "1px solid rgba(255,255,255,0.10)",
+                    },
+                    "& th:last-of-type, & td:last-of-type": { borderRight: "none" },
+                  }}
+                >
                   <Thead>
                     <Tr>
                       <Th color="gray.300">AD</Th>
@@ -203,8 +262,14 @@ function TablesTableRow(props) {
                       <Tr key={ad.ad_id}>
                         <Td>
                           <Flex align="center" gap={3} minW={0}>
-                            {ad.thumb ? (
-                              <Image src={ad.thumb} alt="" boxSize="28px" borderRadius="md" objectFit="cover" />
+                            {ad.thumbnail_url ? (
+                              <Image
+                                src={ad.thumbnail_url}
+                                alt=""
+                                boxSize="28px"
+                                borderRadius="md"
+                                objectFit="cover"
+                              />
                             ) : (
                               <Avatar size="xs" name={ad.ad_name} />
                             )}
@@ -223,16 +288,17 @@ function TablesTableRow(props) {
                             />
                           )}
                         </Td>
+                        {/* у объявления цели нет в этой таблице */}
                         <Td><Text fontSize="xs">—</Text></Td>
-                        <Td>{fmt$(ad.spend)}</Td>
-                        <Td>{fmtN(ad.impressions)}</Td>
-                        <Td>{fmtN(ad.frequency)}</Td>
-                        <Td>{fmtN(ad.leads)}</Td>
-                        <Td>{fmt$(ad.cpa || 0)}</Td>
-                        <Td>{fmt$(ad.cpm)}</Td>
-                        <Td>{fmt%(ad.ctr_link)}</Td>
-                        <Td>{fmt%(ad.link_clicks && ad.impressions ? (ad.link_clicks / ad.impressions) * 100 : 0)}</Td>
-                        <Td>{fmtN(ad.link_clicks)}</Td>
+                        <Td>{fmtMoney(ad.spend)}</Td>
+                        <Td>{fmtNum(ad.impressions)}</Td>
+                        <Td>{fmtNum(ad.frequency)}</Td>
+                        <Td>{fmtNum(ad.leads)}</Td>
+                        <Td>{fmtMoney(ad.cpa || 0)}</Td> {/* CPL = стоимость лида */}
+                        <Td>{fmtMoney(ad.cpm)}</Td>
+                        <Td>{fmtPct(ad.ctr)}</Td>        {/* CTR (ALL) из Graph */}
+                        <Td>{fmtPct(ad.ctr_link)}</Td>   {/* CTR (LINK) посчитан */}
+                        <Td>{fmtNum(ad.link_clicks)}</Td>
                       </Tr>
                     ))}
                   </Tbody>
