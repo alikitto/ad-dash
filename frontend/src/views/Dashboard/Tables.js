@@ -166,6 +166,9 @@ function Tables() {
     ));
   };
 
+  // нейтральный цвет разделителей (под темную тему)
+  const SEPARATOR = "rgba(255,255,255,0.10)";
+
   return (
     <Flex direction="column" pt={{ base: "120px", md: "75px" }}>
       <Card>
@@ -203,12 +206,11 @@ function Tables() {
         </CardHeader>
 
         <CardBody>
-          {/* СКРОЛЛ-КОНТЕЙНЕР С ЛИПКИМ ХЕДЕРОМ */}
+          {/* СКРОЛЛ-КОНТЕЙНЕР С ЛИПКИМ ХЕДЕРОМ + ВЕРТИКАЛЬНЫЕ ЛИНИИ */}
           <Box
             maxH="70vh"
             overflow="auto"
             sx={{
-              // скроллбар
               "&::-webkit-scrollbar": { height: "8px", width: "8px" },
               "&::-webkit-scrollbar-track": { background: "transparent" },
               "&::-webkit-scrollbar-thumb": { background: "#2D3748", borderRadius: "8px" },
@@ -221,17 +223,27 @@ function Tables() {
                 zIndex: 3,
                 background: "#2a406e",
               },
-              // первая колонка в шапке — тоже липкая слева
+              // липкая первая колонка в шапке
               "& thead th:first-of-type": {
                 left: 0,
                 zIndex: 5,
+                boxShadow: `inset -1px 0 0 ${SEPARATOR}`, // вертикальный разделитель справа от первой колонки хедера
               },
-              // первая колонка в теле — липкая слева
+              // липкая первая колонка в теле
               "& tbody td:first-of-type": {
                 position: "sticky",
                 left: 0,
                 zIndex: 4,
                 background: "#273b66",
+                boxShadow: `inset -1px 0 0 ${SEPARATOR}`, // разделитель справа
+              },
+
+              // === ВЕРТИКАЛЬНЫЕ ЛИНИИ ДЛЯ ВСЕХ ЯЧЕЕК ===
+              "& th, & td": {
+                borderRight: `1px solid ${SEPARATOR}`,
+              },
+              "& th:last-of-type, & td:last-of-type": {
+                borderRight: "none",
               },
             }}
           >
