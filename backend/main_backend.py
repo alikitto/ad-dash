@@ -394,6 +394,7 @@ IMPORTANT: You are analyzing a sample of {len(final_adsets)} ad sets from a larg
     except Exception as e:
         logging.error(f"OpenAI API error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to get AI analysis: {e}")
+@app.post("/api/analyze-adsets") # <--- ЭТОТ БЛОК, СКОРЕЕ ВСЕГО, БЫЛ УДАЛЕН
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Other Endpoints (Including the one that was likely deleted)
