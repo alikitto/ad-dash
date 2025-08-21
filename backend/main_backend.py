@@ -327,17 +327,17 @@ async def update_ad_status(ad_id: str, payload: Dict = Body(...)):
         logging.error(f"update_ad_status error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
-# ── AI Analysis ───────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────────────────
+# AI Analysis Logic (The fixed part)
+# ──────────────────────────────────────────────────────────────────────────────
 
 async def get_ai_analysis(adsets: List[dict]) -> Dict:
     if not OPENAI_API_KEY:
         raise HTTPException(status_code=500, detail="OpenAI API key is not configured.")
 
-    # --- САМАЯ НАДЕЖНАЯ ВЕРСИЯ: ОБРАБОТКА ЛЮБЫХ ДАННЫХ ---
     MAX_ADSETS_FOR_AI = 35
     final_adsets = adsets
 
-    # Функция-помощник для 100% безопасного получения числовых значений
     def safe_float(value):
         try:
             return float(value) if value is not None else 0.0
@@ -345,7 +345,6 @@ async def get_ai_analysis(adsets: List[dict]) -> Dict:
             return 0.0
 
     if len(adsets) > MAX_ADSETS_FOR_AI:
-        # Сортируем по разным ключам, используя новую безопасную функцию
         top_by_spend = sorted(adsets, key=lambda x: safe_float(x.get("spend")), reverse=True)[:15]
         top_by_leads = sorted(adsets, key=lambda x: safe_float(x.get("leads")), reverse=True)[:10]
         worst_performers = sorted(
@@ -353,60 +352,49 @@ async def get_ai_analysis(adsets: List[dict]) -> Dict:
             key=lambda x: safe_float(x.get("spend")),
             reverse=True
         )[:5]
-
-        # Объединяем выборки и убираем дубликаты
         combined = {d["adset_id"]: d for d in top_by_spend + top_by_leads + worst_performers}
         final_adsets = list(combined.values())
 
-    # Упрощаем данные для промпта с максимальной защитой
     simplified_adsets = []
     for d in final_adsets:
         impressions = safe_float(d.get("impressions"))
         link_clicks = safe_float(d.get("link_clicks"))
         ctr_link = (link_clicks / impressions * 100.0) if impressions > 0 else 0.0
-        
         simplified_adsets.append({
             "name": f"{d.get('account_name', '')[:15]} / {d.get('adset_name', 'N/A')[:25]}",
-            "status": d.get("status"),
-            "spend": round(safe_float(d.get("spend")), 2),
-            "leads": int(safe_float(d.get("leads"))),
-            "cpl": round(safe_float(d.get("cpl")), 2),
+            "status": d.get("status"), "spend": round(safe_float(d.get("spend")), 2),
+            "leads": int(safe_float(d.get("leads"))), "cpl": round(safe_float(d.get("cpl")), 2),
             "ctr_link": round(ctr_link, 2),
         })
 
-    # Системный промпт - наша инструкция для AI
     system_prompt = f"""
-You are an expert Meta Ads analyst. Your task is to analyze a list of ad sets provided in JSON format.
+You are an expert Meta Ads analyst. Your task is to analyze a list of ad sets.
 Provide a concise, data-driven analysis in Russian.
-Your response MUST be a valid JSON object with three keys: "summary", "insights", and "recommendations".
-1.  `summary`: A short, 2-3 sentence executive summary. Mention total spend and total leads FROM THE ORIGINAL DATASET.
-2.  `insights`: A list of 2-4 key bullet-point observations.
-3.  `recommendations`: A list of actionable recommendations. Each with `priority` ("high", "medium", "low") and `text`.
-Analyze based on Spend, Leads, CPL, and CTR. A low CPL is good. A high CTR is good.
-IMPORTANT: You are analyzing a curated sample of {len(final_adsets)} ad sets from a larger dataset of {len(adsets)} ad sets.
+Your response MUST be a valid JSON object with keys: "summary", "insights", "recommendations".
+1. `summary`: Short executive summary. Mention total spend and leads.
+2. `insights`: 2-4 key bullet-point observations.
+3. `recommendations`: Actionable recommendations, each with `priority` and `text`.
+IMPORTANT: You are analyzing a sample of {len(final_adsets)} ad sets from a larger dataset of {len(adsets)}.
 """
     total_spend = round(sum(safe_float(a.get("spend")) for a in adsets), 2)
     total_leads = int(sum(safe_float(a.get("leads")) for a in adsets))
-    user_data = {
-        "total_spend": total_spend,
-        "total_leads": total_leads,
-        "adsets_sample": simplified_adsets
-    }
+    user_data = {"total_spend": total_spend, "total_leads": total_leads, "adsets_sample": simplified_adsets}
 
     try:
         client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY)
         response = await client.chat.completions.create(
-            model="gpt-4o",
-            response_format={"type": "json_object"},
+            model="gpt-4o", response_format={"type": "json_object"},
             messages=[
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": json.dumps(user_data, indent=2)},
+                {"role": "user", "content": json.dumps(user_data, indent=2, ensure_ascii=False)},
             ],
-            temperature=0.5,
-            max_tokens=2000,
+            temperature=0.5, max_tokens=2000,
         )
-        analysis_content = response.choices[0].message.content
-        return json.loads(analysis_content)
+        return json.loads(response.choices[0].message.content)
     except Exception as e:
         logging.error(f"OpenAI API error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to get AI analysis: {e}")
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Other Endpoints (Including the one that was likely deleted)
+# ───────────────────────────────
