@@ -8,18 +8,12 @@ import {
   Switch,
   useColorModeValue,
   Spinner,
-  Box,
-  Table,
-  Tbody,
-  Th,
-  Thead,
-  IconButton,
   Image,
+  Box,
 } from "@chakra-ui/react";
-import { ChevronRightIcon, ChevronDownIcon } from "@chakra-ui/icons";
 import { CLIENT_AVATARS } from "../../variables/clientAvatars";
 
-// shorten objective for the Objective column
+// ─── helpers ────────────────────────────────────────────────────────────────
 function shortObjective(obj) {
   if (!obj) return "—";
   let s = String(obj).toUpperCase().trim();
@@ -27,8 +21,6 @@ function shortObjective(obj) {
   s = s.replace(/_/g, " ");
   return s;
 }
-
-// helpers
 const fmtMoney = (v) =>
   typeof v !== "number" || !isFinite(v) ? "$0.00" : `$${v.toFixed(2)}`;
 const fmtPct = (v) =>
@@ -36,45 +28,41 @@ const fmtPct = (v) =>
 const fmtNum = (v) =>
   typeof v !== "number" || !isFinite(v) ? "0" : Number(v).toLocaleString("en-US");
 
-// аватар по account_id / account_name
-function candidateKeysFromAdset(adset) {
-  const keys = new Set();
-  const rawId =
+// найти аватар по id/имени аккаунта
+function resolveAvatar(adset) {
+  if (adset?.avatarUrl) return adset.avatarUrl;
+
+  const id =
     adset?.account_id ??
     adset?.accountId ??
     adset?.ad_account_id ??
     adset?.account?.id ??
     adset?.account?.account_id ??
     "";
-  const rawName =
+  const name =
     adset?.account_name ?? adset?.accountName ?? adset?.account?.name ?? "";
-  const idStr = rawId != null ? String(rawId) : "";
-  const nameStr = rawName != null ? String(rawName) : "";
-  if (idStr) {
-    keys.add(idStr);
-    if (!idStr.startsWith("act_")) keys.add(`act_${idStr}`);
-    keys.add(idStr.replace(/^act_/, ""));
+
+  const candidates = [];
+  if (id) {
+    candidates.push(String(id));
+    if (!String(id).startsWith("act_")) candidates.push(`act_${id}`);
+    candidates.push(String(id).replace(/^act_/, ""));
   }
-  if (nameStr) keys.add(nameStr);
-  return Array.from(keys).filter(Boolean);
-}
-function resolveAvatar(adset) {
-  if (adset?.avatarUrl) return { src: adset.avatarUrl, hit: "adset.avatarUrl" };
-  const candidates = candidateKeysFromAdset(adset);
+  if (name) candidates.push(String(name));
+
   for (const k of candidates) {
-    if (Object.prototype.hasOwnProperty.call(CLIENT_AVATARS, k)) {
-      return { src: CLIENT_AVATARS[k], hit: k };
-    }
+    if (Object.prototype.hasOwnProperty.call(CLIENT_AVATARS, k))
+      return CLIENT_AVATARS[k];
   }
-  const name = (adset?.account_name ?? adset?.accountName ?? "").toLowerCase();
-  if (name) {
-    for (const k of Object.keys(CLIENT_AVATARS)) {
-      if (k.toLowerCase() === name) return { src: CLIENT_AVATARS[k], hit: `${k} (ci)` };
-    }
+  // case-insensitive по имени
+  const lower = (name || "").toLowerCase();
+  for (const k of Object.keys(CLIENT_AVATARS)) {
+    if (k.toLowerCase() === lower) return CLIENT_AVATARS[k];
   }
-  return { src: undefined, hit: "not-found" };
+  return undefined;
 }
 
+// ─── component ──────────────────────────────────────────────────────────────
 function TablesTableRow(props) {
   const { adset, onStatusChange, isUpdating, datePreset } = props;
   const textColor = useColorModeValue("white", "white");
@@ -85,37 +73,40 @@ function TablesTableRow(props) {
   const [ads, setAds] = useState([]);
   const [updatingAdId, setUpdatingAdId] = useState(null);
 
+  const leadsCount = adset.leads ?? adset.results ?? 0;
   const ctrLinkClick =
     adset && adset.impressions > 0
       ? (Number(adset.link_clicks || 0) / adset.impressions) * 100
       : 0;
 
-  const leadsCount = adset.leads ?? adset.results ?? 0;
-
   const account = adset.account_name || "—";
   const campaign = adset.campaign_name || "—";
   const adsetName = adset.adset_name || adset.name || "Untitled Ad Set";
-  const { src: avatarSrc } = resolveAvatar(adset);
+  const avatarSrc = resolveAvatar(adset);
+
+  const fetchAds = async () => {
+    setAdsLoading(true);
+    try {
+      const res = await fetch(
+        `https://ad-dash-backend-production.up.railway.app/api/adsets/${adset.adset_id}/ads?date_preset=${datePreset || "last_7d"}`
+      );
+      const data = await res.json();
+      setAds(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.error("ads fetch error", e);
+    } finally {
+      setAdsLoading(false);
+    }
+  };
 
   const toggleExpanded = async () => {
     if (!expanded && ads.length === 0) {
-      setAdsLoading(true);
-      try {
-        const res = await fetch(
-          `https://ad-dash-backend-production.up.railway.app/api/adsets/${adset.adset_id}/ads?date_preset=${datePreset || "last_7d"}`
-        );
-        const data = await res.json();
-        setAds(Array.isArray(data) ? data : []);
-      } catch (err) {
-        console.error("ads fetch error", err);
-      } finally {
-        setAdsLoading(false);
-      }
+      await fetchAds();
     }
-    setExpanded((e) => !e);
+    setExpanded((v) => !v);
   };
 
-  const updateAdStatus = async (ad_id, current) => {
+  const updateAdStatus = async (ad_id, curr) => {
     setUpdatingAdId(ad_id);
     try {
       const res = await fetch(
@@ -124,16 +115,14 @@ function TablesTableRow(props) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            status: current === "ACTIVE" ? "PAUSED" : "ACTIVE",
+            status: curr === "ACTIVE" ? "PAUSED" : "ACTIVE",
           }),
         }
       );
       if (!res.ok) throw new Error("Update failed");
       setAds((prev) =>
         prev.map((a) =>
-          a.ad_id === ad_id
-            ? { ...a, status: current === "ACTIVE" ? "PAUSED" : "ACTIVE" }
-            : a
+          a.ad_id === ad_id ? { ...a, status: curr === "ACTIVE" ? "PAUSED" : "ACTIVE" } : a
         )
       );
     } catch (e) {
@@ -145,19 +134,27 @@ function TablesTableRow(props) {
 
   return (
     <>
+      {/* основная строка ad set */}
       <Tr>
-        {/* LEFT sticky cell: caret + Account → Campaign → Ad Set */}
+        {/* 1-я колонка (липкая): стрелка + аватар + тексты */}
         <Td position="sticky" left="0" zIndex="1" bg={stickyBg} py={3}>
           <Flex align="flex-start" gap={3}>
-            <IconButton
-              aria-label={expanded ? "Collapse" : "Expand"}
-              size="xs"
-              icon={expanded ? <ChevronDownIcon /> : <ChevronRightIcon />}
+            {/* стрелка — белые символы, точно видимые */}
+            <Box
+              as="button"
               onClick={toggleExpanded}
-              variant="ghost"
+              lineHeight="1"
+              fontSize="18px"
               color="white"
-              minW="24px"
-            />
+              w="20px"
+              textAlign="center"
+              mt="2px"
+              aria-label={expanded ? "Collapse" : "Expand"}
+              title={expanded ? "Collapse" : "Expand"}
+            >
+              {expanded ? "▾" : "▸"}
+            </Box>
+
             <Avatar size="sm" name={account} src={avatarSrc} bg="gray.500" />
             <Flex direction="column" minW={0}>
               <Text
@@ -179,7 +176,7 @@ function TablesTableRow(props) {
           </Flex>
         </Td>
 
-        {/* STATUS */}
+        {/* 2: статус ad set */}
         <Td>
           {isUpdating ? (
             <Spinner size="sm" color="white" />
@@ -197,13 +194,14 @@ function TablesTableRow(props) {
           )}
         </Td>
 
-        {/* Objective (short & compact) */}
+        {/* 3: objective */}
         <Td>
           <Text fontSize="xs" color={textColor} noOfLines={1}>
             {shortObjective(adset.objective)}
           </Text>
         </Td>
 
+        {/* остальные метрики ad set */}
         <Td><Text fontSize="sm" color={textColor}>{fmtMoney(adset.spend)}</Text></Td>
         <Td><Text fontSize="sm" color={textColor}>{fmtNum(adset.impressions)}</Text></Td>
         <Td><Text fontSize="sm" color={textColor}>{fmtNum(adset.frequency)}</Text></Td>
@@ -215,98 +213,64 @@ function TablesTableRow(props) {
         <Td><Text fontSize="sm" color={textColor}>{fmtNum(adset.link_clicks)}</Text></Td>
       </Tr>
 
-      {/* EXPANDED ADS */}
+      {/* строки объявлений — без заголовков, в те же колонки */}
       {expanded && (
-        <Tr>
-          <Td colSpan={12} p={0} bg="#21365f">
-            <Box px={4} py={3}>
-              {adsLoading ? (
-                <Flex align="center" justify="center" py={4}>
-                  <Spinner size="sm" mr={2} />
-                  <Text fontSize="sm" color="gray.200">Loading ads...</Text>
+        adsLoading ? (
+          <Tr><Td colSpan={12}><Flex py={3} justify="center" align="center"><Spinner size="sm" mr={2}/><Text color="gray.200">Loading ads…</Text></Flex></Td></Tr>
+        ) : ads.length === 0 ? (
+          <Tr><Td colSpan={12}><Text color="gray.300" fontSize="sm" py={2}>No ads for this ad set.</Text></Td></Tr>
+        ) : (
+          ads.map((ad) => (
+            <Tr key={ad.ad_id}>
+              {/* 1-я колонка для объявления: миниатюра + имя, с отступом чтобы не перекрывать место стрелки */}
+              <Td position="sticky" left="0" zIndex="1" bg={stickyBg} py={2}>
+                <Flex align="center" gap={3} pl="34px">
+                  {ad.thumbnail_url ? (
+                    <Image
+                      src={ad.thumbnail_url}
+                      alt=""
+                      boxSize="24px"
+                      borderRadius="md"
+                      objectFit="cover"
+                      flex="0 0 auto"
+                    />
+                  ) : (
+                    <Avatar size="xs" name={ad.ad_name} />
+                  )}
+                  <Text noOfLines={1}>{ad.ad_name}</Text>
                 </Flex>
-              ) : ads.length === 0 ? (
-                <Text fontSize="sm" color="gray.300">No ads for this ad set.</Text>
-              ) : (
-                <Table
-                  variant="simple"
-                  color="#fff"
-                  size="sm"
-                  w="full"
-                  sx={{
-                    tableLayout: "fixed",
-                    "& th, & td": {
-                      borderRight: "1px solid rgba(255,255,255,0.10)",
-                    },
-                    "& th:last-of-type, & td:last-of-type": { borderRight: "none" },
-                  }}
-                >
-                  <Thead>
-                    <Tr>
-                      <Th color="gray.300">AD</Th>
-                      <Th color="gray.300">STATUS</Th>
-                      <Th color="gray.300">OBJECTIVE</Th>
-                      <Th color="gray.300">SPENT</Th>
-                      <Th color="gray.300">IMPRESSIONS</Th>
-                      <Th color="gray.300">FREQUENCY</Th>
-                      <Th color="gray.300">LEADS (CPA)</Th>
-                      <Th color="gray.300">CPL</Th>
-                      <Th color="gray.300">CPM</Th>
-                      <Th color="gray.300">CTR (ALL)</Th>
-                      <Th color="gray.300">CTR (LINK)</Th>
-                      <Th color="gray.300">LINK CLICKS</Th>
-                    </Tr>
-                  </Thead>
-                  <Tbody>
-                    {ads.map((ad) => (
-                      <Tr key={ad.ad_id}>
-                        <Td>
-                          <Flex align="center" gap={3} minW={0}>
-                            {ad.thumbnail_url ? (
-                              <Image
-                                src={ad.thumbnail_url}
-                                alt=""
-                                boxSize="28px"
-                                borderRadius="md"
-                                objectFit="cover"
-                              />
-                            ) : (
-                              <Avatar size="xs" name={ad.ad_name} />
-                            )}
-                            <Text noOfLines={1}>{ad.ad_name}</Text>
-                          </Flex>
-                        </Td>
-                        <Td>
-                          {updatingAdId === ad.ad_id ? (
-                            <Spinner size="xs" />
-                          ) : (
-                            <Switch
-                              size="sm"
-                              colorScheme="teal"
-                              isChecked={ad.status === "ACTIVE"}
-                              onChange={() => updateAdStatus(ad.ad_id, ad.status)}
-                            />
-                          )}
-                        </Td>
-                        {/* у объявления цели нет в этой таблице */}
-                        <Td><Text fontSize="xs">—</Text></Td>
-                        <Td>{fmtMoney(ad.spend)}</Td>
-                        <Td>{fmtNum(ad.impressions)}</Td>
-                        <Td>{fmtNum(ad.frequency)}</Td>
-                        <Td>{fmtNum(ad.leads)}</Td>
-                        <Td>{fmtMoney(ad.cpa || 0)}</Td> {/* CPL = стоимость лида */}
-                        <Td>{fmtMoney(ad.cpm)}</Td>
-                        <Td>{fmtPct(ad.ctr)}</Td>        {/* CTR (ALL) из Graph */}
-                        <Td>{fmtPct(ad.ctr_link)}</Td>   {/* CTR (LINK) посчитан */}
-                        <Td>{fmtNum(ad.link_clicks)}</Td>
-                      </Tr>
-                    ))}
-                  </Tbody>
-                </Table>
-              )}
-            </Box>
-          </Td>
-        </Tr>
+              </Td>
+
+              {/* 2: статус объявления — свитч */}
+              <Td>
+                {updatingAdId === ad.ad_id ? (
+                  <Spinner size="xs" />
+                ) : (
+                  <Switch
+                    size="sm"
+                    colorScheme="teal"
+                    isChecked={ad.status === "ACTIVE"}
+                    onChange={() => updateAdStatus(ad.ad_id, ad.status)}
+                  />
+                )}
+              </Td>
+
+              {/* 3: objective для ads не показываем */}
+              <Td><Text fontSize="xs">—</Text></Td>
+
+              {/* те же метрики, та же последовательность колонок */}
+              <Td>{fmtMoney(ad.spend)}</Td>
+              <Td>{fmtNum(ad.impressions)}</Td>
+              <Td>{fmtNum(ad.frequency)}</Td>
+              <Td>{fmtNum(ad.leads)}</Td>
+              <Td>{fmtMoney(ad.cpa || 0)}</Td> {/* CPL */}
+              <Td>{fmtMoney(ad.cpm)}</Td>
+              <Td>{fmtPct(ad.ctr)}</Td>        {/* CTR (ALL) из бэка */}
+              <Td>{fmtPct(ad.ctr_link)}</Td>   {/* CTR (LINK) посчитан бэком */}
+              <Td>{fmtNum(ad.link_clicks)}</Td>
+            </Tr>
+          ))
+        )
       )}
     </>
   );
