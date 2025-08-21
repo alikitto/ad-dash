@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, Fragment } from "react";
 import {
   Box,
   Flex,
@@ -14,6 +14,9 @@ import {
   HStack,
   Icon,
   IconButton,
+  Image,
+  Badge,
+  Spinner,
 } from "@chakra-ui/react";
 import { TriangleDownIcon, TriangleUpIcon, RepeatIcon } from "@chakra-ui/icons";
 import { FaSave } from "react-icons/fa";
@@ -21,6 +24,9 @@ import Card from "components/Card/Card.js";
 import CardHeader from "components/Card/CardHeader.js";
 import CardBody from "components/Card/CardBody.js";
 import TablesTableRow from "components/Tables/TablesTableRow";
+
+// === Настройка бэка (поменяй, если у тебя другой домен) ===
+const API_BASE = "https://ad-dash-backend-production.up.railway.app";
 
 function useStickyState(defaultValue, key) {
   const [value, setValue] = useState(() => {
@@ -50,6 +56,10 @@ function Tables() {
     "sortConfig"
   );
 
+  // ── раскрытие Ads + кэш ──────────────────────────────────────────────────────
+  const [expanded, setExpanded] = useState({});         // { [adset_id]: bool }
+  const [adsCache, setAdsCache] = useState({});         // { [adset_id]: { items, loading, error } }
+
   // Updated: now / N mins ago
   const [lastUpdated, setLastUpdated] = useState(null);
   const [tick, setTick] = useState(0);
@@ -73,9 +83,7 @@ function Tables() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(
-        `https://ad-dash-backend-production.up.railway.app/api/adsets?date_preset=${datePreset}`
-      );
+      const response = await fetch(`${API_BASE}/api/adsets?date_preset=${datePreset}`);
       const data = await response.json();
       if (data.detail) throw new Error(data.detail);
       setAllAdsets(data);
@@ -91,17 +99,35 @@ function Tables() {
     fetchData();
   }, [fetchData]);
 
+  const fetchAdsForAdset = async (adsetId) => {
+    // фронт ожидает /api/adsets/{adset_id}/ads — см. твой бэкенд
+    const url = `${API_BASE}/api/adsets/${adsetId}/ads?date_preset=${encodeURIComponent(
+      datePreset
+    )}`;
+    setAdsCache((prev) => ({ ...prev, [adsetId]: { ...(prev[adsetId] || {}), loading: true, error: null } }));
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Failed to fetch ads: ${res.status}`);
+      const items = await res.json();
+      setAdsCache((prev) => ({ ...prev, [adsetId]: { items, loading: false, error: null } }));
+    } catch (e) {
+      setAdsCache((prev) => ({ ...prev, [adsetId]: { items: [], loading: false, error: e.message || "Error" } }));
+    }
+  };
+
+  const toggleExpand = (adsetId) => {
+    setExpanded((prev) => ({ ...prev, [adsetId]: !prev[adsetId] }));
+    if (!adsCache[adsetId]) fetchAdsForAdset(adsetId);
+  };
+
   const handleStatusChange = async (adsetId, newStatus) => {
     setUpdatingId(adsetId);
     try {
-      const response = await fetch(
-        `https://ad-dash-backend-production.up.railway.app/api/adsets/${adsetId}/update-status`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: newStatus }),
-        }
-      );
+      const response = await fetch(`${API_BASE}/api/adsets/${adsetId}/update-status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.detail || "Failed to update status");
@@ -151,23 +177,165 @@ function Tables() {
     </Th>
   );
 
-  const renderTableBody = () => {
-    if (loading) return (<Tr><Td colSpan="12" textAlign="center">Loading ad sets...</Td></Tr>);
-    if (error) return (<Tr><Td colSpan="12" textAlign="center">Error: {error}</Td></Tr>);
-    if (!processedAdsets.length) return (<Tr><Td colSpan="12" textAlign="center">No ad sets found.</Td></Tr>);
+  // ── мини-таблица объявлений ──────────────────────────────────────────────────
+  const AdsSubTable = ({ items = [], loading, error }) => {
+    const formatCurrency = (v) => (typeof v !== "number" || !isFinite(v) ? "$0.00" : `$${v.toFixed(2)}`);
+    const formatPct = (v) => (typeof v !== "number" || !isFinite(v) ? "0.00%" : `${v.toFixed(2)}%`);
+    const formatNum = (v) => (typeof v !== "number" || !isFinite(v) ? "0" : v.toLocaleString("en-US"));
 
-    return processedAdsets.map((adset) => (
-      <TablesTableRow
-        key={adset.adset_id}
-        adset={adset}
-        onStatusChange={handleStatusChange}
-        isUpdating={updatingId === adset.adset_id}
-      />
-    ));
+    return (
+      <Box p={3} bg="#1e2b52" borderTop="1px solid rgba(255,255,255,0.1)">
+        {loading && (
+          <Flex align="center" justify="center" py={6} color="gray.300" gap={2}>
+            <Spinner size="sm" /> <Text>Loading ads…</Text>
+          </Flex>
+        )}
+        {!loading && error && (
+          <Text color="red.300" fontSize="sm">Error: {error}</Text>
+        )}
+        {!loading && !error && (!items || items.length === 0) && (
+          <Text color="gray.300" fontSize="sm">No ads found for this ad set.</Text>
+        )}
+
+        {!loading && !error && items && items.length > 0 && (
+          <Box
+            overflowX="auto"
+            sx={{
+              "& th, & td": { borderRight: "1px solid rgba(255,255,255,0.10)" },
+              "& th:last-of-type, & td:last-of-type": { borderRight: "none" },
+            }}
+          >
+            <Table variant="simple" size="sm" color="#fff" sx={{ minWidth: "900px" }}>
+              <Thead>
+                <Tr>
+                  <Th w="420px" color="gray.200">Ad</Th>
+                  <Th w="110px" color="gray.200">Status</Th>
+                  <Th w="110px" color="gray.200">Spent</Th>
+                  <Th w="130px" color="gray.200">Impressions</Th>
+                  <Th w="120px" color="gray.200">CTR (Link)</Th>
+                  <Th w="110px" color="gray.200">CPC</Th>
+                  <Th w="110px" color="gray.200">CPM</Th>
+                  <Th w="120px" color="gray.200">Leads</Th>
+                  <Th w="110px" color="gray.200">CPA</Th>
+                </Tr>
+              </Thead>
+              <Tbody>
+                {items.map((ad) => {
+                  const name = ad.ad_name || ad.name || "Untitled Ad";
+                  const status = (ad.status || "—").toUpperCase();
+                  const spend = Number(ad.spend || 0);
+                  const impressions = Number(ad.impressions || 0);
+                  const clicks = Number(ad.link_clicks ?? ad.clicks ?? 0);
+                  const results = Number(ad.leads ?? ad.results ?? 0);
+                  const ctrLink = impressions > 0 ? (clicks / impressions) * 100 : 0;
+                  const cpc = clicks > 0 ? spend / clicks : 0;
+                  const cpm = impressions > 0 ? spend / (impressions / 1000) : 0;
+                  const cpa = results > 0 ? spend / results : 0;
+                  const thumb =
+                    ad.thumbnail_url ||
+                    ad.creative_thumbnail ||
+                    ad.image_url ||
+                    undefined;
+
+                  return (
+                    <Tr key={ad.ad_id || ad.id || name}>
+                      <Td>
+                        <HStack align="center" spacing={3}>
+                          <Image
+                            src={thumb}
+                            alt={name}
+                            boxSize="44px"
+                            objectFit="cover"
+                            borderRadius="md"
+                            bg="gray.600"
+                            cursor={thumb ? "zoom-in" : "default"}
+                            onClick={() => thumb && window.open(thumb, "_blank")}
+                          />
+                          <Box minW={0}>
+                            <Text fontWeight="semibold" noOfLines={1}>{name}</Text>
+                            {ad.creative_name && (
+                              <Text fontSize="xs" color="gray.300" noOfLines={1}>
+                                {ad.creative_name}
+                              </Text>
+                            )}
+                          </Box>
+                        </HStack>
+                      </Td>
+                      <Td>
+                        <Badge colorScheme={status === "ACTIVE" ? "green" : "gray"} variant="subtle">
+                          {status}
+                        </Badge>
+                      </Td>
+                      <Td>{formatCurrency(spend)}</Td>
+                      <Td>{formatNum(impressions)}</Td>
+                      <Td>{formatPct(ctrLink)}</Td>
+                      <Td>{formatCurrency(cpc)}</Td>
+                      <Td>{formatCurrency(cpm)}</Td>
+                      <Td>{formatNum(results)}</Td>
+                      <Td>{formatCurrency(cpa)}</Td>
+                    </Tr>
+                  );
+                })}
+              </Tbody>
+            </Table>
+          </Box>
+        )}
+      </Box>
+    );
   };
 
-  // нейтральный цвет разделителей (под темную тему)
   const SEPARATOR = "rgba(255,255,255,0.10)";
+
+  const renderTableBody = () => {
+    if (loading)
+      return (
+        <Tr>
+          <Td colSpan="12" textAlign="center">
+            Loading ad sets...
+          </Td>
+        </Tr>
+      );
+    if (error)
+      return (
+        <Tr>
+          <Td colSpan="12" textAlign="center">
+            Error: {error}
+          </Td>
+        </Tr>
+      );
+    if (!processedAdsets.length)
+      return (
+        <Tr>
+          <Td colSpan="12" textAlign="center">
+            No ad sets found.
+          </Td>
+        </Tr>
+      );
+
+    return processedAdsets.map((adset) => {
+      const isOpen = !!expanded[adset.adset_id];
+      const cache = adsCache[adset.adset_id] || { items: [], loading: false, error: null };
+
+      return (
+        <Fragment key={adset.adset_id}>
+          <TablesTableRow
+            adset={adset}
+            expanded={isOpen}
+            onToggleExpand={() => toggleExpand(adset.adset_id)}
+            onStatusChange={handleStatusChange}
+            isUpdating={updatingId === adset.adset_id}
+          />
+          {isOpen && (
+            <Tr>
+              <Td colSpan={12} p={0} bg="#1a2550" borderTop={`1px solid ${SEPARATOR}`}>
+                <AdsSubTable items={cache.items} loading={cache.loading} error={cache.error} />
+              </Td>
+            </Tr>
+          )}
+        </Fragment>
+      );
+    });
+  };
 
   return (
     <Flex direction="column" pt={{ base: "120px", md: "75px" }}>
@@ -175,7 +343,8 @@ function Tables() {
         <CardHeader>
           <Flex direction="column">
             <Text fontSize="xl" color="#fff" fontWeight="bold">Active Ad Sets</Text>
-            <HStack mt="20px" spacing={3} align="center">
+
+            <HStack mt="20px" spacing={3} align="center" flexWrap="wrap">
               <Select value={selectedAccount} onChange={(e) => setSelectedAccount(e.target.value)} size="sm" borderRadius="md" borderColor="gray.600" color="white" sx={{ "> option": { background: "#0F1535" } }}>
                 {accounts.map((acc) => (<option key={acc} value={acc}>{acc === "all" ? "All Accounts" : acc}</option>))}
               </Select>
@@ -194,8 +363,21 @@ function Tables() {
                 <option value="PAUSED">Paused</option>
                 <option value="ALL">All</option>
               </Select>
-              <IconButton aria-label="Save view" icon={<Icon as={FaSave} />} size="sm"
-                onClick={() => toast({ title: "View saved", description: "Filters and sort are stored locally.", status: "info", duration: 2000, isClosable: true, position: "top" })}
+
+              <IconButton
+                aria-label="Save view"
+                icon={<Icon as={FaSave} />}
+                size="sm"
+                onClick={() =>
+                  toast({
+                    title: "View saved",
+                    description: "Filters and sort are stored locally.",
+                    status: "info",
+                    duration: 2000,
+                    isClosable: true,
+                    position: "top",
+                  })
+                }
               />
               <HStack spacing={2}>
                 <IconButton aria-label="Refresh" icon={<RepeatIcon />} size="sm" onClick={fetchData} isLoading={loading}/>
@@ -206,7 +388,7 @@ function Tables() {
         </CardHeader>
 
         <CardBody>
-          {/* СКРОЛЛ-КОНТЕЙНЕР С ЛИПКИМ ХЕДЕРОМ + ВЕРТИКАЛЬНЫЕ ЛИНИИ */}
+          {/* Скролл-контейнер с липким хедером и вертикальными линиями */}
           <Box
             maxH="70vh"
             overflow="auto"
@@ -227,7 +409,7 @@ function Tables() {
               "& thead th:first-of-type": {
                 left: 0,
                 zIndex: 5,
-                boxShadow: `inset -1px 0 0 ${SEPARATOR}`, // вертикальный разделитель справа от первой колонки хедера
+                boxShadow: `inset -1px 0 0 rgba(255,255,255,0.10)`,
               },
               // липкая первая колонка в теле
               "& tbody td:first-of-type": {
@@ -235,12 +417,12 @@ function Tables() {
                 left: 0,
                 zIndex: 4,
                 background: "#273b66",
-                boxShadow: `inset -1px 0 0 ${SEPARATOR}`, // разделитель справа
+                boxShadow: `inset -1px 0 0 rgba(255,255,255,0.10)`,
               },
 
-              // === ВЕРТИКАЛЬНЫЕ ЛИНИИ ДЛЯ ВСЕХ ЯЧЕЕК ===
+              // вертикальные линии
               "& th, & td": {
-                borderRight: `1px solid ${SEPARATOR}`,
+                borderRight: "1px solid rgba(255,255,255,0.10)",
               },
               "& th:last-of-type, & td:last-of-type": {
                 borderRight: "none",
