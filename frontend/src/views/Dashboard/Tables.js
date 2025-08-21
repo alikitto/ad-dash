@@ -1,4 +1,3 @@
-// Tables.js
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Box,
@@ -23,10 +22,6 @@ import CardHeader from "components/Card/CardHeader.js";
 import CardBody from "components/Card/CardBody.js";
 import TablesTableRow from "components/Tables/TablesTableRow";
 
-const BACKEND =
-  process.env.REACT_APP_BACKEND_BASE ||
-  "https://ad-dash-backend-production.up.railway.app";
-
 function useStickyState(defaultValue, key) {
   const [value, setValue] = useState(() => {
     const stickyValue = window.localStorage.getItem(key);
@@ -43,9 +38,7 @@ function Tables() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [updatingId, setUpdatingId] = useState(null);
-  const [lastUpdated, setLastUpdated] = useState(null);
-  const [avatars, setAvatars] = useState({}); // { accountKey: imageUrl }
-  const [tick, setTick] = useState(0);
+
   const toast = useToast();
 
   const [datePreset, setDatePreset] = useStickyState("last_7d", "datePreset");
@@ -57,6 +50,9 @@ function Tables() {
     "sortConfig"
   );
 
+  // "Updated: ..." label in EN
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [tick, setTick] = useState(0);
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 60_000);
     return () => clearInterval(id);
@@ -74,41 +70,19 @@ function Tables() {
     return `${hrs} hrs ago`;
   }, [lastUpdated, tick]);
 
-  const fetchAvatars = useCallback(async () => {
-    try {
-      const res = await fetch(`${BACKEND}/api/settings/avatars`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-
-      // поддерживаем два формата: array и dict
-      const map = {};
-      if (Array.isArray(data)) {
-        data.forEach((row) => {
-          if (row && row.account_id) map[row.account_id] = row.image_url || "";
-        });
-      } else if (data && typeof data === "object") {
-        Object.entries(data).forEach(([k, v]) => (map[k] = v || ""));
-      }
-      setAvatars(map);
-    } catch (e) {
-      console.warn("avatars fetch failed:", e);
-      setAvatars({}); // тихо продолжаем без аватарок
-    }
-  }, []);
-
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const response = await fetch(
-        `${BACKEND}/api/adsets?date_preset=${datePreset}`
+        `https://ad-dash-backend-production.up.railway.app/api/adsets?date_preset=${datePreset}`
       );
       const data = await response.json();
       if (data.detail) throw new Error(data.detail);
       setAllAdsets(data);
       setLastUpdated(new Date());
     } catch (e) {
-      setError(e.message);
+      setError(e.message || "Failed to load data");
     } finally {
       setLoading(false);
     }
@@ -118,15 +92,11 @@ function Tables() {
     fetchData();
   }, [fetchData]);
 
-  useEffect(() => {
-    fetchAvatars();
-  }, [fetchAvatars]);
-
   const handleStatusChange = async (adsetId, newStatus) => {
     setUpdatingId(adsetId);
     try {
       const response = await fetch(
-        `${BACKEND}/api/adsets/${adsetId}/update-status`,
+        `https://ad-dash-backend-production.up.railway.app/api/adsets/${adsetId}/update-status`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -149,7 +119,7 @@ function Tables() {
       });
     } catch (e) {
       toast({
-        title: "Error",
+        title: "Couldn't update status",
         description: e.message,
         status: "error",
         duration: 2500,
@@ -163,8 +133,7 @@ function Tables() {
 
   const processedAdsets = useMemo(() => {
     let filtered = [...allAdsets];
-    if (statusFilter !== "ALL")
-      filtered = filtered.filter((a) => a.status === statusFilter);
+    if (statusFilter !== "ALL") filtered = filtered.filter((a) => a.status === statusFilter);
     if (selectedAccount !== "all")
       filtered = filtered.filter((a) => a.account_name === selectedAccount);
     if (objectiveFilter !== "all")
@@ -191,8 +160,7 @@ function Tables() {
 
   const requestSort = (key) => {
     let direction = "ascending";
-    if (sortConfig.key === key && sortConfig.direction === "ascending")
-      direction = "descending";
+    if (sortConfig.key === key && sortConfig.direction === "ascending") direction = "descending";
     setSortConfig({ key, direction });
   };
 
@@ -237,19 +205,15 @@ function Tables() {
           </Td>
         </Tr>
       );
-    return processedAdsets.map((adset) => {
-      const key = adset.account_id || adset.account_name; // fallback
-      const avatarUrl = avatars[key] || adset.avatarUrl || "";
-      return (
-        <TablesTableRow
-          key={adset.adset_id}
-          adset={adset}
-          avatarUrl={avatarUrl}
-          onStatusChange={handleStatusChange}
-          isUpdating={updatingId === adset.adset_id}
-        />
-      );
-    });
+
+    return processedAdsets.map((adset) => (
+      <TablesTableRow
+        key={adset.adset_id}
+        adset={adset}
+        onStatusChange={handleStatusChange}
+        isUpdating={updatingId === adset.adset_id}
+      />
+    ));
   };
 
   return (
@@ -262,6 +226,7 @@ function Tables() {
             </Text>
 
             <HStack mt="20px" spacing={3} align="center">
+              {/* filters */}
               <Select
                 value={selectedAccount}
                 onChange={(e) => setSelectedAccount(e.target.value)}
@@ -324,6 +289,7 @@ function Tables() {
                 <option value="ALL">All</option>
               </Select>
 
+              {/* actions */}
               <IconButton
                 aria-label="Save view"
                 icon={<Icon as={FaSave} />}
