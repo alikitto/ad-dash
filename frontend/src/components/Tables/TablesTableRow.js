@@ -10,11 +10,11 @@ import {
   Spinner,
 } from "@chakra-ui/react";
 
-// ⚠️ твой файл лежит здесь: src/variables/clientAvatars.js
-// Ожидаем именованный экспорт: export const CLIENT_AVATARS = { ... }
+// твой словарь: src/variables/clientAvatars.js
+// export const CLIENT_AVATARS = { "act_284902192299330": "https://..." , ... }
 import { CLIENT_AVATARS } from "../../variables/clientAvatars";
 
-// shorten objective for the Objective column
+// --- utils ---
 function shortObjective(obj) {
   if (!obj) return "—";
   let s = String(obj).toUpperCase().trim();
@@ -23,37 +23,59 @@ function shortObjective(obj) {
   return s;
 }
 
-// Пытаемся найти аватар по нескольким возможным ключам
-function resolveAvatarSrc(adset) {
-  // то, что пришло с бэка
-  const rawId = adset?.account_id != null ? String(adset.account_id) : "";
-  const rawName = adset?.account_name != null ? String(adset.account_name) : "";
+// строим список возможных ключей для словаря
+function candidateKeysFromAdset(adset) {
+  const keys = new Set();
 
-  // нормализованные варианты id
-  const idNoAct = rawId.replace(/^act_/, "");
-  const withAct = rawId && !rawId.startsWith("act_") ? `act_${rawId}` : rawId;
+  const rawId =
+    adset?.account_id ??
+    adset?.accountId ??
+    adset?.ad_account_id ??
+    adset?.account?.id ??
+    adset?.account?.account_id ??
+    "";
 
-  // кандидаты в порядке приоритета
-  const candidateKeys = [rawId, withAct, idNoAct, rawName].filter(Boolean);
+  const rawName =
+    adset?.account_name ??
+    adset?.accountName ??
+    adset?.account?.name ??
+    "";
 
-  // 1) если сам адсет уже содержит прямой URL (например, из бэка)
+  const idStr = rawId != null ? String(rawId) : "";
+  const nameStr = rawName != null ? String(rawName) : "";
+
+  if (idStr) {
+    keys.add(idStr);                       // "2849..."
+    if (!idStr.startsWith("act_")) keys.add(`act_${idStr}`); // "act_2849..."
+    keys.add(idStr.replace(/^act_/, ""));  // "2849..." если пришло с act_
+  }
+  if (nameStr) {
+    keys.add(nameStr);                     // точное имя
+  }
+
+  return Array.from(keys).filter(Boolean);
+}
+
+function resolveAvatar(adset) {
+  // приоритет: прямой URL из бэка -> словарь по ключам -> словарь по имени (без регистра)
   if (adset?.avatarUrl) return { src: adset.avatarUrl, hit: "adset.avatarUrl" };
 
-  // 2) ищем точное совпадение по словарю
-  for (const k of candidateKeys) {
+  const candidates = candidateKeysFromAdset(adset);
+  for (const k of candidates) {
     if (Object.prototype.hasOwnProperty.call(CLIENT_AVATARS, k)) {
       return { src: CLIENT_AVATARS[k], hit: k };
     }
   }
 
-  // 3) последний шанс: безрегистровый матч по имени
-  const lowerName = rawName.toLowerCase();
-  for (const key of Object.keys(CLIENT_AVATARS)) {
-    if (key.toLowerCase() === lowerName) {
-      return { src: CLIENT_AVATARS[key], hit: `${key} (ci)` };
+  // case-insensitive по имени
+  const name = (adset?.account_name ?? adset?.accountName ?? "").toLowerCase();
+  if (name) {
+    for (const k of Object.keys(CLIENT_AVATARS)) {
+      if (k.toLowerCase() === name) {
+        return { src: CLIENT_AVATARS[k], hit: `${k} (ci)` };
+      }
     }
   }
-
   return { src: undefined, hit: "not-found" };
 }
 
@@ -78,10 +100,9 @@ function TablesTableRow(props) {
   const campaign = adset.campaign_name || "—";
   const adsetName = adset.adset_name || adset.name || "Untitled Ad Set";
 
-  // подбираем src
-  const { src: avatarSrc, hit } = resolveAvatarSrc(adset);
+  const { src: avatarSrc, hit } = resolveAvatar(adset);
 
-  // временный дебаг — посмотри в консоль по одному ряду, увидишь ключ и src
+  // дебаг в консоль — посмотри что реально подставилось
   /* eslint-disable no-console */
   console.debug("[avatar]", {
     account_id: adset?.account_id,
@@ -101,8 +122,12 @@ function TablesTableRow(props) {
             name={account}
             src={avatarSrc}
             bg="gray.500"
-            // хинт при наведении: какой ключ сработал
             title={`avatar: ${hit}`}
+            onError={(e) => {
+              // покажем в консоли, если картинка не загрузилась (404/403 и т.д.)
+              console.debug("avatar load error:", e?.currentTarget?.src);
+              e.currentTarget.src = ""; // вернётся к инициалам
+            }}
           />
           <Flex direction="column" minW={0}>
             <Text
