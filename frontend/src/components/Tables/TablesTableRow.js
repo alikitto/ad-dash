@@ -10,6 +10,10 @@ import {
   Spinner,
 } from "@chakra-ui/react";
 
+// словарь аватарок, который ты положил в src/variables/clientAvatars.js
+// пример содержимого: export const CLIENT_AVATARS = { "act_123": "https://...", "Account Name": "https://..." }
+import { CLIENT_AVATARS } from "variables/clientAvatars";
+
 // shorten objective for the Objective column
 function shortObjective(obj) {
   if (!obj) return "—";
@@ -40,12 +44,23 @@ function TablesTableRow(props) {
   const campaign = adset.campaign_name || "—";
   const adsetName = adset.adset_name || adset.name || "Untitled Ad Set";
 
+  // КЛЮЧ ДЛЯ АВАТАРКИ:
+  // 1) если бэк когда-нибудь начнёт присылать account_id — используем его
+  // 2) иначе — по имени аккаунта
+  // 3) если у самого adset уже есть avatarUrl (из бэка) — он перекроет словарь
+  const accountKey = adset.account_id || adset.account_name || "";
+  const avatarSrc =
+    adset.avatarUrl ||
+    CLIENT_AVATARS[accountKey] ||
+    CLIENT_AVATARS[adset.account_name || ""] ||
+    undefined;
+
   return (
     <Tr>
       {/* LEFT sticky cell: Account → Campaign → Ad Set */}
       <Td position="sticky" left="0" zIndex="1" bg={stickyBg} py={3}>
         <Flex align="flex-start" gap={3}>
-          <Avatar size="sm" name={account} bg="gray.500" />
+          <Avatar size="sm" name={account} src={avatarSrc} bg="gray.500" />
           <Flex direction="column" minW={0}>
             <Text
               fontSize="10px"
