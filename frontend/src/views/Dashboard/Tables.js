@@ -15,8 +15,9 @@ import {
   Icon,
   IconButton,
   Image,
-  Badge,
   Spinner,
+  Switch as ChSwitch,
+  Spacer,
 } from "@chakra-ui/react";
 import { TriangleDownIcon, TriangleUpIcon, RepeatIcon } from "@chakra-ui/icons";
 import { FaSave } from "react-icons/fa";
@@ -25,7 +26,6 @@ import CardHeader from "components/Card/CardHeader.js";
 import CardBody from "components/Card/CardBody.js";
 import TablesTableRow from "components/Tables/TablesTableRow";
 
-// === Настройка бэка (поменяй, если у тебя другой домен) ===
 const API_BASE = "https://ad-dash-backend-production.up.railway.app";
 
 function useStickyState(defaultValue, key) {
@@ -56,11 +56,11 @@ function Tables() {
     "sortConfig"
   );
 
-  // ── раскрытие Ads + кэш ──────────────────────────────────────────────────────
-  const [expanded, setExpanded] = useState({});         // { [adset_id]: bool }
-  const [adsCache, setAdsCache] = useState({});         // { [adset_id]: { items, loading, error } }
+  // раскрытие Ads + кэш
+  const [expanded, setExpanded] = useState({});   // { [adset_id]: bool }
+  const [adsCache, setAdsCache] = useState({});   // { [adset_id]: { items, loading, error } }
 
-  // Updated: now / N mins ago
+  // Updated label
   const [lastUpdated, setLastUpdated] = useState(null);
   const [tick, setTick] = useState(0);
   useEffect(() => {
@@ -100,10 +100,7 @@ function Tables() {
   }, [fetchData]);
 
   const fetchAdsForAdset = async (adsetId) => {
-    // фронт ожидает /api/adsets/{adset_id}/ads — см. твой бэкенд
-    const url = `${API_BASE}/api/adsets/${adsetId}/ads?date_preset=${encodeURIComponent(
-      datePreset
-    )}`;
+    const url = `${API_BASE}/api/adsets/${adsetId}/ads?date_preset=${encodeURIComponent(datePreset)}`;
     setAdsCache((prev) => ({ ...prev, [adsetId]: { ...(prev[adsetId] || {}), loading: true, error: null } }));
     try {
       const res = await fetch(url);
@@ -143,6 +140,38 @@ function Tables() {
     }
   };
 
+  // статус объявлений (тумблер в подтаблице)
+  const handleAdStatusChange = async (adsetId, adId, newStatus) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/ads/${adId}/update-status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Failed to update ad status");
+      }
+      // обновим локальный кэш ads
+      setAdsCache((prev) => {
+        const bucket = prev[adsetId];
+        if (!bucket) return prev;
+        return {
+          ...prev,
+          [adsetId]: {
+            ...bucket,
+            items: (bucket.items || []).map((ad) =>
+              (ad.ad_id || ad.id) === adId ? { ...ad, status: newStatus } : ad
+            ),
+          },
+        };
+      });
+      toast({ title: "Ad status updated!", status: "success", duration: 1200, isClosable: true, position: "top" });
+    } catch (e) {
+      toast({ title: "Error", description: e.message, status: "error", duration: 2500, isClosable: true, position: "top" });
+    }
+  };
+
   const processedAdsets = useMemo(() => {
     let filtered = [...allAdsets];
     if (statusFilter !== "ALL") filtered = filtered.filter((a) => a.status === statusFilter);
@@ -177,8 +206,8 @@ function Tables() {
     </Th>
   );
 
-  // ── мини-таблица объявлений ──────────────────────────────────────────────────
-  const AdsSubTable = ({ items = [], loading, error }) => {
+  // мини-таблица объявлений: те же колонки, что и в основной
+  const AdsSubTable = ({ adsetId, items = [], loading, error }) => {
     const formatCurrency = (v) => (typeof v !== "number" || !isFinite(v) ? "$0.00" : `$${v.toFixed(2)}`);
     const formatPct = (v) => (typeof v !== "number" || !isFinite(v) ? "0.00%" : `${v.toFixed(2)}%`);
     const formatNum = (v) => (typeof v !== "number" || !isFinite(v) ? "0" : v.toLocaleString("en-US"));
@@ -190,9 +219,7 @@ function Tables() {
             <Spinner size="sm" /> <Text>Loading ads…</Text>
           </Flex>
         )}
-        {!loading && error && (
-          <Text color="red.300" fontSize="sm">Error: {error}</Text>
-        )}
+        {!loading && error && <Text color="red.300" fontSize="sm">Error: {error}</Text>}
         {!loading && !error && (!items || items.length === 0) && (
           <Text color="gray.300" fontSize="sm">No ads found for this ad set.</Text>
         )}
@@ -205,46 +232,49 @@ function Tables() {
               "& th:last-of-type, & td:last-of-type": { borderRight: "none" },
             }}
           >
-            <Table variant="simple" size="sm" color="#fff" sx={{ minWidth: "900px" }}>
+            <Table variant="simple" size="sm" color="#fff" sx={{ minWidth: "1200px" }}>
               <Thead>
                 <Tr>
-                  <Th w="420px" color="gray.200">Ad</Th>
-                  <Th w="110px" color="gray.200">Status</Th>
-                  <Th w="110px" color="gray.200">Spent</Th>
-                  <Th w="130px" color="gray.200">Impressions</Th>
-                  <Th w="120px" color="gray.200">CTR (Link)</Th>
-                  <Th w="110px" color="gray.200">CPC</Th>
-                  <Th w="110px" color="gray.200">CPM</Th>
-                  <Th w="120px" color="gray.200">Leads</Th>
-                  <Th w="110px" color="gray.200">CPA</Th>
+                  <Th color="gray.200">Ad</Th>
+                  <Th color="gray.200">Status</Th>
+                  <Th color="gray.200">Objective</Th>
+                  <Th color="gray.200">Spent</Th>
+                  <Th color="gray.200">Impressions</Th>
+                  <Th color="gray.200">Frequency</Th>
+                  <Th color="gray.200">Leads (CPA)</Th>
+                  <Th color="gray.200">CPL</Th>
+                  <Th color="gray.200">CPM</Th>
+                  <Th color="gray.200">CTR (All)</Th>
+                  <Th color="gray.200">CTR (Link Click)</Th>
+                  <Th color="gray.200">Link Clicks</Th>
                 </Tr>
               </Thead>
               <Tbody>
                 {items.map((ad) => {
+                  const id = ad.ad_id || ad.id;
                   const name = ad.ad_name || ad.name || "Untitled Ad";
-                  const status = (ad.status || "—").toUpperCase();
+                  const thumb =
+                    ad.thumbnail_url || ad.creative_thumbnail || ad.image_url || undefined;
+
                   const spend = Number(ad.spend || 0);
                   const impressions = Number(ad.impressions || 0);
+                  const frequency = Number(ad.frequency || 0);
                   const clicks = Number(ad.link_clicks ?? ad.clicks ?? 0);
-                  const results = Number(ad.leads ?? ad.results ?? 0);
+                  const leads = Number(ad.leads ?? ad.results ?? 0);
+                  const ctrAll = Number(ad.ctr || 0);              // уже %
                   const ctrLink = impressions > 0 ? (clicks / impressions) * 100 : 0;
-                  const cpc = clicks > 0 ? spend / clicks : 0;
-                  const cpm = impressions > 0 ? spend / (impressions / 1000) : 0;
-                  const cpa = results > 0 ? spend / results : 0;
-                  const thumb =
-                    ad.thumbnail_url ||
-                    ad.creative_thumbnail ||
-                    ad.image_url ||
-                    undefined;
+                  const cpm = impressions > 0 ? spend / (impressions / 1000) : Number(ad.cpm || 0);
+                  const cpl = leads > 0 ? spend / leads : 0;
 
                   return (
-                    <Tr key={ad.ad_id || ad.id || name}>
+                    <Tr key={id}>
+                      {/* Ad */}
                       <Td>
                         <HStack align="center" spacing={3}>
                           <Image
                             src={thumb}
                             alt={name}
-                            boxSize="44px"
+                            boxSize="36px"
                             objectFit="cover"
                             borderRadius="md"
                             bg="gray.600"
@@ -253,26 +283,37 @@ function Tables() {
                           />
                           <Box minW={0}>
                             <Text fontWeight="semibold" noOfLines={1}>{name}</Text>
-                            {ad.creative_name && (
-                              <Text fontSize="xs" color="gray.300" noOfLines={1}>
-                                {ad.creative_name}
-                              </Text>
-                            )}
                           </Box>
                         </HStack>
                       </Td>
+
+                      {/* Status switch */}
                       <Td>
-                        <Badge colorScheme={status === "ACTIVE" ? "green" : "gray"} variant="subtle">
-                          {status}
-                        </Badge>
+                        <ChSwitch
+                          colorScheme="teal"
+                          isChecked={(ad.status || "").toUpperCase() === "ACTIVE"}
+                          onChange={() =>
+                            handleAdStatusChange(
+                              adsetId,
+                              id,
+                              (ad.status || "").toUpperCase() === "ACTIVE" ? "PAUSED" : "ACTIVE"
+                            )
+                          }
+                        />
                       </Td>
+
+                      {/* Objective — у ad нет своей цели, ставим «—» */}
+                      <Td><Text fontSize="xs">—</Text></Td>
+
                       <Td>{formatCurrency(spend)}</Td>
                       <Td>{formatNum(impressions)}</Td>
-                      <Td>{formatPct(ctrLink)}</Td>
-                      <Td>{formatCurrency(cpc)}</Td>
+                      <Td>{formatNum(frequency)}</Td>
+                      <Td>{formatNum(leads)}</Td>
+                      <Td>{formatCurrency(cpl)}</Td>
                       <Td>{formatCurrency(cpm)}</Td>
-                      <Td>{formatNum(results)}</Td>
-                      <Td>{formatCurrency(cpa)}</Td>
+                      <Td>{formatPct(ctrAll)}</Td>
+                      <Td>{formatPct(ctrLink)}</Td>
+                      <Td>{formatNum(clicks)}</Td>
                     </Tr>
                   );
                 })}
@@ -287,35 +328,14 @@ function Tables() {
   const SEPARATOR = "rgba(255,255,255,0.10)";
 
   const renderTableBody = () => {
-    if (loading)
-      return (
-        <Tr>
-          <Td colSpan="12" textAlign="center">
-            Loading ad sets...
-          </Td>
-        </Tr>
-      );
-    if (error)
-      return (
-        <Tr>
-          <Td colSpan="12" textAlign="center">
-            Error: {error}
-          </Td>
-        </Tr>
-      );
+    if (loading) return (<Tr><Td colSpan="12" textAlign="center">Loading ad sets...</Td></Tr>);
+    if (error)   return (<Tr><Td colSpan="12" textAlign="center">Error: {error}</Td></Tr>);
     if (!processedAdsets.length)
-      return (
-        <Tr>
-          <Td colSpan="12" textAlign="center">
-            No ad sets found.
-          </Td>
-        </Tr>
-      );
+      return (<Tr><Td colSpan="12" textAlign="center">No ad sets found.</Td></Tr>);
 
     return processedAdsets.map((adset) => {
       const isOpen = !!expanded[adset.adset_id];
       const cache = adsCache[adset.adset_id] || { items: [], loading: false, error: null };
-
       return (
         <Fragment key={adset.adset_id}>
           <TablesTableRow
@@ -328,7 +348,12 @@ function Tables() {
           {isOpen && (
             <Tr>
               <Td colSpan={12} p={0} bg="#1a2550" borderTop={`1px solid ${SEPARATOR}`}>
-                <AdsSubTable items={cache.items} loading={cache.loading} error={cache.error} />
+                <AdsSubTable
+                  adsetId={adset.adset_id}
+                  items={cache.items}
+                  loading={cache.loading}
+                  error={cache.error}
+                />
               </Td>
             </Tr>
           )}
@@ -341,45 +366,73 @@ function Tables() {
     <Flex direction="column" pt={{ base: "120px", md: "75px" }}>
       <Card>
         <CardHeader>
-          <Flex direction="column">
+          <Flex direction="column" w="100%">
             <Text fontSize="xl" color="#fff" fontWeight="bold">Active Ad Sets</Text>
 
-            <HStack mt="20px" spacing={3} align="center" flexWrap="wrap">
-              <Select value={selectedAccount} onChange={(e) => setSelectedAccount(e.target.value)} size="sm" borderRadius="md" borderColor="gray.600" color="white" sx={{ "> option": { background: "#0F1535" } }}>
-                {accounts.map((acc) => (<option key={acc} value={acc}>{acc === "all" ? "All Accounts" : acc}</option>))}
-              </Select>
-              <Select value={objectiveFilter} onChange={(e) => setObjectiveFilter(e.target.value)} size="sm" borderRadius="md" borderColor="gray.600" color="white" sx={{ "> option": { background: "#0F1535" } }}>
-                {objectives.map((obj) => (<option key={obj} value={obj}>{obj === "all" ? "All Objectives" : obj}</option>))}
-              </Select>
-              <Select value={datePreset} onChange={(e) => setDatePreset(e.target.value)} size="sm" borderRadius="md" borderColor="gray.600" color="white" sx={{ "> option": { background: "#0F1535" } }}>
-                <option value="today">Today</option>
-                <option value="yesterday">Yesterday</option>
-                <option value="last_7d">Last 7 Days</option>
-                <option value="last_30d">Last 30 Days</option>
-                <option value="maximum">Maximum</option>
-              </Select>
-              <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} size="sm" borderRadius="md" borderColor="gray.600" color="white" sx={{ "> option": { background: "#0F1535" } }}>
-                <option value="ACTIVE">Active</option>
-                <option value="PAUSED">Paused</option>
-                <option value="ALL">All</option>
-              </Select>
+            {/* FIX фильтров: одна строка, справа — кнопки/таймер; на узких — перенос */}
+            <HStack mt="16px" spacing={3} align="center" flexWrap="wrap">
+              <HStack spacing={3} flexWrap="wrap">
+                <Select minW="220px" flex="0 0 auto"
+                  value={selectedAccount} onChange={(e) => setSelectedAccount(e.target.value)}
+                  size="sm" borderRadius="md" borderColor="gray.600" color="white"
+                  sx={{ "> option": { background: "#0F1535" } }}
+                >
+                  {accounts.map((acc) => (
+                    <option key={acc} value={acc}>{acc === "all" ? "All Accounts" : acc}</option>
+                  ))}
+                </Select>
 
-              <IconButton
-                aria-label="Save view"
-                icon={<Icon as={FaSave} />}
-                size="sm"
-                onClick={() =>
-                  toast({
-                    title: "View saved",
-                    description: "Filters and sort are stored locally.",
-                    status: "info",
-                    duration: 2000,
-                    isClosable: true,
-                    position: "top",
-                  })
-                }
-              />
+                <Select minW="220px" flex="0 0 auto"
+                  value={objectiveFilter} onChange={(e) => setObjectiveFilter(e.target.value)}
+                  size="sm" borderRadius="md" borderColor="gray.600" color="white"
+                  sx={{ "> option": { background: "#0F1535" } }}
+                >
+                  {objectives.map((obj) => (
+                    <option key={obj} value={obj}>{obj === "all" ? "All Objectives" : obj}</option>
+                  ))}
+                </Select>
+
+                <Select minW="180px" flex="0 0 auto"
+                  value={datePreset} onChange={(e) => setDatePreset(e.target.value)}
+                  size="sm" borderRadius="md" borderColor="gray.600" color="white"
+                  sx={{ "> option": { background: "#0F1535" } }}
+                >
+                  <option value="today">Today</option>
+                  <option value="yesterday">Yesterday</option>
+                  <option value="last_7d">Last 7 Days</option>
+                  <option value="last_30d">Last 30 Days</option>
+                  <option value="maximum">Maximum</option>
+                </Select>
+
+                <Select minW="160px" flex="0 0 auto"
+                  value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
+                  size="sm" borderRadius="md" borderColor="gray.600" color="white"
+                  sx={{ "> option": { background: "#0F1535" } }}
+                >
+                  <option value="ACTIVE">Active</option>
+                  <option value="PAUSED">Paused</option>
+                  <option value="ALL">All</option>
+                </Select>
+              </HStack>
+
+              <Spacer />
+
               <HStack spacing={2}>
+                <IconButton
+                  aria-label="Save view"
+                  icon={<Icon as={FaSave} />}
+                  size="sm"
+                  onClick={() =>
+                    toast({
+                      title: "View saved",
+                      description: "Filters and sort are stored locally.",
+                      status: "info",
+                      duration: 2000,
+                      isClosable: true,
+                      position: "top",
+                    })
+                  }
+                />
                 <IconButton aria-label="Refresh" icon={<RepeatIcon />} size="sm" onClick={fetchData} isLoading={loading}/>
                 <Text fontSize="xs" color="gray.400">Updated: {lastUpdatedLabel}</Text>
               </HStack>
@@ -388,7 +441,7 @@ function Tables() {
         </CardHeader>
 
         <CardBody>
-          {/* Скролл-контейнер с липким хедером и вертикальными линиями */}
+          {/* Скролл-контейнер: липкая шапка/первая колонка + вертикальные линии */}
           <Box
             maxH="70vh"
             overflow="auto"
@@ -398,35 +451,12 @@ function Tables() {
               "&::-webkit-scrollbar-thumb": { background: "#2D3748", borderRadius: "8px" },
               "&::-webkit-scrollbar-thumb:hover": { background: "#4A5568" },
 
-              // липкая шапка
-              "& thead th": {
-                position: "sticky",
-                top: 0,
-                zIndex: 3,
-                background: "#2a406e",
-              },
-              // липкая первая колонка в шапке
-              "& thead th:first-of-type": {
-                left: 0,
-                zIndex: 5,
-                boxShadow: `inset -1px 0 0 rgba(255,255,255,0.10)`,
-              },
-              // липкая первая колонка в теле
-              "& tbody td:first-of-type": {
-                position: "sticky",
-                left: 0,
-                zIndex: 4,
-                background: "#273b66",
-                boxShadow: `inset -1px 0 0 rgba(255,255,255,0.10)`,
-              },
+              "& thead th": { position: "sticky", top: 0, zIndex: 3, background: "#2a406e" },
+              "& thead th:first-of-type": { left: 0, zIndex: 5, boxShadow: `inset -1px 0 0 rgba(255,255,255,0.10)` },
+              "& tbody td:first-of-type": { position: "sticky", left: 0, zIndex: 4, background: "#273b66", boxShadow: `inset -1px 0 0 rgba(255,255,255,0.10)` },
 
-              // вертикальные линии
-              "& th, & td": {
-                borderRight: "1px solid rgba(255,255,255,0.10)",
-              },
-              "& th:last-of-type, & td:last-of-type": {
-                borderRight: "none",
-              },
+              "& th, & td": { borderRight: "1px solid rgba(255,255,255,0.10)" },
+              "& th:last-of-type, & td:last-of-type": { borderRight: "none" },
             }}
           >
             <Table variant="simple" color="#fff">
