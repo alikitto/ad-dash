@@ -10,10 +10,11 @@ import {
   Spinner,
   Image,
   Box,
+  useToast,
 } from "@chakra-ui/react";
 import { CLIENT_AVATARS } from "../../variables/clientAvatars";
 
-// helpers
+// ── helpers ─────────────────────────────────────────────────────────────────
 function shortObjective(obj) {
   if (!obj) return "—";
   let s = String(obj).toUpperCase().trim();
@@ -39,6 +40,7 @@ function resolveAvatar(adset) {
     "";
   const name =
     adset?.account_name ?? adset?.accountName ?? adset?.account?.name ?? "";
+
   const candidates = [];
   if (id) {
     candidates.push(String(id));
@@ -53,10 +55,13 @@ function resolveAvatar(adset) {
   return undefined;
 }
 
+// ── component ───────────────────────────────────────────────────────────────
 function TablesTableRow(props) {
   const { adset, onStatusChange, isUpdating, datePreset } = props;
   const textColor = useColorModeValue("white", "white");
-  const stickyBg = useColorModeValue("#273b66", "#273b66");
+  const stickyBg = useColorModeValue("#273b66", "#273b66"); // для первой колонки
+  const AD_ROW_BG = "#21365f"; // фон строки объявлений (как на твоём примере)
+  const toast = useToast();
 
   const [expanded, setExpanded] = useState(false);
   const [adsLoading, setAdsLoading] = useState(false);
@@ -106,13 +111,28 @@ function TablesTableRow(props) {
         }
       );
       if (!res.ok) throw new Error("Update failed");
+
       setAds((prev) =>
         prev.map((a) =>
           a.ad_id === ad_id ? { ...a, status: curr === "ACTIVE" ? "PAUSED" : "ACTIVE" } : a
         )
       );
+
+      toast({
+        title: "Ad status updated",
+        status: "success",
+        duration: 1500,
+        isClosable: true,
+        position: "top",
+      });
     } catch (e) {
-      console.error(e);
+      toast({
+        title: "Couldn't update ad status",
+        status: "error",
+        duration: 2200,
+        isClosable: true,
+        position: "top",
+      });
     } finally {
       setUpdatingAdId(null);
     }
@@ -122,7 +142,7 @@ function TablesTableRow(props) {
     <>
       {/* основная строка ad set */}
       <Tr>
-        {/* 1: стрелка + аватар + текст (липкая колонка) */}
+        {/* 1: стрелка + аватар + тексты (липкая колонка) */}
         <Td position="sticky" left="0" zIndex="1" bg={stickyBg} py={3}>
           <Flex align="flex-start" gap={3}>
             <Box
@@ -184,7 +204,7 @@ function TablesTableRow(props) {
         <Td><Text fontSize="sm" color={textColor}>{fmtNum(adset.link_clicks)}</Text></Td>
       </Tr>
 
-      {/* строки объявлений: БЕЗ заголовков, выровнены по тем же колонкам */}
+      {/* строки объявлений: без заголовков, выровнены по тем же колонкам */}
       {expanded &&
         (adsLoading ? (
           <Tr>
@@ -204,20 +224,27 @@ function TablesTableRow(props) {
         ) : (
           ads.map((ad) => (
             <Tr key={ad.ad_id}>
-              {/* 1: миниатюра + имя объявления, с отступом, чтобы не конфликтовать со стрелкой */}
-              <Td position="sticky" left="0" zIndex="1" bg={stickyBg} py={2}>
-                <Flex align="center" gap={3} pl="34px">
+              {/* 1: миниатюра + имя (сдвиг вправо для «вложенности») */}
+              <Td position="sticky" left="0" zIndex="1" bg={AD_ROW_BG} py={2}>
+                <Flex align="center" gap={3} pl="48px">
                   {ad.thumbnail_url ? (
-                    <Image src={ad.thumbnail_url} alt="" boxSize="24px" borderRadius="md" objectFit="cover" />
+                    <Image
+                      src={ad.thumbnail_url}
+                      alt=""
+                      boxSize="32px"          // крупнее миниатюра
+                      borderRadius="md"
+                      objectFit="cover"
+                      flex="0 0 auto"
+                    />
                   ) : (
-                    <Avatar size="xs" name={ad.ad_name} />
+                    <Avatar size="sm" name={ad.ad_name} />
                   )}
                   <Text noOfLines={1}>{ad.ad_name}</Text>
                 </Flex>
               </Td>
 
-              {/* 2: статус ad */}
-              <Td>
+              {/* 2: статус ad + toast */}
+              <Td bg={AD_ROW_BG}>
                 {updatingAdId === ad.ad_id ? (
                   <Spinner size="xs" />
                 ) : (
@@ -231,18 +258,18 @@ function TablesTableRow(props) {
               </Td>
 
               {/* 3: objective для ads не показываем */}
-              <Td><Text fontSize="xs">—</Text></Td>
+              <Td bg={AD_ROW_BG}><Text fontSize="xs">—</Text></Td>
 
-              {/* метрики — те же колонки, та же последовательность */}
-              <Td>{fmtMoney(ad.spend)}</Td>
-              <Td>{fmtNum(ad.impressions)}</Td>
-              <Td>{fmtNum(ad.frequency)}</Td>
-              <Td>{fmtNum(ad.leads)}</Td>
-              <Td>{fmtMoney(ad.cpa || 0)}</Td> {/* CPL */}
-              <Td>{fmtMoney(ad.cpm)}</Td>
-              <Td>{fmtPct(ad.ctr)}</Td>        {/* CTR (ALL) из бэка */}
-              <Td>{fmtPct(ad.ctr_link)}</Td>   {/* CTR (LINK) посчитан бэком */}
-              <Td>{fmtNum(ad.link_clicks)}</Td>
+              {/* остальные метрики — та же последовательность колонок */}
+              <Td bg={AD_ROW_BG}>{fmtMoney(ad.spend)}</Td>
+              <Td bg={AD_ROW_BG}>{fmtNum(ad.impressions)}</Td>
+              <Td bg={AD_ROW_BG}>{fmtNum(ad.frequency)}</Td>
+              <Td bg={AD_ROW_BG}>{fmtNum(ad.leads)}</Td>
+              <Td bg={AD_ROW_BG}>{fmtMoney(ad.cpa || 0)}</Td> {/* CPL */}
+              <Td bg={AD_ROW_BG}>{fmtMoney(ad.cpm)}</Td>
+              <Td bg={AD_ROW_BG}>{fmtPct(ad.ctr)}</Td>        {/* CTR (ALL) */}
+              <Td bg={AD_ROW_BG}>{fmtPct(ad.ctr_link)}</Td>   {/* CTR (LINK) */}
+              <Td bg={AD_ROW_BG}>{fmtNum(ad.link_clicks)}</Td>
             </Tr>
           ))
         ))}
