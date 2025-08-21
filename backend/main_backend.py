@@ -333,21 +333,24 @@ async def get_ai_analysis(adsets: List[dict]) -> Dict:
     if not OPENAI_API_KEY:
         raise HTTPException(status_code=500, detail="OpenAI API key is not configured.")
 
-    # --- НОВАЯ ЛОГИКА: УМНОЕ СОКРАЩЕНИЕ ДАННЫХ ---
-    MAX_ADSETS_FOR_AI = 35 # Макс. кол-во адсетов для отправки
+    # --- САМАЯ НАДЕЖНАЯ ВЕРСИЯ: ОБРАБОТКА ЛЮБЫХ ДАННЫХ ---
+    MAX_ADSETS_FOR_AI = 35
     final_adsets = adsets
 
+    # Функция-помощник для 100% безопасного получения числовых значений
+    def safe_float(value):
+        try:
+            return float(value) if value is not None else 0.0
+        except (ValueError, TypeError):
+            return 0.0
+
     if len(adsets) > MAX_ADSETS_FOR_AI:
-        # Сортируем по разным ключам, чтобы выбрать самое важное
-        adsets.sort(key=lambda x: x.get("spend", 0), reverse=True)
-        top_by_spend = adsets[:15]
-
-        adsets.sort(key=lambda x: x.get("leads", 0), reverse=True)
-        top_by_leads = adsets[:10]
-
+        # Сортируем по разным ключам, используя новую безопасную функцию
+        top_by_spend = sorted(adsets, key=lambda x: safe_float(x.get("spend")), reverse=True)[:15]
+        top_by_leads = sorted(adsets, key=lambda x: safe_float(x.get("leads")), reverse=True)[:10]
         worst_performers = sorted(
-            [a for a in adsets if a.get("leads", 0) == 0 and a.get("spend", 0) > 0],
-            key=lambda x: x.get("spend", 0),
+            [a for a in adsets if safe_float(a.get("leads")) == 0 and safe_float(a.get("spend")) > 0],
+            key=lambda x: safe_float(x.get("spend")),
             reverse=True
         )[:5]
 
@@ -355,43 +358,40 @@ async def get_ai_analysis(adsets: List[dict]) -> Dict:
         combined = {d["adset_id"]: d for d in top_by_spend + top_by_leads + worst_performers}
         final_adsets = list(combined.values())
 
-
-    # Упрощаем данные для промпта
-    simplified_adsets = [
-        {
+    # Упрощаем данные для промпта с максимальной защитой
+    simplified_adsets = []
+    for d in final_adsets:
+        impressions = safe_float(d.get("impressions"))
+        link_clicks = safe_float(d.get("link_clicks"))
+        ctr_link = (link_clicks / impressions * 100.0) if impressions > 0 else 0.0
+        
+        simplified_adsets.append({
             "name": f"{d.get('account_name', '')[:15]} / {d.get('adset_name', 'N/A')[:25]}",
             "status": d.get("status"),
-            "spend": round(d.get("spend", 0), 2),
-            "leads": d.get("leads", 0),
-            "cpl": round(d.get("cpl", 0), 2),
-            "ctr_link": round((d.get("link_clicks", 0) / d.get("impressions", 1)) * 100, 2),
-        }
-        for d in final_adsets
-    ]
+            "spend": round(safe_float(d.get("spend")), 2),
+            "leads": int(safe_float(d.get("leads"))),
+            "cpl": round(safe_float(d.get("cpl")), 2),
+            "ctr_link": round(ctr_link, 2),
+        })
 
     # Системный промпт - наша инструкция для AI
     system_prompt = f"""
 You are an expert Meta Ads analyst. Your task is to analyze a list of ad sets provided in JSON format.
 Provide a concise, data-driven analysis in Russian.
 Your response MUST be a valid JSON object with three keys: "summary", "insights", and "recommendations".
-
-1.  `summary`: A short, 2-3 sentence executive summary of the overall performance in Markdown format. Mention total spend and total leads FROM THE ORIGINAL DATASET.
-2.  `insights`: A list of 2-4 key bullet-point observations. Identify the best and worst performers.
-3.  `recommendations`: A list of actionable recommendations. Each recommendation must be an object with two keys: `priority` ("high", "medium", or "low") and `text` (the recommendation itself).
-
-Analyze based on Spend, Leads, CPL (Cost Per Lead), and CTR (Link Click). A good CPL is a low CPL. A good CTR is a high CTR.
-IMPORTANT: You are analyzing a curated sample of {len(final_adsets)} ad sets from a larger dataset of {len(adsets)} ad sets. Mention this context in your summary if relevant.
+1.  `summary`: A short, 2-3 sentence executive summary. Mention total spend and total leads FROM THE ORIGINAL DATASET.
+2.  `insights`: A list of 2-4 key bullet-point observations.
+3.  `recommendations`: A list of actionable recommendations. Each with `priority` ("high", "medium", "low") and `text`.
+Analyze based on Spend, Leads, CPL, and CTR. A low CPL is good. A high CTR is good.
+IMPORTANT: You are analyzing a curated sample of {len(final_adsets)} ad sets from a larger dataset of {len(adsets)} ad sets.
 """
-
-    # Считаем общие метрики для summary, чтобы AI не выдумывал их
-    total_spend = round(sum(a.get("spend", 0) for a in adsets), 2)
-    total_leads = sum(a.get("leads", 0) for a in adsets)
+    total_spend = round(sum(safe_float(a.get("spend")) for a in adsets), 2)
+    total_leads = int(sum(safe_float(a.get("leads")) for a in adsets))
     user_data = {
         "total_spend": total_spend,
         "total_leads": total_leads,
         "adsets_sample": simplified_adsets
     }
-
 
     try:
         client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY)
@@ -403,20 +403,10 @@ IMPORTANT: You are analyzing a curated sample of {len(final_adsets)} ad sets fro
                 {"role": "user", "content": json.dumps(user_data, indent=2)},
             ],
             temperature=0.5,
-            max_tokens=2000, # Немного увеличим на всякий случай
+            max_tokens=2000,
         )
         analysis_content = response.choices[0].message.content
         return json.loads(analysis_content)
-
     except Exception as e:
         logging.error(f"OpenAI API error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to get AI analysis: {e}")
-
-
-@app.post("/api/analyze-adsets")
-async def analyze_adsets_endpoint(adsets: List[dict] = Body(...)):
-    if not adsets:
-        raise HTTPException(status_code=400, detail="Adset data is required.")
-    
-    analysis_result = await get_ai_analysis(adsets)
-    return analysis_result
