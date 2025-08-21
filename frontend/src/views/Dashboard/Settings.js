@@ -1,106 +1,216 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { Flex, Text, Button, useToast, VStack, Input, FormControl, FormLabel, Spinner, Table, Thead, Tbody, Tr, Th, Td, IconButton } from "@chakra-ui/react";
-import { DeleteIcon } from "@chakra-ui/icons";
-import Card from "components/Card/Card.js";
-import CardHeader from "components/Card/CardHeader.js";
-import CardBody from "components/Card/CardBody.js";
+// Settings.js
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  Avatar,
+  Box,
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Flex,
+  HStack,
+  IconButton,
+  Input,
+  Table,
+  Tbody,
+  Td,
+  Text,
+  Th,
+  Thead,
+  Tr,
+  useToast,
+} from "@chakra-ui/react";
+import { RepeatIcon, DeleteIcon } from "@chakra-ui/icons";
 
-function Settings() {
-  const [avatars, setAvatars] = useState({});
-  const [loading, setLoading] = useState(true);
-  const [accountId, setAccountId] = useState("");
-  const [imageUrl, setImageUrl] = useState("");
+// Настрой: можно вынести в .env -> REACT_APP_BACKEND_BASE
+const BACKEND = process.env.REACT_APP_BACKEND_BASE || "https://ad-dash-backend-production.up.railway.app";
+
+export default function Settings() {
   const toast = useToast();
+  const [loading, setLoading] = useState(false);
+  const [adsets, setAdsets] = useState([]);
+  const [avatars, setAvatars] = useState({}); // { accountKey: imageUrl }
+  const [draft, setDraft] = useState({}); // локальные инпуты { accountKey: imageUrl }
 
-  const fetchAvatars = useCallback(async () => {
+  // грузим любые адсеты, чтобы понять список кабинетов
+  const loadAdsets = async () => {
+    const res = await fetch(`${BACKEND}/api/adsets?date_preset=last_7d`);
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  };
+
+  const loadAvatars = async () => {
+    const res = await fetch(`${BACKEND}/api/settings/avatars`);
+    const data = await res.json();
+    // ожидаем [{ account_id, image_url }]
+    const map = {};
+    (data || []).forEach((row) => (map[row.account_id] = row.image_url));
+    return map;
+  };
+
+  const refresh = async () => {
     try {
-      // ВАЖНО: Укажите здесь URL вашего *основного* бэкенда.
-      // Railway направит запрос на правильный сервис.
-      const response = await fetch("https://ad-dash-backend-production.up.railway.app/api/settings/avatars");
-      if (!response.ok) throw new Error("Failed to fetch settings");
-      const data = await response.json();
-      setAvatars(data);
-    } catch (error) {
-      toast({ title: "Error fetching avatars", description: error.message, status: "error", duration: 3000 });
+      setLoading(true);
+      const [adsetsData, avatarsMap] = await Promise.all([loadAdsets(), loadAvatars()]);
+      setAdsets(adsetsData);
+      setAvatars(avatarsMap);
+      setDraft(avatarsMap);
+    } catch (e) {
+      toast({ title: "Failed to load data", description: String(e), status: "error" });
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  };
 
   useEffect(() => {
-    fetchAvatars();
-  }, [fetchAvatars]);
+    refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const handleSave = async () => {
-    if (!accountId || !imageUrl) return;
+  // извлекаем кабинеты (уникальные)
+  const accounts = useMemo(() => {
+    const m = new Map();
+    for (const a of adsets) {
+      const key = a.account_id || a.account_name; // fallback
+      if (!key) continue;
+      if (!m.has(key)) {
+        m.set(key, {
+          accountKey: key,
+          account_name: a.account_name || key,
+          // campaign/adset не нужны на этой странице
+        });
+      }
+    }
+    return Array.from(m.values()).sort((x, y) =>
+      x.account_name.localeCompare(y.account_name, "en")
+    );
+  }, [adsets]);
+
+  const saveAvatar = async (accountKey) => {
+    const imageUrl = (draft[accountKey] || "").trim();
+    if (!imageUrl) {
+      toast({ title: "Image URL is empty", status: "warning" });
+      return;
+    }
     try {
-      const response = await fetch("https://ad-dash-backend-production.up.railway.app/api/settings/avatars", {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accountId, imageUrl })
+      setLoading(true);
+      const res = await fetch(`${BACKEND}/api/settings/avatars`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accountId: accountKey, imageUrl }),
       });
-      if (!response.ok) throw new Error("Failed to save");
-      setAccountId("");
-      setImageUrl("");
-      toast({ title: "Avatar saved!", status: "success", duration: 2000 });
-      fetchAvatars(); // Обновляем список
-    } catch (error) {
-      toast({ title: "Error saving avatar", description: error.message, status: "error", duration: 3000 });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setAvatars((prev) => ({ ...prev, [accountKey]: imageUrl }));
+      toast({ title: "Avatar saved", status: "success" });
+    } catch (e) {
+      toast({ title: "Save failed", description: String(e), status: "error" });
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleDelete = async (id) => {
+  const deleteAvatar = async (accountKey) => {
     try {
-        const response = await fetch(`https://ad-dash-backend-production.up.railway.app/api/settings/avatars/${id}`, { method: 'DELETE' });
-        if (!response.ok) throw new Error("Failed to delete");
-        toast({ title: "Avatar deleted!", status: "warning", duration: 2000 });
-        fetchAvatars(); // Обновляем список
-    } catch (error) {
-        toast({ title: "Error deleting avatar", description: error.message, status: "error", duration: 3000 });
+      setLoading(true);
+      const res = await fetch(`${BACKEND}/api/settings/avatars/${encodeURIComponent(accountKey)}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setAvatars((prev) => {
+        const copy = { ...prev };
+        delete copy[accountKey];
+        return copy;
+      });
+      setDraft((prev) => {
+        const copy = { ...prev };
+        delete copy[accountKey];
+        return copy;
+      });
+      toast({ title: "Avatar deleted", status: "info" });
+    } catch (e) {
+      toast({ title: "Delete failed", description: String(e), status: "error" });
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <Flex direction="column" pt={{ base: "120px", md: "75px" }}>
       <Card>
-        <CardHeader><Text fontSize="xl" color="#fff" fontWeight="bold">Client Avatars Settings</Text></CardHeader>
-        <CardBody>
-          <VStack spacing={4} align="stretch" mb={8}>
-            <FormControl>
-              <FormLabel color="white">Ad Account ID (только цифры)</FormLabel>
-              <Input placeholder="1234567890123" value={accountId} onChange={(e) => setAccountId(e.target.value)} color="white" />
-            </FormControl>
-            <FormControl>
-              <FormLabel color="white">Image URL</FormLabel>
-              <Input placeholder="https://.../avatar.png" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} color="white" />
-            </FormControl>
-            <Button onClick={handleSave} colorScheme="teal">Save / Update Avatar</Button>
-          </VStack>
+        <CardHeader>
+          <HStack justify="space-between">
+            <Text fontSize="xl" color="#fff" fontWeight="bold">Settings — Avatars</Text>
+            <IconButton aria-label="Refresh" icon={<RepeatIcon />} onClick={refresh} isLoading={loading} />
+          </HStack>
+          <Text mt="2" fontSize="sm" color="gray.300">
+            Добавь URL-адрес картинки для каждого рекламного кабинета. Советы: используй прямые ссылки
+            (Cloudinary, S3, imgur) с https:// и разрешением .png/.jpg.
+          </Text>
+        </CardHeader>
 
-          {loading ? <Spinner color="white" /> : (
-            <Table variant="simple" color="white">
+        <CardBody>
+          <Box overflowX="auto">
+            <Table variant="simple" color="#fff">
               <Thead>
                 <Tr>
-                  <Th color="gray.400">Account ID</Th>
-                  <Th color="gray.400">Image URL</Th>
-                  <Th color="gray.400">Actions</Th>
+                  <Th color="white">Avatar</Th>
+                  <Th color="white">Account name</Th>
+                  <Th color="white">Account key (id or name)</Th>
+                  <Th color="white" w="40%">Image URL</Th>
+                  <Th color="white">Actions</Th>
                 </Tr>
               </Thead>
               <Tbody>
-                {Object.entries(avatars).map(([id, url]) => (
-                  <Tr key={id}>
-                    <Td>{id}</Td>
-                    <Td><Text isTruncated maxWidth="300px">{url}</Text></Td>
-                    <Td><IconButton aria-label="Delete" icon={<DeleteIcon />} size="sm" colorScheme="red" onClick={() => handleDelete(id)} /></Td>
-                  </Tr>
-                ))}
+                {accounts.map((acc) => {
+                  const key = acc.accountKey;
+                  const current = avatars[key];
+                  const value = draft[key] ?? current ?? "";
+                  return (
+                    <Tr key={key}>
+                      <Td>
+                        <Avatar size="sm" name={acc.account_name} src={value || current || undefined} />
+                      </Td>
+                      <Td>
+                        <Text fontWeight="semibold">{acc.account_name}</Text>
+                      </Td>
+                      <Td>
+                        <Text fontSize="xs" color="gray.300">{key}</Text>
+                      </Td>
+                      <Td>
+                        <Input
+                          placeholder="https://..."
+                          value={value}
+                          onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))}
+                          size="sm"
+                          color="white"
+                          borderColor="gray.600"
+                        />
+                      </Td>
+                      <Td>
+                        <HStack>
+                          <Button size="sm" colorScheme="teal" onClick={() => saveAvatar(key)} isLoading={loading}>
+                            Save
+                          </Button>
+                          <IconButton
+                            size="sm"
+                            aria-label="Delete"
+                            icon={<DeleteIcon />}
+                            onClick={() => deleteAvatar(key)}
+                            isDisabled={!current}
+                          />
+                        </HStack>
+                      </Td>
+                    </Tr>
+                  );
+                })}
+                {!accounts.length && (
+                  <Tr><Td colSpan="5"><Text textAlign="center" color="gray.300">No accounts found.</Text></Td></Tr>
+                )}
               </Tbody>
             </Table>
-          )}
+          </Box>
         </CardBody>
       </Card>
     </Flex>
   );
 }
-
-export default Settings;
