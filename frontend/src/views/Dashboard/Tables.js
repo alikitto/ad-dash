@@ -1,7 +1,20 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
-  Box, Flex, Select, Table, Tbody, Td, Text, Th, Thead, Tr,
-  useToast, HStack, Icon, IconButton,
+  Box,
+  Flex,
+  Select,
+  Table,
+  Tbody,
+  Td,
+  Text,
+  Th,
+  Thead,
+  Tr,
+  useToast,
+  HStack,
+  Icon,
+  IconButton,
+  Switch,
 } from "@chakra-ui/react";
 import { TriangleDownIcon, TriangleUpIcon, RepeatIcon } from "@chakra-ui/icons";
 import { FaSave } from "react-icons/fa";
@@ -37,7 +50,9 @@ function Tables() {
     { key: "spend", direction: "descending" },
     "sortConfig"
   );
+  const [groupByAccount, setGroupByAccount] = useStickyState(true, "groupByAccount");
 
+  // Updated: now / N mins ago
   const [lastUpdated, setLastUpdated] = useState(null);
   const [tick, setTick] = useState(0);
   useEffect(() => {
@@ -104,21 +119,7 @@ function Tables() {
     }
   };
 
-  const processedAdsets = useMemo(() => {
-    let filtered = [...allAdsets];
-    if (statusFilter !== "ALL") filtered = filtered.filter((a) => a.status === statusFilter);
-    if (selectedAccount !== "all") filtered = filtered.filter((a) => a.account_name === selectedAccount);
-    if (objectiveFilter !== "all") filtered = filtered.filter((a) => a.objective === objectiveFilter);
-
-    filtered.sort((a, b) => {
-      if (a[sortConfig.key] < b[sortConfig.key]) return sortConfig.direction === "ascending" ? -1 : 1;
-      if (a[sortConfig.key] > b[sortConfig.key]) return sortConfig.direction === "ascending" ? 1 : -1;
-      return 0;
-    });
-    return filtered;
-  }, [allAdsets, selectedAccount, objectiveFilter, statusFilter, sortConfig]);
-
-  const accounts = useMemo(() => ["all", ...new Set(allAdsets.map((a) => a.account_name))], [allAdsets]);
+  const accounts = useMemo(() => ["all", ...new Set(allAdsets.map((a) => a.account_name || "—"))], [allAdsets]);
   const objectives = useMemo(() => ["all", ...new Set(allAdsets.map((a) => a.objective || "N/A"))], [allAdsets]);
 
   const requestSort = (key) => {
@@ -138,22 +139,64 @@ function Tables() {
     </Th>
   );
 
+  const processedAdsets = useMemo(() => {
+    // фильтры
+    let filtered = [...allAdsets];
+    if (statusFilter !== "ALL") filtered = filtered.filter((a) => a.status === statusFilter);
+    if (selectedAccount !== "all") filtered = filtered.filter((a) => a.account_name === selectedAccount);
+    if (objectiveFilter !== "all") filtered = filtered.filter((a) => a.objective === objectiveFilter);
+
+    // общий сравниватель по текущей сортировке
+    const cmp = (a, b) => {
+      const key = sortConfig.key;
+      const dir = sortConfig.direction === "ascending" ? 1 : -1;
+      const va = a[key];
+      const vb = b[key];
+      if (va < vb) return -1 * dir;
+      if (va > vb) return 1 * dir;
+      return 0;
+    };
+
+    // Если сортируем по Spent или CPL — игнорируем группировку, чистая глобальная сортировка
+    const sortKeyIsGlobal = ["spend", "cpl"].includes(sortConfig.key);
+    const shouldGroup = groupByAccount && !sortKeyIsGlobal;
+
+    if (!shouldGroup) {
+      return filtered.sort(cmp);
+    }
+
+    // Иначе — группируем по аккаунту, сортируем внутри групп, группы — по имени аккаунта
+    const groups = filtered.reduce((acc, item) => {
+      const key = item.account_name || "—";
+      (acc[key] = acc[key] || []).push(item);
+      return acc;
+    }, {});
+    const orderedAccountNames = Object.keys(groups).sort((a, b) => a.localeCompare(b));
+
+    const result = [];
+    for (const name of orderedAccountNames) {
+      const rows = groups[name].slice().sort(cmp);
+      result.push(...rows);
+    }
+    return result;
+  }, [allAdsets, selectedAccount, objectiveFilter, statusFilter, sortConfig, groupByAccount]);
+
   const renderTableBody = () => {
     if (loading) return (<Tr><Td colSpan="12" textAlign="center">Loading ad sets...</Td></Tr>);
     if (error) return (<Tr><Td colSpan="12" textAlign="center">Error: {error}</Td></Tr>);
     if (!processedAdsets.length) return (<Tr><Td colSpan="12" textAlign="center">No ad sets found.</Td></Tr>);
-
     return processedAdsets.map((adset) => (
       <TablesTableRow
         key={adset.adset_id}
         adset={adset}
         onStatusChange={handleStatusChange}
         isUpdating={updatingId === adset.adset_id}
-        datePreset={datePreset}           // <-- добавили
+        datePreset={datePreset}
       />
     ));
   };
 
+  // нейтральный цвет разделителей (под темную тему)
   const SEPARATOR = "rgba(255,255,255,0.10)";
 
   return (
@@ -162,7 +205,7 @@ function Tables() {
         <CardHeader>
           <Flex direction="column">
             <Text fontSize="xl" color="#fff" fontWeight="bold">Active Ad Sets</Text>
-            <HStack mt="20px" spacing={3} align="center">
+            <HStack mt="20px" spacing={3} align="center" flexWrap="wrap">
               <Select value={selectedAccount} onChange={(e) => setSelectedAccount(e.target.value)} size="sm" borderRadius="md" borderColor="gray.600" color="white" sx={{ "> option": { background: "#0F1535" } }}>
                 {accounts.map((acc) => (<option key={acc} value={acc}>{acc === "all" ? "All Accounts" : acc}</option>))}
               </Select>
@@ -181,8 +224,20 @@ function Tables() {
                 <option value="PAUSED">Paused</option>
                 <option value="ALL">All</option>
               </Select>
+
+              {/* Group by account toggle */}
+              <HStack pl={2} pr={3} borderLeft={`1px solid ${SEPARATOR}`}>
+                <Text fontSize="xs" color="gray.300">Group by account</Text>
+                <Switch
+                  size="sm"
+                  isChecked={groupByAccount}
+                  onChange={(e) => setGroupByAccount(e.target.checked)}
+                  colorScheme="teal"
+                />
+              </HStack>
+
               <IconButton aria-label="Save view" icon={<Icon as={FaSave} />} size="sm"
-                onClick={() => toast({ title: "View saved", description: "Filters and sort are stored locally.", status: "info", duration: 2000, isClosable: true, position: "top" })}
+                onClick={() => toast({ title: "View saved", description: "Filters, grouping and sort are stored locally.", status: "info", duration: 2000, isClosable: true, position: "top" })}
               />
               <HStack spacing={2}>
                 <IconButton aria-label="Refresh" icon={<RepeatIcon />} size="sm" onClick={fetchData} isLoading={loading}/>
@@ -193,11 +248,13 @@ function Tables() {
         </CardHeader>
 
         <CardBody>
+          {/* СКРОЛЛ-КОНТЕЙНЕР С ЛИПКИМ ХЕДЕРОМ + ВЕРТИКАЛЬНЫЕ ЛИНИИ */}
           <Box
             maxH="70vh"
             overflow="auto"
             sx={{
               "&::-webkit-scrollbar": { height: "8px", width: "8px" },
+              "&::-webkit-scrollbar-track": { background: "transparent" },
               "&::-webkit-scrollbar-thumb": { background: "#2D3748", borderRadius: "8px" },
               "&::-webkit-scrollbar-thumb:hover": { background: "#4A5568" },
               "& thead th": { position: "sticky", top: 0, zIndex: 3, background: "#2a406e" },
