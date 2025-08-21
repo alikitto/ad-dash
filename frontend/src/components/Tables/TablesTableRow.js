@@ -10,8 +10,8 @@ import {
   Spinner,
 } from "@chakra-ui/react";
 
-// словарь аватарок, который ты положил в src/variables/clientAvatars.js
-// пример содержимого: export const CLIENT_AVATARS = { "act_123": "https://...", "Account Name": "https://..." }
+// ⚠️ твой файл лежит здесь: src/variables/clientAvatars.js
+// Ожидаем именованный экспорт: export const CLIENT_AVATARS = { ... }
 import { CLIENT_AVATARS } from "../../variables/clientAvatars";
 
 // shorten objective for the Objective column
@@ -21,6 +21,40 @@ function shortObjective(obj) {
   s = s.replace(/^OUTCOME_/, "");
   s = s.replace(/_/g, " ");
   return s;
+}
+
+// Пытаемся найти аватар по нескольким возможным ключам
+function resolveAvatarSrc(adset) {
+  // то, что пришло с бэка
+  const rawId = adset?.account_id != null ? String(adset.account_id) : "";
+  const rawName = adset?.account_name != null ? String(adset.account_name) : "";
+
+  // нормализованные варианты id
+  const idNoAct = rawId.replace(/^act_/, "");
+  const withAct = rawId && !rawId.startsWith("act_") ? `act_${rawId}` : rawId;
+
+  // кандидаты в порядке приоритета
+  const candidateKeys = [rawId, withAct, idNoAct, rawName].filter(Boolean);
+
+  // 1) если сам адсет уже содержит прямой URL (например, из бэка)
+  if (adset?.avatarUrl) return { src: adset.avatarUrl, hit: "adset.avatarUrl" };
+
+  // 2) ищем точное совпадение по словарю
+  for (const k of candidateKeys) {
+    if (Object.prototype.hasOwnProperty.call(CLIENT_AVATARS, k)) {
+      return { src: CLIENT_AVATARS[k], hit: k };
+    }
+  }
+
+  // 3) последний шанс: безрегистровый матч по имени
+  const lowerName = rawName.toLowerCase();
+  for (const key of Object.keys(CLIENT_AVATARS)) {
+    if (key.toLowerCase() === lowerName) {
+      return { src: CLIENT_AVATARS[key], hit: `${key} (ci)` };
+    }
+  }
+
+  return { src: undefined, hit: "not-found" };
 }
 
 function TablesTableRow(props) {
@@ -44,23 +78,32 @@ function TablesTableRow(props) {
   const campaign = adset.campaign_name || "—";
   const adsetName = adset.adset_name || adset.name || "Untitled Ad Set";
 
-  // КЛЮЧ ДЛЯ АВАТАРКИ:
-  // 1) если бэк когда-нибудь начнёт присылать account_id — используем его
-  // 2) иначе — по имени аккаунта
-  // 3) если у самого adset уже есть avatarUrl (из бэка) — он перекроет словарь
-  const accountKey = adset.account_id || adset.account_name || "";
-  const avatarSrc =
-    adset.avatarUrl ||
-    CLIENT_AVATARS[accountKey] ||
-    CLIENT_AVATARS[adset.account_name || ""] ||
-    undefined;
+  // подбираем src
+  const { src: avatarSrc, hit } = resolveAvatarSrc(adset);
+
+  // временный дебаг — посмотри в консоль по одному ряду, увидишь ключ и src
+  /* eslint-disable no-console */
+  console.debug("[avatar]", {
+    account_id: adset?.account_id,
+    account_name: adset?.account_name,
+    used_key: hit,
+    src: avatarSrc,
+  });
+  /* eslint-enable no-console */
 
   return (
     <Tr>
       {/* LEFT sticky cell: Account → Campaign → Ad Set */}
       <Td position="sticky" left="0" zIndex="1" bg={stickyBg} py={3}>
         <Flex align="flex-start" gap={3}>
-          <Avatar size="sm" name={account} src={avatarSrc} bg="gray.500" />
+          <Avatar
+            size="sm"
+            name={account}
+            src={avatarSrc}
+            bg="gray.500"
+            // хинт при наведении: какой ключ сработал
+            title={`avatar: ${hit}`}
+          />
           <Flex direction="column" minW={0}>
             <Text
               fontSize="10px"
