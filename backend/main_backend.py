@@ -395,6 +395,10 @@ IMPORTANT: You are analyzing a sample of {len(final_adsets)} ad sets from a larg
         logging.error(f"OpenAI API error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to get AI analysis: {e}")
 @app.post("/api/analyze-adsets") # <--- ЭТОТ БЛОК, СКОРЕЕ ВСЕГО, БЫЛ УДАЛЕН
+async def analyze_adsets_endpoint(adsets: List[dict] = Body(...)):
+    if not adsets:
+        raise HTTPException(status_code=400, detail="Adset data is required.")
+    return await get_ai_analysis(adsets)
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Other Endpoints (Including the one that was likely deleted)
