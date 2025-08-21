@@ -50,7 +50,7 @@ function Tables() {
     "sortConfig"
   );
 
-  // Updated label (English)
+  // "Updated: ..." label in EN
   const [lastUpdated, setLastUpdated] = useState(null);
   const [tick, setTick] = useState(0);
   useEffect(() => {
@@ -289,7 +289,7 @@ function Tables() {
                 <option value="ALL">All</option>
               </Select>
 
-              {/* ACTIONS: Save, Refresh + Updated */}
+              {/* actions */}
               <IconButton
                 aria-label="Save view"
                 icon={<Icon as={FaSave} />}
@@ -335,7 +335,7 @@ function Tables() {
               <Thead>
                 <Tr my=".8rem" ps="0px">
                   <Th color="white" position="sticky" left="0" zIndex="1" bg="#2a406e">
-                    Ad Set / Campaign
+                    Account / Campaign / Ad Set
                   </Th>
                   <Th color="gray.400">Status</Th>
                   <Th color="gray.400">Objective</Th>
