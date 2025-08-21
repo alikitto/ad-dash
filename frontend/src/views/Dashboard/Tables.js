@@ -1,19 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
-  Box,
-  Flex,
-  Select,
-  Table,
-  Tbody,
-  Td,
-  Text,
-  Th,
-  Thead,
-  Tr,
-  useToast,
-  HStack,
-  Icon,
-  IconButton,
+  Box, Flex, Select, Table, Tbody, Td, Text, Th, Thead, Tr,
+  useToast, HStack, Icon, IconButton,
 } from "@chakra-ui/react";
 import { TriangleDownIcon, TriangleUpIcon, RepeatIcon } from "@chakra-ui/icons";
 import { FaSave } from "react-icons/fa";
@@ -50,7 +38,6 @@ function Tables() {
     "sortConfig"
   );
 
-  // Updated: now / N mins ago
   const [lastUpdated, setLastUpdated] = useState(null);
   const [tick, setTick] = useState(0);
   useEffect(() => {
@@ -162,11 +149,11 @@ function Tables() {
         adset={adset}
         onStatusChange={handleStatusChange}
         isUpdating={updatingId === adset.adset_id}
+        datePreset={datePreset}           // <-- добавили
       />
     ));
   };
 
-  // нейтральный цвет разделителей (под темную тему)
   const SEPARATOR = "rgba(255,255,255,0.10)";
 
   return (
@@ -206,45 +193,18 @@ function Tables() {
         </CardHeader>
 
         <CardBody>
-          {/* СКРОЛЛ-КОНТЕЙНЕР С ЛИПКИМ ХЕДЕРОМ + ВЕРТИКАЛЬНЫЕ ЛИНИИ */}
           <Box
             maxH="70vh"
             overflow="auto"
             sx={{
               "&::-webkit-scrollbar": { height: "8px", width: "8px" },
-              "&::-webkit-scrollbar-track": { background: "transparent" },
               "&::-webkit-scrollbar-thumb": { background: "#2D3748", borderRadius: "8px" },
               "&::-webkit-scrollbar-thumb:hover": { background: "#4A5568" },
-
-              // липкая шапка
-              "& thead th": {
-                position: "sticky",
-                top: 0,
-                zIndex: 3,
-                background: "#2a406e",
-              },
-              // липкая первая колонка в шапке
-              "& thead th:first-of-type": {
-                left: 0,
-                zIndex: 5,
-                boxShadow: `inset -1px 0 0 ${SEPARATOR}`, // вертикальный разделитель справа от первой колонки хедера
-              },
-              // липкая первая колонка в теле
-              "& tbody td:first-of-type": {
-                position: "sticky",
-                left: 0,
-                zIndex: 4,
-                background: "#273b66",
-                boxShadow: `inset -1px 0 0 ${SEPARATOR}`, // разделитель справа
-              },
-
-              // === ВЕРТИКАЛЬНЫЕ ЛИНИИ ДЛЯ ВСЕХ ЯЧЕЕК ===
-              "& th, & td": {
-                borderRight: `1px solid ${SEPARATOR}`,
-              },
-              "& th:last-of-type, & td:last-of-type": {
-                borderRight: "none",
-              },
+              "& thead th": { position: "sticky", top: 0, zIndex: 3, background: "#2a406e" },
+              "& thead th:first-of-type": { left: 0, zIndex: 5, boxShadow: `inset -1px 0 0 ${SEPARATOR}` },
+              "& tbody td:first-of-type": { position: "sticky", left: 0, zIndex: 4, background: "#273b66", boxShadow: `inset -1px 0 0 ${SEPARATOR}` },
+              "& th, & td": { borderRight: `1px solid ${SEPARATOR}` },
+              "& th:last-of-type, & td:last-of-type": { borderRight: "none" },
             }}
           >
             <Table variant="simple" color="#fff">
