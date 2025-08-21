@@ -326,50 +326,84 @@ async def update_ad_status(ad_id: str, payload: Dict = Body(...)):
     except Exception as e:
         logging.error(f"update_ad_status error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
 # ── AI Analysis ───────────────────────────────────────────────────────────────
 
 async def get_ai_analysis(adsets: List[dict]) -> Dict:
     if not OPENAI_API_KEY:
         raise HTTPException(status_code=500, detail="OpenAI API key is not configured.")
 
-    # Упрощаем данные для промпта, чтобы не превышать лимит токенов
+    # --- НОВАЯ ЛОГИКА: УМНОЕ СОКРАЩЕНИЕ ДАННЫХ ---
+    MAX_ADSETS_FOR_AI = 35 # Макс. кол-во адсетов для отправки
+    final_adsets = adsets
+
+    if len(adsets) > MAX_ADSETS_FOR_AI:
+        # Сортируем по разным ключам, чтобы выбрать самое важное
+        adsets.sort(key=lambda x: x.get("spend", 0), reverse=True)
+        top_by_spend = adsets[:15]
+
+        adsets.sort(key=lambda x: x.get("leads", 0), reverse=True)
+        top_by_leads = adsets[:10]
+
+        worst_performers = sorted(
+            [a for a in adsets if a.get("leads", 0) == 0 and a.get("spend", 0) > 0],
+            key=lambda x: x.get("spend", 0),
+            reverse=True
+        )[:5]
+
+        # Объединяем выборки и убираем дубликаты
+        combined = {d["adset_id"]: d for d in top_by_spend + top_by_leads + worst_performers}
+        final_adsets = list(combined.values())
+
+
+    # Упрощаем данные для промпта
     simplified_adsets = [
         {
             "name": f"{d.get('account_name', '')[:15]} / {d.get('adset_name', 'N/A')[:25]}",
             "status": d.get("status"),
-            "spend": d.get("spend", 0),
+            "spend": round(d.get("spend", 0), 2),
             "leads": d.get("leads", 0),
-            "cpl": d.get("cpl", 0),
-            "ctr_link": (d.get("link_clicks", 0) / d.get("impressions", 1)) * 100,
-            "impressions": d.get("impressions", 0),
+            "cpl": round(d.get("cpl", 0), 2),
+            "ctr_link": round((d.get("link_clicks", 0) / d.get("impressions", 1)) * 100, 2),
         }
-        for d in adsets
+        for d in final_adsets
     ]
 
     # Системный промпт - наша инструкция для AI
-    system_prompt = """
+    system_prompt = f"""
 You are an expert Meta Ads analyst. Your task is to analyze a list of ad sets provided in JSON format.
 Provide a concise, data-driven analysis in Russian.
 Your response MUST be a valid JSON object with three keys: "summary", "insights", and "recommendations".
 
-1.  `summary`: A short, 2-3 sentence executive summary of the overall performance in Markdown format. Mention total spend and total leads.
+1.  `summary`: A short, 2-3 sentence executive summary of the overall performance in Markdown format. Mention total spend and total leads FROM THE ORIGINAL DATASET.
 2.  `insights`: A list of 2-4 key bullet-point observations. Identify the best and worst performers.
 3.  `recommendations`: A list of actionable recommendations. Each recommendation must be an object with two keys: `priority` ("high", "medium", or "low") and `text` (the recommendation itself).
 
 Analyze based on Spend, Leads, CPL (Cost Per Lead), and CTR (Link Click). A good CPL is a low CPL. A good CTR is a high CTR.
+IMPORTANT: You are analyzing a curated sample of {len(final_adsets)} ad sets from a larger dataset of {len(adsets)} ad sets. Mention this context in your summary if relevant.
 """
+
+    # Считаем общие метрики для summary, чтобы AI не выдумывал их
+    total_spend = round(sum(a.get("spend", 0) for a in adsets), 2)
+    total_leads = sum(a.get("leads", 0) for a in adsets)
+    user_data = {
+        "total_spend": total_spend,
+        "total_leads": total_leads,
+        "adsets_sample": simplified_adsets
+    }
+
 
     try:
         client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY)
         response = await client.chat.completions.create(
-            model="gpt-4o", # или gpt-3.5-turbo для скорости и экономии
+            model="gpt-4o",
             response_format={"type": "json_object"},
             messages=[
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": json.dumps(simplified_adsets, indent=2)},
+                {"role": "user", "content": json.dumps(user_data, indent=2)},
             ],
             temperature=0.5,
-            max_tokens=1000,
+            max_tokens=2000, # Немного увеличим на всякий случай
         )
         analysis_content = response.choices[0].message.content
         return json.loads(analysis_content)
@@ -384,6 +418,5 @@ async def analyze_adsets_endpoint(adsets: List[dict] = Body(...)):
     if not adsets:
         raise HTTPException(status_code=400, detail="Adset data is required.")
     
-    # Запускаем анализ асинхронно
     analysis_result = await get_ai_analysis(adsets)
     return analysis_result
