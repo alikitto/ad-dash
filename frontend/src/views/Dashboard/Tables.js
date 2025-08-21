@@ -33,9 +33,6 @@ function useStickyState(defaultValue, key) {
   return [value, setValue];
 }
 
-// Если шапка прячется под fixed-баром, увеличь offset:
-const HEADER_STICKY_TOP = 0; // например 75
-
 function Tables() {
   const [allAdsets, setAllAdsets] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -53,7 +50,7 @@ function Tables() {
     "sortConfig"
   );
 
-  // Updated: now / 5 mins ago
+  // Updated: now / N mins ago
   const [lastUpdated, setLastUpdated] = useState(null);
   const [tick, setTick] = useState(0);
   useEffect(() => {
@@ -63,8 +60,7 @@ function Tables() {
   const lastUpdatedLabel = useMemo(() => {
     if (!lastUpdated) return "—";
     const now = new Date();
-    const diffMs = now.getTime() - lastUpdated.getTime();
-    const mins = Math.floor(diffMs / 60000);
+    const mins = Math.floor((now - lastUpdated) / 60000);
     const hrs = Math.floor(mins / 60);
     if (mins < 1) return "now";
     if (mins === 1) return "1 min ago";
@@ -84,7 +80,6 @@ function Tables() {
       if (data.detail) throw new Error(data.detail);
       setAllAdsets(data);
       setLastUpdated(new Date());
-      // window.__lastAdsets = data; // (оставь, если нужно дебажить)
     } catch (e) {
       setError(e.message || "Failed to load data");
     } finally {
@@ -114,22 +109,9 @@ function Tables() {
       setAllAdsets((prev) =>
         prev.map((a) => (a.adset_id === adsetId ? { ...a, status: newStatus } : a))
       );
-      toast({
-        title: "Status updated!",
-        status: "success",
-        duration: 1500,
-        isClosable: true,
-        position: "top",
-      });
+      toast({ title: "Status updated!", status: "success", duration: 1500, isClosable: true, position: "top" });
     } catch (e) {
-      toast({
-        title: "Couldn't update status",
-        description: e.message,
-        status: "error",
-        duration: 2500,
-        isClosable: true,
-        position: "top",
-      });
+      toast({ title: "Couldn't update status", description: e.message, status: "error", duration: 2500, isClosable: true, position: "top" });
     } finally {
       setUpdatingId(null);
     }
@@ -138,29 +120,19 @@ function Tables() {
   const processedAdsets = useMemo(() => {
     let filtered = [...allAdsets];
     if (statusFilter !== "ALL") filtered = filtered.filter((a) => a.status === statusFilter);
-    if (selectedAccount !== "all")
-      filtered = filtered.filter((a) => a.account_name === selectedAccount);
-    if (objectiveFilter !== "all")
-      filtered = filtered.filter((a) => a.objective === objectiveFilter);
+    if (selectedAccount !== "all") filtered = filtered.filter((a) => a.account_name === selectedAccount);
+    if (objectiveFilter !== "all") filtered = filtered.filter((a) => a.objective === objectiveFilter);
 
     filtered.sort((a, b) => {
-      if (a[sortConfig.key] < b[sortConfig.key])
-        return sortConfig.direction === "ascending" ? -1 : 1;
-      if (a[sortConfig.key] > b[sortConfig.key])
-        return sortConfig.direction === "ascending" ? 1 : -1;
+      if (a[sortConfig.key] < b[sortConfig.key]) return sortConfig.direction === "ascending" ? -1 : 1;
+      if (a[sortConfig.key] > b[sortConfig.key]) return sortConfig.direction === "ascending" ? 1 : -1;
       return 0;
     });
     return filtered;
   }, [allAdsets, selectedAccount, objectiveFilter, statusFilter, sortConfig]);
 
-  const accounts = useMemo(
-    () => ["all", ...new Set(allAdsets.map((a) => a.account_name))],
-    [allAdsets]
-  );
-  const objectives = useMemo(
-    () => ["all", ...new Set(allAdsets.map((a) => a.objective || "N/A"))],
-    [allAdsets]
-  );
+  const accounts = useMemo(() => ["all", ...new Set(allAdsets.map((a) => a.account_name))], [allAdsets]);
+  const objectives = useMemo(() => ["all", ...new Set(allAdsets.map((a) => a.objective || "N/A"))], [allAdsets]);
 
   const requestSort = (key) => {
     let direction = "ascending";
@@ -168,77 +140,21 @@ function Tables() {
     setSortConfig({ key, direction });
   };
 
-  const SortableTh = ({ children, sortKey, stickyLeft = false }) => (
-    <Th
-      cursor="pointer"
-      onClick={() => requestSort(sortKey)}
-      color="gray.200"
-      position="sticky"
-      top={`${HEADER_STICKY_TOP}px`}
-      zIndex={stickyLeft ? 4 : 3}
-      bg="#2a406e"
-      left={stickyLeft ? 0 : undefined}
-      _before={{
-        // небольшая подложка, чтобы не просвечивало под границами строк
-        content: '""',
-        position: "absolute",
-        inset: 0,
-        bg: "#2a406e",
-        zIndex: -1,
-      }}
-    >
+  const SortableTh = ({ children, sortKey }) => (
+    <Th cursor="pointer" onClick={() => requestSort(sortKey)} color="gray.200">
       <Flex align="center">
         {children}
-        {sortKey && sortConfig.key === sortKey && (
-          <Icon
-            as={sortConfig.direction === "ascending" ? TriangleUpIcon : TriangleDownIcon}
-            w={3}
-            h={3}
-            ml={2}
-          />
+        {sortConfig.key === sortKey && (
+          <Icon as={sortConfig.direction === "ascending" ? TriangleUpIcon : TriangleDownIcon} w={3} h={3} ml={2} />
         )}
       </Flex>
     </Th>
   );
 
-  const NormalStickyTh = ({ children }) => (
-    <Th
-      color="gray.200"
-      position="sticky"
-      top={`${HEADER_STICKY_TOP}px`}
-      zIndex={3}
-      bg="#2a406e"
-      _before={{ content: '""', position: "absolute", inset: 0, bg: "#2a406e", zIndex: -1 }}
-    >
-      {children}
-    </Th>
-  );
-
   const renderTableBody = () => {
-    if (loading)
-      return (
-        <Tr>
-          <Td colSpan="12" textAlign="center">
-            Loading ad sets...
-          </Td>
-        </Tr>
-      );
-    if (error)
-      return (
-        <Tr>
-          <Td colSpan="12" textAlign="center">
-            Error: {error}
-          </Td>
-        </Tr>
-      );
-    if (!processedAdsets.length)
-      return (
-        <Tr>
-          <Td colSpan="12" textAlign="center">
-            No ad sets found.
-          </Td>
-        </Tr>
-      );
+    if (loading) return (<Tr><Td colSpan="12" textAlign="center">Loading ad sets...</Td></Tr>);
+    if (error) return (<Tr><Td colSpan="12" textAlign="center">Error: {error}</Td></Tr>);
+    if (!processedAdsets.length) return (<Tr><Td colSpan="12" textAlign="center">No ad sets found.</Td></Tr>);
 
     return processedAdsets.map((adset) => (
       <TablesTableRow
@@ -255,133 +171,85 @@ function Tables() {
       <Card>
         <CardHeader>
           <Flex direction="column">
-            <Text fontSize="xl" color="#fff" fontWeight="bold">
-              Active Ad Sets
-            </Text>
-
+            <Text fontSize="xl" color="#fff" fontWeight="bold">Active Ad Sets</Text>
             <HStack mt="20px" spacing={3} align="center">
-              {/* filters */}
-              <Select
-                value={selectedAccount}
-                onChange={(e) => setSelectedAccount(e.target.value)}
-                size="sm"
-                borderRadius="md"
-                borderColor="gray.600"
-                color="white"
-                sx={{ "> option": { background: "#0F1535" } }}
-              >
-                {accounts.map((acc) => (
-                  <option key={acc} value={acc}>
-                    {acc === "all" ? "All Accounts" : acc}
-                  </option>
-                ))}
+              <Select value={selectedAccount} onChange={(e) => setSelectedAccount(e.target.value)} size="sm" borderRadius="md" borderColor="gray.600" color="white" sx={{ "> option": { background: "#0F1535" } }}>
+                {accounts.map((acc) => (<option key={acc} value={acc}>{acc === "all" ? "All Accounts" : acc}</option>))}
               </Select>
-
-              <Select
-                value={objectiveFilter}
-                onChange={(e) => setObjectiveFilter(e.target.value)}
-                size="sm"
-                borderRadius="md"
-                borderColor="gray.600"
-                color="white"
-                sx={{ "> option": { background: "#0F1535" } }}
-              >
-                {objectives.map((obj) => (
-                  <option key={obj} value={obj}>
-                    {obj === "all" ? "All Objectives" : obj}
-                  </option>
-                ))}
+              <Select value={objectiveFilter} onChange={(e) => setObjectiveFilter(e.target.value)} size="sm" borderRadius="md" borderColor="gray.600" color="white" sx={{ "> option": { background: "#0F1535" } }}>
+                {objectives.map((obj) => (<option key={obj} value={obj}>{obj === "all" ? "All Objectives" : obj}</option>))}
               </Select>
-
-              <Select
-                value={datePreset}
-                onChange={(e) => setDatePreset(e.target.value)}
-                size="sm"
-                borderRadius="md"
-                borderColor="gray.600"
-                color="white"
-                sx={{ "> option": { background: "#0F1535" } }}
-              >
+              <Select value={datePreset} onChange={(e) => setDatePreset(e.target.value)} size="sm" borderRadius="md" borderColor="gray.600" color="white" sx={{ "> option": { background: "#0F1535" } }}>
                 <option value="today">Today</option>
                 <option value="yesterday">Yesterday</option>
                 <option value="last_7d">Last 7 Days</option>
                 <option value="last_30d">Last 30 Days</option>
                 <option value="maximum">Maximum</option>
               </Select>
-
-              <Select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                size="sm"
-                borderRadius="md"
-                borderColor="gray.600"
-                color="white"
-                sx={{ "> option": { background: "#0F1535" } }}
-              >
+              <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} size="sm" borderRadius="md" borderColor="gray.600" color="white" sx={{ "> option": { background: "#0F1535" } }}>
                 <option value="ACTIVE">Active</option>
                 <option value="PAUSED">Paused</option>
                 <option value="ALL">All</option>
               </Select>
-
-              {/* actions */}
-              <IconButton
-                aria-label="Save view"
-                icon={<Icon as={FaSave} />}
-                size="sm"
-                onClick={() =>
-                  toast({
-                    title: "View saved",
-                    description: "Filters and sort are stored locally.",
-                    status: "info",
-                    duration: 2000,
-                    isClosable: true,
-                    position: "top",
-                  })
-                }
+              <IconButton aria-label="Save view" icon={<Icon as={FaSave} />} size="sm"
+                onClick={() => toast({ title: "View saved", description: "Filters and sort are stored locally.", status: "info", duration: 2000, isClosable: true, position: "top" })}
               />
               <HStack spacing={2}>
-                <IconButton
-                  aria-label="Refresh"
-                  icon={<RepeatIcon />}
-                  size="sm"
-                  onClick={fetchData}
-                  isLoading={loading}
-                />
-                <Text fontSize="xs" color="gray.400">
-                  Updated: {lastUpdatedLabel}
-                </Text>
+                <IconButton aria-label="Refresh" icon={<RepeatIcon />} size="sm" onClick={fetchData} isLoading={loading}/>
+                <Text fontSize="xs" color="gray.400">Updated: {lastUpdatedLabel}</Text>
               </HStack>
             </HStack>
           </Flex>
         </CardHeader>
 
         <CardBody>
+          {/* СКРОЛЛ-КОНТЕЙНЕР С ЛИПКИМ ХЕДЕРОМ */}
           <Box
-            overflowX="auto"
+            maxH="70vh"
+            overflow="auto"
             sx={{
-              "&::-webkit-scrollbar": { height: "8px" },
+              // скроллбар
+              "&::-webkit-scrollbar": { height: "8px", width: "8px" },
               "&::-webkit-scrollbar-track": { background: "transparent" },
               "&::-webkit-scrollbar-thumb": { background: "#2D3748", borderRadius: "8px" },
               "&::-webkit-scrollbar-thumb:hover": { background: "#4A5568" },
+
+              // липкая шапка
+              "& thead th": {
+                position: "sticky",
+                top: 0,
+                zIndex: 3,
+                background: "#2a406e",
+              },
+              // первая колонка в шапке — тоже липкая слева
+              "& thead th:first-of-type": {
+                left: 0,
+                zIndex: 5,
+              },
+              // первая колонка в теле — липкая слева
+              "& tbody td:first-of-type": {
+                position: "sticky",
+                left: 0,
+                zIndex: 4,
+                background: "#273b66",
+              },
             }}
           >
             <Table variant="simple" color="#fff">
               <Thead>
                 <Tr my=".8rem" ps="0px">
-                  <SortableTh stickyLeft sortKey={null /* не сортируем по названию блока */}>
-                    Account / Campaign / Ad Set
-                  </SortableTh>
-                  <NormalStickyTh>Status</NormalStickyTh>
-                  <NormalStickyTh>Objective</NormalStickyTh>
+                  <Th color="white">Account / Campaign / Ad Set</Th>
+                  <Th color="gray.200">Status</Th>
+                  <Th color="gray.200">Objective</Th>
                   <SortableTh sortKey="spend">Spent</SortableTh>
-                  <NormalStickyTh>Impressions</NormalStickyTh>
-                  <NormalStickyTh>Frequency</NormalStickyTh>
-                  <NormalStickyTh>Leads (CPA)</NormalStickyTh>
+                  <Th color="gray.200">Impressions</Th>
+                  <Th color="gray.200">Frequency</Th>
+                  <Th color="gray.200">Leads (CPA)</Th>
                   <SortableTh sortKey="cpl">CPL</SortableTh>
-                  <NormalStickyTh>CPM</NormalStickyTh>
-                  <NormalStickyTh>CTR (All)</NormalStickyTh>
-                  <NormalStickyTh>CTR (Link Click)</NormalStickyTh>
-                  <NormalStickyTh>Link Clicks</NormalStickyTh>
+                  <Th color="gray.200">CPM</Th>
+                  <Th color="gray.200">CTR (All)</Th>
+                  <Th color="gray.200">CTR (Link Click)</Th>
+                  <Th color="gray.200">Link Clicks</Th>
                 </Tr>
               </Thead>
               <Tbody>{renderTableBody()}</Tbody>
