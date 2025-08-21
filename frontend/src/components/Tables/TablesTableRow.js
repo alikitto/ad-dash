@@ -10,10 +10,11 @@ import {
   Spinner,
 } from "@chakra-ui/react";
 
+// shorten objective for the Objective column
 function shortObjective(obj) {
   if (!obj) return "—";
   let s = String(obj).toUpperCase().trim();
-  s = s.replace(/^OUTCOME_/, ""); // drop OUTCOME_
+  s = s.replace(/^OUTCOME_/, "");
   s = s.replace(/_/g, " ");
   return s;
 }
@@ -35,33 +36,32 @@ function TablesTableRow(props) {
 
   const leadsCount = adset.leads ?? adset.results ?? 0;
 
-  const name = adset.adset_name || adset.name || "Untitled Ad Set";
-  const subline = [adset.account_name, adset.campaign_name].filter(Boolean).join(" • ");
+  const account = adset.account_name || "—";
+  const campaign = adset.campaign_name || "—";
+  const adsetName = adset.adset_name || adset.name || "Untitled Ad Set";
 
   return (
     <Tr>
-      {/* LEFT sticky cell */}
-      <Td position="sticky" left="0" zIndex="1" bg={stickyBg}>
+      {/* LEFT sticky cell: Account → Campaign → Ad Set */}
+      <Td position="sticky" left="0" zIndex="1" bg={stickyBg} py={3}>
         <Flex align="flex-start" gap={3}>
-          <Avatar
-            size="sm"
-            name={adset.account_name || adset.campaign_name || adset.adset_name}
-            bg="gray.500"
-          />
-          <Flex direction="column">
-            <Text fontWeight="bold" color={textColor} noOfLines={2}>
-              {name}
+          <Avatar size="sm" name={account} bg="gray.500" />
+          <Flex direction="column" minW={0}>
+            <Text
+              fontSize="10px"
+              textTransform="uppercase"
+              letterSpacing="0.6px"
+              color="gray.300"
+              noOfLines={1}
+            >
+              {account}
             </Text>
-            {subline && (
-              <Text fontSize="xs" color="gray.300" noOfLines={1}>
-                {subline}
-              </Text>
-            )}
-            {adset.objective && (
-              <Text fontSize="xs" color="gray.500" noOfLines={1}>
-                {shortObjective(adset.objective)}
-              </Text>
-            )}
+            <Text fontSize="sm" fontWeight="semibold" color={textColor} noOfLines={1} mt="1px">
+              {campaign}
+            </Text>
+            <Text fontSize="sm" color="gray.200" noOfLines={1} mt="1px">
+              {adsetName}
+            </Text>
           </Flex>
         </Flex>
       </Td>
@@ -81,22 +81,22 @@ function TablesTableRow(props) {
         )}
       </Td>
 
-      {/* Objective (short & small) */}
+      {/* Objective (short & compact) */}
       <Td>
         <Text fontSize="xs" color={textColor} noOfLines={1}>
           {shortObjective(adset.objective)}
         </Text>
       </Td>
 
-      <Td><Text fontSize="md" color={textColor}>{formatCurrency(adset.spend)}</Text></Td>
-      <Td><Text fontSize="md" color={textColor}>{formatNumber(adset.impressions)}</Text></Td>
-      <Td><Text fontSize="md" color={textColor}>{formatNumber(adset.frequency)}</Text></Td>
-      <Td><Text fontSize="md" color={textColor}>{formatNumber(leadsCount)}</Text></Td>
-      <Td><Text fontSize="md" color={textColor}>{formatCurrency(adset.cpl)}</Text></Td>
-      <Td><Text fontSize="md" color={textColor}>{formatCurrency(adset.cpm)}</Text></Td>
-      <Td><Text fontSize="md" color={textColor}>{formatPercentage(adset.ctr_all)}</Text></Td>
-      <Td><Text fontSize="md" color={textColor}>{formatPercentage(ctrLinkClick)}</Text></Td>
-      <Td><Text fontSize="md" color={textColor}>{formatNumber(adset.link_clicks)}</Text></Td>
+      <Td><Text fontSize="sm" color={textColor}>{formatCurrency(adset.spend)}</Text></Td>
+      <Td><Text fontSize="sm" color={textColor}>{formatNumber(adset.impressions)}</Text></Td>
+      <Td><Text fontSize="sm" color={textColor}>{formatNumber(adset.frequency)}</Text></Td>
+      <Td><Text fontSize="sm" color={textColor}>{formatNumber(leadsCount)}</Text></Td>
+      <Td><Text fontSize="sm" color={textColor}>{formatCurrency(adset.cpl)}</Text></Td>
+      <Td><Text fontSize="sm" color={textColor}>{formatCurrency(adset.cpm)}</Text></Td>
+      <Td><Text fontSize="sm" color={textColor}>{formatPercentage(adset.ctr_all)}</Text></Td>
+      <Td><Text fontSize="sm" color={textColor}>{formatPercentage(ctrLinkClick)}</Text></Td>
+      <Td><Text fontSize="sm" color={textColor}>{formatNumber(adset.link_clicks)}</Text></Td>
     </Tr>
   );
 }
