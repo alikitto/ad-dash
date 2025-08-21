@@ -1,3 +1,4 @@
+// src/views/Dashboard/Tables.js
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Box,
@@ -221,82 +222,156 @@ function Tables() {
   return (
     <Flex direction="column" pt={{ base: "120px", md: "75px" }}>
       <Card>
-<CardHeader>
-  <Flex direction="column">
-    <Text fontSize="xl" color="#fff" fontWeight="bold">Active Ad Sets</Text>
+        {/* ФИЛЬТРЫ — как раньше */}
+        <CardHeader>
+          <Flex direction="column">
+            <Text fontSize="xl" color="#fff" fontWeight="bold">
+              Active Ad Sets
+            </Text>
 
-    <HStack mt="20px" spacing={3} align="center">
-      <Select value={selectedAccount} onChange={(e) => setSelectedAccount(e.target.value)} size="sm"
-        borderRadius="md" borderColor="gray.600" color="white" sx={{ "> option": { background: "#0F1535" } }}>
-        {accounts.map((acc) => (
-          <option key={acc} value={acc}>{acc === "all" ? "All Accounts" : acc}</option>
-        ))}
-      </Select>
+            <HStack mt="20px" spacing={3} align="center">
+              <Select
+                value={selectedAccount}
+                onChange={(e) => setSelectedAccount(e.target.value)}
+                size="sm"
+                borderRadius="md"
+                borderColor="gray.600"
+                color="white"
+                sx={{ "> option": { background: "#0F1535" } }}
+              >
+                {accounts.map((acc) => (
+                  <option key={acc} value={acc}>
+                    {acc === "all" ? "All Accounts" : acc}
+                  </option>
+                ))}
+              </Select>
 
-      <Select value={objectiveFilter} onChange={(e) => setObjectiveFilter(e.target.value)} size="sm"
-        borderRadius="md" borderColor="gray.600" color="white" sx={{ "> option": { background: "#0F1535" } }}>
-        {objectives.map((obj) => (
-          <option key={obj} value={obj}>{obj === "all" ? "All Objectives" : obj}</option>
-        ))}
-      </Select>
+              <Select
+                value={objectiveFilter}
+                onChange={(e) => setObjectiveFilter(e.target.value)}
+                size="sm"
+                borderRadius="md"
+                borderColor="gray.600"
+                color="white"
+                sx={{ "> option": { background: "#0F1535" } }}
+              >
+                {objectives.map((obj) => (
+                  <option key={obj} value={obj}>
+                    {obj === "all" ? "All Objectives" : obj}
+                  </option>
+                ))}
+              </Select>
 
-      <Select value={datePreset} onChange={(e) => setDatePreset(e.target.value)} size="sm"
-        borderRadius="md" borderColor="gray.600" color="white" sx={{ "> option": { background: "#0F1535" } }}>
-        <option value="today">Today</option>
-        <option value="yesterday">Yesterday</option>
-        <option value="last_7d">Last 7 Days</option>
-        <option value="last_30d">Last 30 Days</option>
-        <option value="maximum">Maximum</option>
-      </Select>
+              <Select
+                value={datePreset}
+                onChange={(e) => setDatePreset(e.target.value)}
+                size="sm"
+                borderRadius="md"
+                borderColor="gray.600"
+                color="white"
+                sx={{ "> option": { background: "#0F1535" } }}
+              >
+                <option value="today">Today</option>
+                <option value="yesterday">Yesterday</option>
+                <option value="last_7d">Last 7 Days</option>
+                <option value="last_30d">Last 30 Days</option>
+                <option value="maximum">Maximum</option>
+              </Select>
 
-      <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} size="sm"
-        borderRadius="md" borderColor="gray.600" color="white" sx={{ "> option": { background: "#0F1535" } }}>
-        <option value="ACTIVE">Active</option>
-        <option value="PAUSED">Paused</option>
-        <option value="ALL">All</option>
-      </Select>
+              <Select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                size="sm"
+                borderRadius="md"
+                borderColor="gray.600"
+                color="white"
+                sx={{ "> option": { background: "#0F1535" } }}
+              >
+                <option value="ACTIVE">Active</option>
+                <option value="PAUSED">Paused</option>
+                <option value="ALL">All</option>
+              </Select>
 
-      <IconButton aria-label="Save view" icon={<Icon as={FaSave} />} size="sm"
-        onClick={() => toast({ title: "View saved", description: "Filters and sort are stored locally.",
-          status: "info", duration: 2000, isClosable: true, position: "top" })} />
+              <IconButton
+                aria-label="Save view"
+                icon={<Icon as={FaSave} />}
+                size="sm"
+                onClick={() =>
+                  toast({
+                    title: "View saved",
+                    description: "Filters and sort are stored locally.",
+                    status: "info",
+                    duration: 2000,
+                    isClosable: true,
+                    position: "top",
+                  })
+                }
+              />
+              <HStack spacing={2}>
+                <IconButton
+                  aria-label="Refresh"
+                  icon={<RepeatIcon />}
+                  size="sm"
+                  onClick={fetchData}
+                  isLoading={loading}
+                />
+                <Text fontSize="xs" color="gray.400">
+                  Updated: {lastUpdatedLabel}
+                </Text>
+              </HStack>
+            </HStack>
+          </Flex>
+        </CardHeader>
 
-      <HStack spacing={2}>
-        <IconButton aria-label="Refresh" icon={<RepeatIcon />} size="sm"
-          onClick={fetchData} isLoading={loading}/>
-        <Text fontSize="xs" color="gray.400">Updated: {lastUpdatedLabel}</Text>
-      </HStack>
-    </HStack>
-  </Flex>
-</CardHeader>
-
-
+        {/* ТАБЛИЦА — как работала раньше */}
         <CardBody>
-          {/* Скролл-контейнер: липкая шапка, липкая 1-я колонка и вертикальные разделители */}
-<Box
-    maxH="70vh"
-    overflowY="auto"
-    overflowX="hidden"   // <— важное
-    sx={{
-      "&::-webkit-scrollbar": { width: "8px" },  // только вертикальная полоса
-      "&::-webkit-scrollbar-thumb": { background: "#2D3748", borderRadius: "8px" },
-      "&::-webkit-scrollbar-thumb:hover": { background: "#4A5568" },
+          <Box
+            maxH="70vh"
+            overflow="auto"
+            sx={{
+              "&::-webkit-scrollbar": { height: "8px", width: "8px" },
+              "&::-webkit-scrollbar-track": { background: "transparent" },
+              "&::-webkit-scrollbar-thumb": { background: "#2D3748", borderRadius: "8px" },
+              "&::-webkit-scrollbar-thumb:hover": { background: "#4A5568" },
 
-      // липкая шапка и 1-я колонка
-      "& thead th": { position: "sticky", top: 0, zIndex: 3, background: "#2a406e" },
-      "& thead th:first-of-type": { left: 0, zIndex: 5, boxShadow: "inset -1px 0 0 rgba(255,255,255,0.10)" },
-      "& tbody td:first-of-type": { position: "sticky", left: 0, zIndex: 4, background: "#273b66",
-        boxShadow: "inset -1px 0 0 rgba(255,255,255,0.10)" },
+              "& thead th": { position: "sticky", top: 0, zIndex: 3, background: "#2a406e" },
+              "& thead th:first-of-type": {
+                left: 0,
+                zIndex: 5,
+                boxShadow: `inset -1px 0 0 ${SEPARATOR}`,
+              },
+              "& tbody td:first-of-type": {
+                position: "sticky",
+                left: 0,
+                zIndex: 4,
+                background: "#273b66",
+                boxShadow: `inset -1px 0 0 ${SEPARATOR}`,
+              },
 
-      // вертикальные линии
-      "& th, & td": { borderRight: "1px solid rgba(255,255,255,0.10)" },
-      "& th:last-of-type, & td:last-of-type": { borderRight: "none" },
-
-      // таблица занимает всю ширину, чтобы не было горизонтального переполнения
-      "& table": { tableLayout: "fixed", width: "100%" },
-    }}
-  >
-    {/* ...Table/Thead/Tbody как сейчас... */}
-  </Box>
+              "& th, & td": { borderRight: `1px solid ${SEPARATOR}` },
+              "& th:last-of-type, & td:last-of-type": { borderRight: "none" },
+            }}
+          >
+            <Table variant="simple" color="#fff">
+              <Thead>
+                <Tr my=".8rem" ps="0px">
+                  <Th color="white">Account / Campaign / Ad Set</Th>
+                  <Th color="gray.200">Status</Th>
+                  <Th color="gray.200">Objective</Th>
+                  <SortableTh sortKey="spend">Spent</SortableTh>
+                  <Th color="gray.200">Impressions</Th>
+                  <Th color="gray.200">Frequency</Th>
+                  <Th color="gray.200">Leads (CPA)</Th>
+                  <SortableTh sortKey="cpl">CPL</SortableTh>
+                  <Th color="gray.200">CPM</Th>
+                  <Th color="gray.200">CTR (All)</Th>
+                  <Th color="gray.200">CTR (Link Click)</Th>
+                  <Th color="gray.200">Link Clicks</Th>
+                </Tr>
+              </Thead>
+              <Tbody>{renderTableBody()}</Tbody>
+            </Table>
+          </Box>
         </CardBody>
       </Card>
     </Flex>
