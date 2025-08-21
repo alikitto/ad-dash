@@ -1,16 +1,9 @@
-// Settings.js
-import React, { useEffect, useMemo, useState } from "react";
+// Tables.js
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
-  Avatar,
   Box,
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
   Flex,
-  HStack,
-  IconButton,
-  Input,
+  Select,
   Table,
   Tbody,
   Td,
@@ -19,194 +12,379 @@ import {
   Thead,
   Tr,
   useToast,
+  HStack,
+  Icon,
+  IconButton,
 } from "@chakra-ui/react";
-import { RepeatIcon, DeleteIcon } from "@chakra-ui/icons";
+import { TriangleDownIcon, TriangleUpIcon, RepeatIcon } from "@chakra-ui/icons";
+import { FaSave } from "react-icons/fa";
+import Card from "components/Card/Card.js";
+import CardHeader from "components/Card/CardHeader.js";
+import CardBody from "components/Card/CardBody.js";
+import TablesTableRow from "components/Tables/TablesTableRow";
 
-// Настрой: можно вынести в .env -> REACT_APP_BACKEND_BASE
-const BACKEND = process.env.REACT_APP_BACKEND_BASE || "https://ad-dash-backend-production.up.railway.app";
+const BACKEND =
+  process.env.REACT_APP_BACKEND_BASE ||
+  "https://ad-dash-backend-production.up.railway.app";
 
-export default function Settings() {
-  const toast = useToast();
-  const [loading, setLoading] = useState(false);
-  const [adsets, setAdsets] = useState([]);
+function useStickyState(defaultValue, key) {
+  const [value, setValue] = useState(() => {
+    const stickyValue = window.localStorage.getItem(key);
+    return stickyValue !== null ? JSON.parse(stickyValue) : defaultValue;
+  });
+  useEffect(() => {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  }, [key, value]);
+  return [value, setValue];
+}
+
+function Tables() {
+  const [allAdsets, setAllAdsets] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [updatingId, setUpdatingId] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(null);
   const [avatars, setAvatars] = useState({}); // { accountKey: imageUrl }
-  const [draft, setDraft] = useState({}); // локальные инпуты { accountKey: imageUrl }
+  const [tick, setTick] = useState(0);
+  const toast = useToast();
 
-  // грузим любые адсеты, чтобы понять список кабинетов
-  const loadAdsets = async () => {
-    const res = await fetch(`${BACKEND}/api/adsets?date_preset=last_7d`);
-    const data = await res.json();
-    return Array.isArray(data) ? data : [];
-  };
-
-  const loadAvatars = async () => {
-    const res = await fetch(`${BACKEND}/api/settings/avatars`);
-    const data = await res.json();
-    // ожидаем [{ account_id, image_url }]
-    const map = {};
-    (data || []).forEach((row) => (map[row.account_id] = row.image_url));
-    return map;
-  };
-
-  const refresh = async () => {
-    try {
-      setLoading(true);
-      const [adsetsData, avatarsMap] = await Promise.all([loadAdsets(), loadAvatars()]);
-      setAdsets(adsetsData);
-      setAvatars(avatarsMap);
-      setDraft(avatarsMap);
-    } catch (e) {
-      toast({ title: "Failed to load data", description: String(e), status: "error" });
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [datePreset, setDatePreset] = useStickyState("last_7d", "datePreset");
+  const [selectedAccount, setSelectedAccount] = useStickyState("all", "selectedAccount");
+  const [statusFilter, setStatusFilter] = useStickyState("ACTIVE", "statusFilter");
+  const [objectiveFilter, setObjectiveFilter] = useStickyState("all", "objectiveFilter");
+  const [sortConfig, setSortConfig] = useStickyState(
+    { key: "spend", direction: "descending" },
+    "sortConfig"
+  );
 
   useEffect(() => {
-    refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const id = setInterval(() => setTick((t) => t + 1), 60_000);
+    return () => clearInterval(id);
+  }, []);
+  const lastUpdatedLabel = useMemo(() => {
+    if (!lastUpdated) return "—";
+    const now = new Date();
+    const diffMs = now.getTime() - lastUpdated.getTime();
+    const mins = Math.floor(diffMs / 60000);
+    const hrs = Math.floor(mins / 60);
+    if (mins < 1) return "now";
+    if (mins === 1) return "1 min ago";
+    if (mins < 60) return `${mins} mins ago`;
+    if (hrs === 1) return "1 hr ago";
+    return `${hrs} hrs ago`;
+  }, [lastUpdated, tick]);
+
+  const fetchAvatars = useCallback(async () => {
+    try {
+      const res = await fetch(`${BACKEND}/api/settings/avatars`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+
+      // поддерживаем два формата: array и dict
+      const map = {};
+      if (Array.isArray(data)) {
+        data.forEach((row) => {
+          if (row && row.account_id) map[row.account_id] = row.image_url || "";
+        });
+      } else if (data && typeof data === "object") {
+        Object.entries(data).forEach(([k, v]) => (map[k] = v || ""));
+      }
+      setAvatars(map);
+    } catch (e) {
+      console.warn("avatars fetch failed:", e);
+      setAvatars({}); // тихо продолжаем без аватарок
+    }
   }, []);
 
-  // извлекаем кабинеты (уникальные)
-  const accounts = useMemo(() => {
-    const m = new Map();
-    for (const a of adsets) {
-      const key = a.account_id || a.account_name; // fallback
-      if (!key) continue;
-      if (!m.has(key)) {
-        m.set(key, {
-          accountKey: key,
-          account_name: a.account_name || key,
-          // campaign/adset не нужны на этой странице
-        });
-      }
-    }
-    return Array.from(m.values()).sort((x, y) =>
-      x.account_name.localeCompare(y.account_name, "en")
-    );
-  }, [adsets]);
-
-  const saveAvatar = async (accountKey) => {
-    const imageUrl = (draft[accountKey] || "").trim();
-    if (!imageUrl) {
-      toast({ title: "Image URL is empty", status: "warning" });
-      return;
-    }
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
-      setLoading(true);
-      const res = await fetch(`${BACKEND}/api/settings/avatars`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ accountId: accountKey, imageUrl }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setAvatars((prev) => ({ ...prev, [accountKey]: imageUrl }));
-      toast({ title: "Avatar saved", status: "success" });
+      const response = await fetch(
+        `${BACKEND}/api/adsets?date_preset=${datePreset}`
+      );
+      const data = await response.json();
+      if (data.detail) throw new Error(data.detail);
+      setAllAdsets(data);
+      setLastUpdated(new Date());
     } catch (e) {
-      toast({ title: "Save failed", description: String(e), status: "error" });
+      setError(e.message);
     } finally {
       setLoading(false);
+    }
+  }, [datePreset]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  useEffect(() => {
+    fetchAvatars();
+  }, [fetchAvatars]);
+
+  const handleStatusChange = async (adsetId, newStatus) => {
+    setUpdatingId(adsetId);
+    try {
+      const response = await fetch(
+        `${BACKEND}/api/adsets/${adsetId}/update-status`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: newStatus }),
+        }
+      );
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || "Failed to update status");
+      }
+      setAllAdsets((prev) =>
+        prev.map((a) => (a.adset_id === adsetId ? { ...a, status: newStatus } : a))
+      );
+      toast({
+        title: "Status updated!",
+        status: "success",
+        duration: 1500,
+        isClosable: true,
+        position: "top",
+      });
+    } catch (e) {
+      toast({
+        title: "Error",
+        description: e.message,
+        status: "error",
+        duration: 2500,
+        isClosable: true,
+        position: "top",
+      });
+    } finally {
+      setUpdatingId(null);
     }
   };
 
-  const deleteAvatar = async (accountKey) => {
-    try {
-      setLoading(true);
-      const res = await fetch(`${BACKEND}/api/settings/avatars/${encodeURIComponent(accountKey)}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setAvatars((prev) => {
-        const copy = { ...prev };
-        delete copy[accountKey];
-        return copy;
-      });
-      setDraft((prev) => {
-        const copy = { ...prev };
-        delete copy[accountKey];
-        return copy;
-      });
-      toast({ title: "Avatar deleted", status: "info" });
-    } catch (e) {
-      toast({ title: "Delete failed", description: String(e), status: "error" });
-    } finally {
-      setLoading(false);
-    }
+  const processedAdsets = useMemo(() => {
+    let filtered = [...allAdsets];
+    if (statusFilter !== "ALL")
+      filtered = filtered.filter((a) => a.status === statusFilter);
+    if (selectedAccount !== "all")
+      filtered = filtered.filter((a) => a.account_name === selectedAccount);
+    if (objectiveFilter !== "all")
+      filtered = filtered.filter((a) => a.objective === objectiveFilter);
+
+    filtered.sort((a, b) => {
+      if (a[sortConfig.key] < b[sortConfig.key])
+        return sortConfig.direction === "ascending" ? -1 : 1;
+      if (a[sortConfig.key] > b[sortConfig.key])
+        return sortConfig.direction === "ascending" ? 1 : -1;
+      return 0;
+    });
+    return filtered;
+  }, [allAdsets, selectedAccount, objectiveFilter, statusFilter, sortConfig]);
+
+  const accounts = useMemo(
+    () => ["all", ...new Set(allAdsets.map((a) => a.account_name))],
+    [allAdsets]
+  );
+  const objectives = useMemo(
+    () => ["all", ...new Set(allAdsets.map((a) => a.objective || "N/A"))],
+    [allAdsets]
+  );
+
+  const requestSort = (key) => {
+    let direction = "ascending";
+    if (sortConfig.key === key && sortConfig.direction === "ascending")
+      direction = "descending";
+    setSortConfig({ key, direction });
+  };
+
+  const SortableTh = ({ children, sortKey }) => (
+    <Th cursor="pointer" onClick={() => requestSort(sortKey)} color="gray.400">
+      <Flex align="center">
+        {children}
+        {sortConfig.key === sortKey && (
+          <Icon
+            as={sortConfig.direction === "ascending" ? TriangleUpIcon : TriangleDownIcon}
+            w={3}
+            h={3}
+            ml={2}
+          />
+        )}
+      </Flex>
+    </Th>
+  );
+
+  const renderTableBody = () => {
+    if (loading)
+      return (
+        <Tr>
+          <Td colSpan="12" textAlign="center">
+            Loading ad sets...
+          </Td>
+        </Tr>
+      );
+    if (error)
+      return (
+        <Tr>
+          <Td colSpan="12" textAlign="center">
+            Error: {error}
+          </Td>
+        </Tr>
+      );
+    if (!processedAdsets.length)
+      return (
+        <Tr>
+          <Td colSpan="12" textAlign="center">
+            No ad sets found.
+          </Td>
+        </Tr>
+      );
+    return processedAdsets.map((adset) => {
+      const key = adset.account_id || adset.account_name; // fallback
+      const avatarUrl = avatars[key] || adset.avatarUrl || "";
+      return (
+        <TablesTableRow
+          key={adset.adset_id}
+          adset={adset}
+          avatarUrl={avatarUrl}
+          onStatusChange={handleStatusChange}
+          isUpdating={updatingId === adset.adset_id}
+        />
+      );
+    });
   };
 
   return (
     <Flex direction="column" pt={{ base: "120px", md: "75px" }}>
       <Card>
         <CardHeader>
-          <HStack justify="space-between">
-            <Text fontSize="xl" color="#fff" fontWeight="bold">Settings — Avatars</Text>
-            <IconButton aria-label="Refresh" icon={<RepeatIcon />} onClick={refresh} isLoading={loading} />
-          </HStack>
-          <Text mt="2" fontSize="sm" color="gray.300">
-            Добавь URL-адрес картинки для каждого рекламного кабинета. Советы: используй прямые ссылки
-            (Cloudinary, S3, imgur) с https:// и разрешением .png/.jpg.
-          </Text>
+          <Flex direction="column">
+            <Text fontSize="xl" color="#fff" fontWeight="bold">
+              Active Ad Sets
+            </Text>
+
+            <HStack mt="20px" spacing={3} align="center">
+              <Select
+                value={selectedAccount}
+                onChange={(e) => setSelectedAccount(e.target.value)}
+                size="sm"
+                borderRadius="md"
+                borderColor="gray.600"
+                color="white"
+                sx={{ "> option": { background: "#0F1535" } }}
+              >
+                {accounts.map((acc) => (
+                  <option key={acc} value={acc}>
+                    {acc === "all" ? "All Accounts" : acc}
+                  </option>
+                ))}
+              </Select>
+
+              <Select
+                value={objectiveFilter}
+                onChange={(e) => setObjectiveFilter(e.target.value)}
+                size="sm"
+                borderRadius="md"
+                borderColor="gray.600"
+                color="white"
+                sx={{ "> option": { background: "#0F1535" } }}
+              >
+                {objectives.map((obj) => (
+                  <option key={obj} value={obj}>
+                    {obj === "all" ? "All Objectives" : obj}
+                  </option>
+                ))}
+              </Select>
+
+              <Select
+                value={datePreset}
+                onChange={(e) => setDatePreset(e.target.value)}
+                size="sm"
+                borderRadius="md"
+                borderColor="gray.600"
+                color="white"
+                sx={{ "> option": { background: "#0F1535" } }}
+              >
+                <option value="today">Today</option>
+                <option value="yesterday">Yesterday</option>
+                <option value="last_7d">Last 7 Days</option>
+                <option value="last_30d">Last 30 Days</option>
+                <option value="maximum">Maximum</option>
+              </Select>
+
+              <Select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                size="sm"
+                borderRadius="md"
+                borderColor="gray.600"
+                color="white"
+                sx={{ "> option": { background: "#0F1535" } }}
+              >
+                <option value="ACTIVE">Active</option>
+                <option value="PAUSED">Paused</option>
+                <option value="ALL">All</option>
+              </Select>
+
+              <IconButton
+                aria-label="Save view"
+                icon={<Icon as={FaSave} />}
+                size="sm"
+                onClick={() =>
+                  toast({
+                    title: "View saved",
+                    description: "Filters and sort are stored locally.",
+                    status: "info",
+                    duration: 2000,
+                    isClosable: true,
+                    position: "top",
+                  })
+                }
+              />
+              <HStack spacing={2}>
+                <IconButton
+                  aria-label="Refresh"
+                  icon={<RepeatIcon />}
+                  size="sm"
+                  onClick={fetchData}
+                  isLoading={loading}
+                />
+                <Text fontSize="xs" color="gray.400">
+                  Updated: {lastUpdatedLabel}
+                </Text>
+              </HStack>
+            </HStack>
+          </Flex>
         </CardHeader>
 
         <CardBody>
-          <Box overflowX="auto">
+          <Box
+            overflowX="auto"
+            sx={{
+              "&::-webkit-scrollbar": { height: "8px" },
+              "&::-webkit-scrollbar-track": { background: "transparent" },
+              "&::-webkit-scrollbar-thumb": { background: "#2D3748", borderRadius: "8px" },
+              "&::-webkit-scrollbar-thumb:hover": { background: "#4A5568" },
+            }}
+          >
             <Table variant="simple" color="#fff">
               <Thead>
-                <Tr>
-                  <Th color="white">Avatar</Th>
-                  <Th color="white">Account name</Th>
-                  <Th color="white">Account key (id or name)</Th>
-                  <Th color="white" w="40%">Image URL</Th>
-                  <Th color="white">Actions</Th>
+                <Tr my=".8rem" ps="0px">
+                  <Th color="white" position="sticky" left="0" zIndex="1" bg="#2a406e">
+                    Account / Campaign / Ad Set
+                  </Th>
+                  <Th color="gray.400">Status</Th>
+                  <Th color="gray.400">Objective</Th>
+                  <SortableTh sortKey="spend">Spent</SortableTh>
+                  <Th color="gray.400">Impressions</Th>
+                  <Th color="gray.400">Frequency</Th>
+                  <Th color="gray.400">Leads (CPA)</Th>
+                  <SortableTh sortKey="cpl">CPL</SortableTh>
+                  <Th color="gray.400">CPM</Th>
+                  <Th color="gray.400">CTR (All)</Th>
+                  <Th color="gray.400">CTR (Link Click)</Th>
+                  <Th color="gray.400">Link Clicks</Th>
                 </Tr>
               </Thead>
-              <Tbody>
-                {accounts.map((acc) => {
-                  const key = acc.accountKey;
-                  const current = avatars[key];
-                  const value = draft[key] ?? current ?? "";
-                  return (
-                    <Tr key={key}>
-                      <Td>
-                        <Avatar size="sm" name={acc.account_name} src={value || current || undefined} />
-                      </Td>
-                      <Td>
-                        <Text fontWeight="semibold">{acc.account_name}</Text>
-                      </Td>
-                      <Td>
-                        <Text fontSize="xs" color="gray.300">{key}</Text>
-                      </Td>
-                      <Td>
-                        <Input
-                          placeholder="https://..."
-                          value={value}
-                          onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))}
-                          size="sm"
-                          color="white"
-                          borderColor="gray.600"
-                        />
-                      </Td>
-                      <Td>
-                        <HStack>
-                          <Button size="sm" colorScheme="teal" onClick={() => saveAvatar(key)} isLoading={loading}>
-                            Save
-                          </Button>
-                          <IconButton
-                            size="sm"
-                            aria-label="Delete"
-                            icon={<DeleteIcon />}
-                            onClick={() => deleteAvatar(key)}
-                            isDisabled={!current}
-                          />
-                        </HStack>
-                      </Td>
-                    </Tr>
-                  );
-                })}
-                {!accounts.length && (
-                  <Tr><Td colSpan="5"><Text textAlign="center" color="gray.300">No accounts found.</Text></Td></Tr>
-                )}
-              </Tbody>
+              <Tbody>{renderTableBody()}</Tbody>
             </Table>
           </Box>
         </CardBody>
@@ -214,3 +392,5 @@ export default function Settings() {
     </Flex>
   );
 }
+
+export default Tables;
