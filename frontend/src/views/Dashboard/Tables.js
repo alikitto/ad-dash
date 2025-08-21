@@ -22,7 +22,6 @@ import CardHeader from "components/Card/CardHeader.js";
 import CardBody from "components/Card/CardBody.js";
 import TablesTableRow from "components/Tables/TablesTableRow";
 
-// сохраняем значения между перезагрузками
 function useStickyState(defaultValue, key) {
   const [value, setValue] = useState(() => {
     const stickyValue = window.localStorage.getItem(key);
@@ -51,26 +50,24 @@ function Tables() {
     "sortConfig"
   );
 
-  // NEW: время последнего успешного обновления + «тик» раз в минуту для пересчёта "N мин назад"
+  // Updated label (English)
   const [lastUpdated, setLastUpdated] = useState(null);
   const [tick, setTick] = useState(0);
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 60_000);
     return () => clearInterval(id);
   }, []);
-
   const lastUpdatedLabel = useMemo(() => {
     if (!lastUpdated) return "—";
     const now = new Date();
-    const diffMs = now - lastUpdated;
-    const diffMin = Math.floor(diffMs / 60000);
-    const hhmm = lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    if (diffMin <= 0) return `только что (${hhmm})`;
-    if (diffMin === 1) return `1 мин назад (${hhmm})`;
-    if (diffMin < 60) return `${diffMin} мин назад (${hhmm})`;
-    const diffHr = Math.floor(diffMin / 60);
-    return `${diffHr} ч назад (${hhmm})`;
-    // зависит от tick, чтобы пересчитываться каждую минуту
+    const diffMs = now.getTime() - lastUpdated.getTime();
+    const mins = Math.floor(diffMs / 60000);
+    const hrs = Math.floor(mins / 60);
+    if (mins < 1) return "now";
+    if (mins === 1) return "1 min ago";
+    if (mins < 60) return `${mins} mins ago`;
+    if (hrs === 1) return "1 hr ago";
+    return `${hrs} hrs ago`;
   }, [lastUpdated, tick]);
 
   const fetchData = useCallback(async () => {
@@ -83,9 +80,9 @@ function Tables() {
       const data = await response.json();
       if (data.detail) throw new Error(data.detail);
       setAllAdsets(data);
-      setLastUpdated(new Date()); // NEW: фиксируем время успешной загрузки
+      setLastUpdated(new Date());
     } catch (e) {
-      setError(e.message);
+      setError(e.message || "Failed to load data");
     } finally {
       setLoading(false);
     }
@@ -107,25 +104,25 @@ function Tables() {
         }
       );
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.detail || "Failed to update status");
       }
-      setAllAdsets(
-        allAdsets.map((a) => (a.adset_id === adsetId ? { ...a, status: newStatus } : a))
+      setAllAdsets((prev) =>
+        prev.map((a) => (a.adset_id === adsetId ? { ...a, status: newStatus } : a))
       );
       toast({
-        title: "Status updated successfully!",
+        title: "Status updated!",
         status: "success",
-        duration: 2000,
+        duration: 1500,
         isClosable: true,
         position: "top",
       });
     } catch (e) {
       toast({
-        title: "Error updating status.",
+        title: "Couldn't update status",
         description: e.message,
         status: "error",
-        duration: 3000,
+        duration: 2500,
         isClosable: true,
         position: "top",
       });
@@ -136,18 +133,17 @@ function Tables() {
 
   const processedAdsets = useMemo(() => {
     let filtered = [...allAdsets];
-    if (statusFilter !== "ALL") {
-      filtered = filtered.filter((adset) => adset.status === statusFilter);
-    }
-    if (selectedAccount !== "all") {
-      filtered = filtered.filter((adset) => adset.account_name === selectedAccount);
-    }
-    if (objectiveFilter !== "all") {
-      filtered = filtered.filter((adset) => adset.objective === objectiveFilter);
-    }
+    if (statusFilter !== "ALL") filtered = filtered.filter((a) => a.status === statusFilter);
+    if (selectedAccount !== "all")
+      filtered = filtered.filter((a) => a.account_name === selectedAccount);
+    if (objectiveFilter !== "all")
+      filtered = filtered.filter((a) => a.objective === objectiveFilter);
+
     filtered.sort((a, b) => {
-      if (a[sortConfig.key] < b[sortConfig.key]) return sortConfig.direction === "ascending" ? -1 : 1;
-      if (a[sortConfig.key] > b[sortConfig.key]) return sortConfig.direction === "ascending" ? 1 : -1;
+      if (a[sortConfig.key] < b[sortConfig.key])
+        return sortConfig.direction === "ascending" ? -1 : 1;
+      if (a[sortConfig.key] > b[sortConfig.key])
+        return sortConfig.direction === "ascending" ? 1 : -1;
       return 0;
     });
     return filtered;
@@ -164,9 +160,7 @@ function Tables() {
 
   const requestSort = (key) => {
     let direction = "ascending";
-    if (sortConfig.key === key && sortConfig.direction === "ascending") {
-      direction = "descending";
-    }
+    if (sortConfig.key === key && sortConfig.direction === "ascending") direction = "descending";
     setSortConfig({ key, direction });
   };
 
@@ -187,10 +181,30 @@ function Tables() {
   );
 
   const renderTableBody = () => {
-    if (loading) return <Tr><Td colSpan="12" textAlign="center">Loading ad sets...</Td></Tr>;
-    if (error) return <Tr><Td colSpan="12" textAlign="center">Error: {error}</Td></Tr>;
+    if (loading)
+      return (
+        <Tr>
+          <Td colSpan="12" textAlign="center">
+            Loading ad sets...
+          </Td>
+        </Tr>
+      );
+    if (error)
+      return (
+        <Tr>
+          <Td colSpan="12" textAlign="center">
+            Error: {error}
+          </Td>
+        </Tr>
+      );
     if (!processedAdsets.length)
-      return <Tr><Td colSpan="12" textAlign="center">No ad sets found matching your criteria.</Td></Tr>;
+      return (
+        <Tr>
+          <Td colSpan="12" textAlign="center">
+            No ad sets found.
+          </Td>
+        </Tr>
+      );
 
     return processedAdsets.map((adset) => (
       <TablesTableRow
@@ -212,7 +226,7 @@ function Tables() {
             </Text>
 
             <HStack mt="20px" spacing={3} align="center">
-              {/* фильтры */}
+              {/* filters */}
               <Select
                 value={selectedAccount}
                 onChange={(e) => setSelectedAccount(e.target.value)}
@@ -275,17 +289,17 @@ function Tables() {
                 <option value="ALL">All</option>
               </Select>
 
-              {/* КНОПКИ: теперь сначала "Сохранить", затем "Обновить" */}
+              {/* ACTIONS: Save, Refresh + Updated */}
               <IconButton
-                aria-label="Save Filters"
+                aria-label="Save view"
                 icon={<Icon as={FaSave} />}
                 size="sm"
                 onClick={() =>
                   toast({
-                    title: "Filters saved!",
-                    description: "Your current filter and sort settings are saved automatically.",
+                    title: "View saved",
+                    description: "Filters and sort are stored locally.",
                     status: "info",
-                    duration: 3000,
+                    duration: 2000,
                     isClosable: true,
                     position: "top",
                   })
@@ -293,14 +307,14 @@ function Tables() {
               />
               <HStack spacing={2}>
                 <IconButton
-                  aria-label="Refresh Data"
+                  aria-label="Refresh"
                   icon={<RepeatIcon />}
                   size="sm"
                   onClick={fetchData}
                   isLoading={loading}
                 />
                 <Text fontSize="xs" color="gray.400">
-                  Обновлено: {lastUpdatedLabel}
+                  Updated: {lastUpdatedLabel}
                 </Text>
               </HStack>
             </HStack>
@@ -323,6 +337,7 @@ function Tables() {
                   <Th color="white" position="sticky" left="0" zIndex="1" bg="#2a406e">
                     Ad Set / Campaign
                   </Th>
+                  <Th color="gray.400">Status</Th>
                   <Th color="gray.400">Objective</Th>
                   <SortableTh sortKey="spend">Spent</SortableTh>
                   <Th color="gray.400">Impressions</Th>
@@ -333,7 +348,6 @@ function Tables() {
                   <Th color="gray.400">CTR (All)</Th>
                   <Th color="gray.400">CTR (Link Click)</Th>
                   <Th color="gray.400">Link Clicks</Th>
-                  <Th color="gray.400">Status</Th>
                 </Tr>
               </Thead>
               <Tbody>{renderTableBody()}</Tbody>
