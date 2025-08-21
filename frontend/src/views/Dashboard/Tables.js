@@ -328,7 +328,7 @@ function Tables() {
               "&::-webkit-scrollbar": { height: "8px" },
               "&::-webkit-scrollbar-track": { background: "transparent" },
               "&::-webkit-scrollbar-thumb": { background: "#2D3748", borderRadius: "8px" },
-              "&::-webkit-scrollbar-thumb:hover": { background: "#4A5568" },
+              "&::-webkit-scrollbar-thumb:hover": { background:"#4A5568" },
             }}
           >
             <Table variant="simple" color="#fff">
