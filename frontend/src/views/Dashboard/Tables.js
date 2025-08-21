@@ -33,6 +33,9 @@ function useStickyState(defaultValue, key) {
   return [value, setValue];
 }
 
+// Если шапка прячется под fixed-баром, увеличь offset:
+const HEADER_STICKY_TOP = 0; // например 75
+
 function Tables() {
   const [allAdsets, setAllAdsets] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -50,7 +53,7 @@ function Tables() {
     "sortConfig"
   );
 
-  // "Updated: ..." label in EN
+  // Updated: now / 5 mins ago
   const [lastUpdated, setLastUpdated] = useState(null);
   const [tick, setTick] = useState(0);
   useEffect(() => {
@@ -81,6 +84,7 @@ function Tables() {
       if (data.detail) throw new Error(data.detail);
       setAllAdsets(data);
       setLastUpdated(new Date());
+      // window.__lastAdsets = data; // (оставь, если нужно дебажить)
     } catch (e) {
       setError(e.message || "Failed to load data");
     } finally {
@@ -164,11 +168,28 @@ function Tables() {
     setSortConfig({ key, direction });
   };
 
-  const SortableTh = ({ children, sortKey }) => (
-    <Th cursor="pointer" onClick={() => requestSort(sortKey)} color="gray.400">
+  const SortableTh = ({ children, sortKey, stickyLeft = false }) => (
+    <Th
+      cursor="pointer"
+      onClick={() => requestSort(sortKey)}
+      color="gray.200"
+      position="sticky"
+      top={`${HEADER_STICKY_TOP}px`}
+      zIndex={stickyLeft ? 4 : 3}
+      bg="#2a406e"
+      left={stickyLeft ? 0 : undefined}
+      _before={{
+        // небольшая подложка, чтобы не просвечивало под границами строк
+        content: '""',
+        position: "absolute",
+        inset: 0,
+        bg: "#2a406e",
+        zIndex: -1,
+      }}
+    >
       <Flex align="center">
         {children}
-        {sortConfig.key === sortKey && (
+        {sortKey && sortConfig.key === sortKey && (
           <Icon
             as={sortConfig.direction === "ascending" ? TriangleUpIcon : TriangleDownIcon}
             w={3}
@@ -177,6 +198,19 @@ function Tables() {
           />
         )}
       </Flex>
+    </Th>
+  );
+
+  const NormalStickyTh = ({ children }) => (
+    <Th
+      color="gray.200"
+      position="sticky"
+      top={`${HEADER_STICKY_TOP}px`}
+      zIndex={3}
+      bg="#2a406e"
+      _before={{ content: '""', position: "absolute", inset: 0, bg: "#2a406e", zIndex: -1 }}
+    >
+      {children}
     </Th>
   );
 
@@ -334,20 +368,20 @@ function Tables() {
             <Table variant="simple" color="#fff">
               <Thead>
                 <Tr my=".8rem" ps="0px">
-                  <Th color="white" position="sticky" left="0" zIndex="1" bg="#2a406e">
+                  <SortableTh stickyLeft sortKey={null /* не сортируем по названию блока */}>
                     Account / Campaign / Ad Set
-                  </Th>
-                  <Th color="gray.400">Status</Th>
-                  <Th color="gray.400">Objective</Th>
+                  </SortableTh>
+                  <NormalStickyTh>Status</NormalStickyTh>
+                  <NormalStickyTh>Objective</NormalStickyTh>
                   <SortableTh sortKey="spend">Spent</SortableTh>
-                  <Th color="gray.400">Impressions</Th>
-                  <Th color="gray.400">Frequency</Th>
-                  <Th color="gray.400">Leads (CPA)</Th>
+                  <NormalStickyTh>Impressions</NormalStickyTh>
+                  <NormalStickyTh>Frequency</NormalStickyTh>
+                  <NormalStickyTh>Leads (CPA)</NormalStickyTh>
                   <SortableTh sortKey="cpl">CPL</SortableTh>
-                  <Th color="gray.400">CPM</Th>
-                  <Th color="gray.400">CTR (All)</Th>
-                  <Th color="gray.400">CTR (Link Click)</Th>
-                  <Th color="gray.400">Link Clicks</Th>
+                  <NormalStickyTh>CPM</NormalStickyTh>
+                  <NormalStickyTh>CTR (All)</NormalStickyTh>
+                  <NormalStickyTh>CTR (Link Click)</NormalStickyTh>
+                  <NormalStickyTh>Link Clicks</NormalStickyTh>
                 </Tr>
               </Thead>
               <Tbody>{renderTableBody()}</Tbody>
