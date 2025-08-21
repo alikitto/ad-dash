@@ -15,7 +15,9 @@ load_dotenv()
 META_TOKEN = os.getenv("META_ACCESS_TOKEN")
 API_VERSION = "v19.0"
 LEAD_ACTION_TYPE = "onsite_conversion.messaging_conversation_started_7d"
-client_avatars = {}
+client_avatars = {
+"act_284902192299330": "https://video.karal.az/avatars/ahadnazim.jpg",
+}
 
 app = FastAPI()
 origins = [
