@@ -1,4 +1,4 @@
-// --- Tables.js (Full updated code) ---
+// frontend/src/components/Tables/Tables.js
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Box, Flex, Select, Table, Tbody, Td, Text, Th, Thead, Tr, useToast, HStack, Icon, IconButton, Button, Spacer } from "@chakra-ui/react";
@@ -10,20 +10,16 @@ import CardBody from "components/Card/CardBody.js";
 import TablesTableRow from "components/Tables/TablesTableRow";
 import AnalysisModal from "components/Tables/AnalysisModal";
 
-// ... (useStickyState hook remains the same)
 function useStickyState(defaultValue, key) {
   const [value, setValue] = useState(() => {
     const stickyValue = window.localStorage.getItem(key);
     return stickyValue !== null ? JSON.parse(stickyValue) : defaultValue;
   });
-  useEffect(() => {
-    window.localStorage.setItem(key, JSON.stringify(value));
-  }, [key, value]);
+  useEffect(() => { window.localStorage.setItem(key, JSON.stringify(value)); }, [key, value]);
   return [value, setValue];
 }
 
 function Tables() {
-    // ... (all state definitions remain the same)
   const [allAdsets, setAllAdsets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -99,7 +95,6 @@ function Tables() {
   }, [allAdsets, selectedAccount, objectiveFilter, statusFilter, sortConfig]);
   
   const handleAnalysisClick = async () => {
-    // ... (This function remains the same)
     if (!processedAdsets || processedAdsets.length === 0) {
       toast({ title: "No data to analyze", status: "warning", duration: 2000, isClosable: true, position: "top" });
       return;
@@ -120,7 +115,7 @@ function Tables() {
   const accounts = useMemo(() => ["all", ...new Set(allAdsets.map((a) => a.account_name))], [allAdsets]);
   const objectives = useMemo(() => ["all", ...new Set(allAdsets.map((a) => a.objective || "N/A"))], [allAdsets]);
   const requestSort = (key) => { let direction = "ascending"; if (sortConfig.key === key && sortConfig.direction === "ascending") direction = "descending"; setSortConfig({ key, direction }); };
-  const SortableTh = ({ children, sortKey }) => (<Th cursor="pointer" onClick={() => requestSort(sortKey)} color="gray.200"><Flex align="center">{children}{sortConfig.key === sortKey && <Icon as={sortConfig.direction === "ascending" ? TriangleUpIcon : TriangleDownIcon} w={3} h={3} ml={2} />}</Flex></Th>);
+  const SortableTh = ({ children, sortKey }) => (<Th color="white" cursor="pointer" onClick={() => requestSort(sortKey)}><Flex align="center">{children}{sortConfig.key === sortKey && <Icon as={sortConfig.direction === "ascending" ? TriangleUpIcon : TriangleDownIcon} w={3} h={3} ml={2} />}</Flex></Th>);
   const renderTableBody = () => {
     if (loading) return <Tr><Td colSpan={13} textAlign="center">Loading ad sets...</Td></Tr>;
     if (error) return <Tr><Td colSpan={13} textAlign="center">Error: {error}</Td></Tr>;
@@ -133,14 +128,14 @@ function Tables() {
   return (
     <Flex direction="column" pt={{ base: "120px", md: "75px" }}>
       <Card>
-        <CardHeader mb="4"> {/* <-- ADDED MARGIN HERE FOR SPACING */}
+        <CardHeader mb="4">
           <Flex direction="column">
-            <Text fontSize="xl" color="#fff" fontWeight="bold">Active Ad Sets</Text>
+            <Text fontSize="xl" color="white" fontWeight="bold">Active Ad Sets</Text>
             <HStack mt="20px" spacing={3} align="center">
-              <Select value={selectedAccount} onChange={(e) => setSelectedAccount(e.target.value)} size="sm" borderRadius="md" maxW="200px">{accounts.map((acc) => <option key={acc} value={acc}>{acc === "all" ? "All Accounts" : acc}</option>)}</Select>
-              <Select value={objectiveFilter} onChange={(e) => setObjectiveFilter(e.target.value)} size="sm" borderRadius="md" maxW="200px">{objectives.map((obj) => <option key={obj} value={obj}>{obj === "all" ? "All Objectives" : obj}</option>)}</Select>
-              <Select value={datePreset} onChange={(e) => setDatePreset(e.target.value)} size="sm" borderRadius="md" maxW="150px"><option value="today">Today</option><option value="yesterday">Yesterday</option><option value="last_7d">Last 7 Days</option><option value="last_30d">Last 30 Days</option><option value="maximum">Maximum</option></Select>
-              <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} size="sm" borderRadius="md" maxW="120px"><option value="ACTIVE">Active</option><option value="PAUSED">Paused</option><option value="ALL">All</option></Select>
+              <Select color="white" sx={{ "> option": { background: "#0F1535" } }} value={selectedAccount} onChange={(e) => setSelectedAccount(e.target.value)} size="sm" borderRadius="md" maxW="200px">{accounts.map((acc) => <option key={acc} value={acc}>{acc === "all" ? "All Accounts" : acc}</option>)}</Select>
+              <Select color="white" sx={{ "> option": { background: "#0F1535" } }} value={objectiveFilter} onChange={(e) => setObjectiveFilter(e.target.value)} size="sm" borderRadius="md" maxW="200px">{objectives.map((obj) => <option key={obj} value={obj}>{obj === "all" ? "All Objectives" : obj}</option>)}</Select>
+              <Select color="white" sx={{ "> option": { background: "#0F1535" } }} value={datePreset} onChange={(e) => setDatePreset(e.target.value)} size="sm" borderRadius="md" maxW="150px"><option value="today">Today</option><option value="yesterday">Yesterday</option><option value="last_7d">Last 7 Days</option><option value="last_30d">Last 30 Days</option><option value="maximum">Maximum</option></Select>
+              <Select color="white" sx={{ "> option": { background: "#0F1535" } }} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} size="sm" borderRadius="md" maxW="120px"><option value="ACTIVE">Active</option><option value="PAUSED">Paused</option><option value="ALL">All</option></Select>
               <Spacer />
               <HStack spacing={2}>
                 <Button leftIcon={<Icon as={FaMagic} />} colorScheme="purple" size="sm" onClick={handleAnalysisClick} isLoading={isAnalyzing} loadingText="Analyzing">AI Analysis</Button>
@@ -150,15 +145,15 @@ function Tables() {
             </HStack>
           </Flex>
         </CardHeader>
-        <CardBody pt="0"> {/* Removed padding-top to compensate for header margin */}
+        <CardBody pt="0">
           <Box maxH="70vh" overflow="auto" sx={{ "&::-webkit-scrollbar": { height: "8px", width: "8px" }, "&::-webkit-scrollbar-thumb": { background: "#2D3748", borderRadius: "8px" }, "& thead th": { position: "sticky", top: 0, zIndex: 3, background: "#2a406e" }, "& thead th:first-of-type": { left: 0, zIndex: 5 }, "& tbody td:first-of-type": { position: "sticky", left: 0, zIndex: 4 }, "& th, & td": { borderRight: `1px solid ${SEPARATOR}` }}}>
-            <Table variant="simple" color="#fff">
+            <Table variant="simple" color="white">
               <Thead>
                 <Tr my=".8rem" ps="0px">
                   <SortableTh sortKey="account_name">Account / Campaign / Ad Set</SortableTh>
-                  <Th>Status</Th>
-                  <Th>Actions</Th>
-                  <Th>Objective</Th>
+                  <Th color="white">Status</Th>
+                  <Th color="white">Actions</Th>
+                  <Th color="white">Objective</Th>
                   <SortableTh sortKey="spend">Spent</SortableTh>
                   <SortableTh sortKey="impressions">Impressions</SortableTh>
                   <SortableTh sortKey="frequency">Frequency</SortableTh>
@@ -166,7 +161,7 @@ function Tables() {
                   <SortableTh sortKey="cpl">CPL</SortableTh>
                   <SortableTh sortKey="cpm">CPM</SortableTh>
                   <SortableTh sortKey="ctr_all">CTR (All)</SortableTh>
-                  <Th>CTR (Link Click)</Th>
+                  <Th color="white">CTR (Link Click)</Th>
                   <SortableTh sortKey="link_clicks">Link Clicks</SortableTh>
                 </Tr>
               </Thead>
