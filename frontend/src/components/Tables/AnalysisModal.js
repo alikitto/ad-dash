@@ -1,4 +1,5 @@
-// --- src/components/Tables/AnalysisModal.js ---
+// src/components/Tables/AnalysisModal.js (Final, safe version)
+
 import React from "react";
 import {
   Modal, ModalOverlay, ModalContent, ModalHeader, ModalFooter, ModalBody, ModalCloseButton,
@@ -30,8 +31,15 @@ function AnalysisModal({ isOpen, onClose, data }) {
 
   if (!data) return null;
 
+  // --- SAFEGUARD ADDED HERE ---
+  // This ensures 'insights' and 'recommendations' are always arrays,
+  // preventing crashes if the AI returns a string or null.
+  const insights = Array.isArray(data?.insights) ? data.insights : [];
+  const recommendations = Array.isArray(data?.recommendations) ? data.recommendations : [];
+  // --- END OF SAFEGUARD ---
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="xl" isCentered>
+    <Modal isOpen={isOpen} onClose={onClose} size="xl" isCentered scrollBehavior="inside">
       <ModalOverlay />
       <ModalContent bg={bgColor}>
         <ModalHeader color={headerColor}>AI-Powered Analysis</ModalHeader>
@@ -46,8 +54,7 @@ function AnalysisModal({ isOpen, onClose, data }) {
               <Box
                 color={textColor}
                 className="ai-summary"
-                // Рендерим Markdown от AI
-                dangerouslySetInnerHTML={{ __html: data.summary }}
+                dangerouslySetInnerHTML={{ __html: data.summary || "" }}
                 sx={{
                   "& p": { marginBottom: "0.5rem" },
                   "& strong": { fontWeight: "semibold" },
@@ -61,7 +68,7 @@ function AnalysisModal({ isOpen, onClose, data }) {
                 Key Insights
               </Text>
               <VStack align="stretch" spacing={2}>
-                {data.insights?.map((insight, index) => (
+                {insights.map((insight, index) => (
                   <Text key={index} color={textColor}>• {insight}</Text>
                 ))}
               </VStack>
@@ -73,7 +80,7 @@ function AnalysisModal({ isOpen, onClose, data }) {
                 Recommendations
               </Text>
               <VStack align="stretch" spacing={3}>
-                {data.recommendations?.map((rec, index) => (
+                {recommendations.map((rec, index) => (
                   <HStack key={index} align="start" spacing={3}>
                     <PriorityTag priority={rec.priority} />
                     <Text pt="1px" color={textColor}>{rec.text}</Text>
