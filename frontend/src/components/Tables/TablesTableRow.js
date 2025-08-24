@@ -1,11 +1,44 @@
-// --- TablesTableRow.js (Full updated code) ---
+// frontend/src/components/Tables/TablesTableRow.js
 
 import React, { useState } from "react";
 import { Avatar, Flex, Td, Text, Tr, Switch, useColorModeValue, Spinner, Image, Box, useToast, IconButton, Icon } from "@chakra-ui/react";
 import { FaMagic } from "react-icons/fa";
 import AnalysisModal from "components/Tables/AnalysisModal";
+import { CLIENT_AVATARS } from "../../variables/clientAvatars.js"; // <-- ИМПОРТИРУЕМ АВАТАРКИ
 
-// ... (helpers like fmtMoney, etc., remain the same)
+// --- НОВАЯ ФУНКЦИЯ ДЛЯ ПОИСКА АВАТАРОК ---
+function resolveAvatar(adset) {
+  if (!adset) return undefined;
+  // Данные могут приходить в разных форматах, проверяем все
+  const id = adset.account_id || adset.accountId || "";
+  const name = adset.account_name || adset.accountName || "";
+  
+  const candidates = [];
+  if (id) {
+    candidates.push(String(id)); // e.g., "284902192299330"
+    if (!String(id).startsWith("act_")) candidates.push(`act_${id}`); // "act_284902192299330"
+  }
+  if (name) candidates.push(String(name)); // "Ahad Nazim"
+  
+  // Ищем точное совпадение
+  for (const key of candidates) {
+    if (CLIENT_AVATARS[key]) {
+      return CLIENT_AVATARS[key];
+    }
+  }
+  // Ищем совпадение без учета регистра (для имен)
+  const lowerName = (name || "").toLowerCase();
+  if (lowerName) {
+      for (const key in CLIENT_AVATARS) {
+          if (key.toLowerCase() === lowerName) {
+              return CLIENT_AVATARS[key];
+          }
+      }
+  }
+  return undefined; // Если ничего не найдено
+}
+
+
 const shortObjective = (obj) => obj ? String(obj).toUpperCase().replace(/^OUTCOME_/, "").replace(/_/g, " ") : "—";
 const fmtMoney = (v) => typeof v !== "number" || !isFinite(v) ? "$0.00" : `$${v.toFixed(2)}`;
 const fmtPct = (v) => typeof v !== "number" || !isFinite(v) ? "0.00%" : `${v.toFixed(2)}%`;
@@ -26,8 +59,7 @@ function TablesTableRow(props) {
   const [rowAnalysisResult, setRowAnalysisResult] = useState(null);
   const [isRowModalOpen, setIsRowModalOpen] = useState(false);
   
-  // Simplified avatar logic: just use the URL from the backend.
-  const avatarSrc = adset.avatarUrl;
+  const avatarSrc = resolveAvatar(adset); // <-- ИСПОЛЬЗУЕМ НОВУЮ ФУНКЦИЮ
   const ctrLinkClick = adset && adset.impressions > 0 ? (Number(adset.link_clicks || 0) / adset.impressions) * 100 : 0;
 
   const toggleExpanded = async () => {
@@ -43,7 +75,6 @@ function TablesTableRow(props) {
     setExpanded((v) => !v);
   };
   
-  // Reworked analysis handler
   const handleRowAnalysis = async () => {
     setIsRowAnalyzing(true);
     setRowAnalysisResult(null);
@@ -62,7 +93,6 @@ function TablesTableRow(props) {
   };
 
   const updateAdStatus = async (ad_id, curr) => {
-    // ... (This function remains unchanged)
     setUpdatingAdId(ad_id);
     try {
       const res = await fetch(`https://ad-dash-backend-production.up.railway.app/api/ads/${ad_id}/update-status`, {
@@ -106,37 +136,7 @@ function TablesTableRow(props) {
         <Td><Text fontSize="sm">{fmtNum(adset.link_clicks)}</Text></Td>
       </Tr>
 
-      {/* Expanded rows for ads */}
-      {expanded && (
-        adsLoading ? (
-            <Tr><Td colSpan={13}><Flex py={3} justify="center" align="center"><Spinner size="sm" mr={2} />Loading ads…</Flex></Td></Tr>
-        ) : ads.length === 0 ? (
-            <Tr><Td colSpan={13}><Text color="gray.300" fontSize="sm" py={3} pl="68px">No ads found for this ad set.</Text></Td></Tr>
-        ) : (
-          ads.map((ad) => (
-            <Tr key={ad.ad_id} bg={AD_ROW_BG}>
-              <Td position="sticky" left="0" zIndex="1" py={2}>
-                <Flex align="center" gap={3} pl="48px">
-                  {ad.thumbnail_url ? <Image src={ad.thumbnail_url} alt="" boxSize="32px" borderRadius="md" objectFit="cover" /> : <Avatar size="sm" name={ad.ad_name} />}
-                  <Text noOfLines={1}>{ad.ad_name}</Text>
-                </Flex>
-              </Td>
-              <Td>{updatingAdId === ad.ad_id ? <Spinner size="xs" /> : <Switch size="sm" colorScheme="teal" isChecked={ad.status === "ACTIVE"} onChange={() => updateAdStatus(ad.ad_id, ad.status)} />}</Td>
-              <Td></Td>
-              <Td><Text fontSize="xs">—</Text></Td>
-              <Td>{fmtMoney(ad.spend)}</Td>
-              <Td>{fmtNum(ad.impressions)}</Td>
-              <Td>{ad.frequency?.toFixed(3)}</Td>
-              <Td>{fmtNum(ad.leads)}</Td>
-              <Td>{fmtMoney(ad.cpa)}</Td>
-              <Td>{fmtMoney(ad.cpm)}</Td>
-              <Td>{fmtPct(ad.ctr)}</Td>
-              <Td>{fmtPct(ad.ctr_link)}</Td>
-              <Td>{fmtNum(ad.link_clicks)}</Td>
-            </Tr>
-          ))
-        )
-      )}
+      {expanded && (adsLoading ? (<Tr><Td colSpan={13}><Flex py={3} justify="center" align="center"><Spinner size="sm" mr={2} />Loading ads…</Flex></Td></Tr>) : ads.length === 0 ? (<Tr><Td colSpan={13}><Text color="gray.300" fontSize="sm" py={3} pl="68px">No ads found for this ad set.</Text></Td></Tr>) : (ads.map((ad) => (<Tr key={ad.ad_id} bg={AD_ROW_BG}><Td position="sticky" left="0" zIndex="1" py={2}><Flex align="center" gap={3} pl="48px">{ad.thumbnail_url ? <Image src={ad.thumbnail_url} alt="" boxSize="32px" borderRadius="md" objectFit="cover" /> : <Avatar size="sm" name={ad.ad_name} />}<Text noOfLines={1}>{ad.ad_name}</Text></Flex></Td><Td>{updatingAdId === ad.ad_id ? <Spinner size="xs" /> : <Switch size="sm" colorScheme="teal" isChecked={ad.status === "ACTIVE"} onChange={() => updateAdStatus(ad.ad_id, ad.status)} />}</Td><Td></Td><Td><Text fontSize="xs">—</Text></Td><Td>{fmtMoney(ad.spend)}</Td><Td>{fmtNum(ad.impressions)}</Td><Td>{ad.frequency?.toFixed(3)}</Td><Td>{fmtNum(ad.leads)}</Td><Td>{fmtMoney(ad.cpa)}</Td><Td>{fmtMoney(ad.cpm)}</Td><Td>{fmtPct(ad.ctr)}</Td><Td>{fmtPct(ad.ctr_link)}</Td><Td>{fmtNum(ad.link_clicks)}</Td></Tr>))))}
       
       {rowAnalysisResult && <AnalysisModal isOpen={isRowModalOpen} onClose={() => setIsRowModalOpen(false)} data={rowAnalysisResult} />}
     </>
