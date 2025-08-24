@@ -22,11 +22,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 if OPENAI_API_KEY: openai.api_key = OPENAI_API_KEY
 API_VERSION = "v19.0"
 LEAD_ACTION_TYPE = "onsite_conversion.messaging_conversation_started_7d"
-
-client_avatars: Dict[str, str] = {
-    "act_284902192299330": "https://video.karal.az/avatars/ahadnazim.jpg",
-}
-
+client_avatars: Dict[str, str] = {"act_284902192299330": "https://video.karal.az/avatars/ahadnazim.jpg"}
 FRONTEND_ORIGINS = ["https://ad-dash-frontend-production.up.railway.app", "http://localhost:3000"]
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=FRONTEND_ORIGINS, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
@@ -110,12 +106,16 @@ async def get_ai_analysis(adsets: List[dict]) -> Dict:
         final_adsets = list({d["adset_id"]: d for d in top_by_spend + top_by_leads + worst}.values())
     simplified_adsets = [{"name":f"{d.get('account_name','')} / {d.get('adset_name','N/A')}", "spend":round(safe_float(d.get("spend")),2), "leads":int(safe_float(d.get("leads"))), "cpl":round(safe_float(d.get("cpl")),2), "ctr_link":round((safe_float(d.get("link_clicks"))/safe_float(d.get("impressions"))*100.0) if safe_float(d.get("impressions"))>0 else 0.0, 2)} for d in final_adsets]
     
+    # --- NEW, SMARTER PROMPT FOR OVERALL ANALYSIS ---
     system_prompt = """
-You are a senior Meta Ads analyst. Your task is to analyze a summary of ad sets and provide a high-level overview.
+You are a senior Meta Ads analyst. Your task is to analyze a summary of ad sets from multiple accounts.
 Your response MUST be a valid JSON object in Russian with keys "summary", "insights", and "recommendations".
+
+**IMPORTANT RULE:** All recommendations must be given **within the scope of a single ad account**. Never suggest moving budget between different accounts (e.g., from 'Client A' to 'Client B'). Analyze each account as a separate entity.
+
 - `summary`: A 2-3 sentence executive summary using Markdown. Mention total spend, total leads, and overall CPL.
-- `insights`: A Markdown list of 3-4 key insights. Identify the top-performing campaign by CPL, the campaign with highest spend but poor results, and any outliers.
-- `recommendations`: A list of 2-3 actionable recommendation objects. Each object MUST have two keys: `priority` (string: "high", "medium", or "low") and `text` (string: the recommendation in Markdown). Example: [{"priority": "high", "text": "**Переместить бюджет:** из [Кампания Х] в [Кампания Y] для максимизации CPL."}]
+- `insights`: A Markdown list of 3-4 key insights. For each major account, identify its best-performing ad set. Also, identify any ad set across all accounts that is spending a lot with poor results.
+- `recommendations`: A list of 2-3 actionable recommendation objects. Each object MUST have `priority` ("high", "medium", or "low") and `text` (the recommendation in Markdown). Recommendations should be specific to one account.
 """
     total_spend, total_leads = round(sum(safe_float(a.get("spend")) for a in adsets), 2), int(sum(safe_float(a.get("leads")) for a in adsets))
     user_data = {"total_spend": total_spend, "total_leads": total_leads, "adsets_sample": simplified_adsets}
@@ -128,20 +128,30 @@ Your response MUST be a valid JSON object in Russian with keys "summary", "insig
         logging.error(f"OpenAI API error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to get AI analysis: {e}")
 
+# --- NEW, MORE RESILIENT DETAILED ANALYSIS ---
 async def get_ai_detailed_analysis(adset_id: str) -> Dict:
     if not OPENAI_API_KEY: raise HTTPException(status_code=500, detail="OpenAI API key not configured.")
-    try:
-        async with aiohttp.ClientSession() as session:
-            adset_info_task = get_adset_and_account_info(session, adset_id)
-            ads_today_task = build_ads_payload(session, adset_id, "today")
-            ads_yesterday_task = build_ads_payload(session, adset_id, "yesterday")
-            ads_maximum_task = build_ads_payload(session, adset_id, "maximum")
-            adset_info, ads_today, ads_yesterday, ads_maximum = await asyncio.gather(
-                adset_info_task, ads_today_task, ads_yesterday_task, ads_maximum_task
-            )
-    except Exception as e:
-        logging.error(f"Failed to fetch trend data for detailed analysis: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to fetch data from Facebook for trend analysis.")
+    
+    adset_info, ads_today, ads_yesterday, ads_maximum = [None] * 4
+    async with aiohttp.ClientSession() as session:
+        # Use return_exceptions=True to prevent one failure from stopping all
+        results = await asyncio.gather(
+            get_adset_and_account_info(session, adset_id),
+            build_ads_payload(session, adset_id, "today"),
+            build_ads_payload(session, adset_id, "yesterday"),
+            build_ads_payload(session, adset_id, "maximum"),
+            return_exceptions=True
+        )
+    
+    # Check results for errors
+    if isinstance(results[0], Exception):
+        logging.error(f"Failed to fetch adset info for {adset_id}: {results[0]}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to fetch basic adset info from Facebook.")
+    
+    adset_info = results[0]
+    ads_today = [] if isinstance(results[1], Exception) else results[1]
+    ads_yesterday = [] if isinstance(results[2], Exception) else results[2]
+    ads_maximum = [] if isinstance(results[3], Exception) else results[3]
 
     def summarize_ads(ads_list):
         if not ads_list: return {"total_spend": 0, "total_leads": 0, "cpl": 0, "ads_count": 0}
@@ -157,10 +167,10 @@ async def get_ai_detailed_analysis(adset_id: str) -> Dict:
     }
 
     system_prompt = """
-You are a meticulous performance marketing specialist analyzing a single ad set's trend data. Your response MUST be a valid JSON object in Russian with keys "summary", "insights", and "recommendations". Use Markdown for formatting lists and bold text.
+You are a meticulous performance marketing specialist analyzing a single ad set's trend data. Your response MUST be a valid JSON object in Russian with keys "summary", "insights", and "recommendations". Use Markdown for formatting.
 - `summary`: Summarize the ad set's current performance (Today vs Yesterday) and its overall historical performance (Lifetime).
-- `insights`: Provide detailed bullet points. Compare Today's CPL vs. Yesterday's CPL to identify trends (improving/declining?). Identify the best and worst performing *ads* within the set based on their Lifetime CPA and lead volume from the provided list.
-- `recommendations`: A list of concrete, numbered recommendation objects. Each object MUST have `priority` (string: "high", "medium", "low") and `text` (string). Examples: [{"priority": "high", "text": "1. **Приостановить объявление 'X':** Его CPA за все время в 3 раза выше среднего."}]
+- `insights`: Provide detailed bullet points. Compare Today's CPL vs. Yesterday's CPL to identify trends (improving/declining?). Identify the best and worst performing *ads* within the set based on their Lifetime CPA.
+- `recommendations`: A list of concrete, numbered recommendation objects. Each MUST have `priority` ("high", "medium", "low") and `text` (string). Examples: [{"priority": "high", "text": "1. **Приостановить объявление 'X':** Его CPA за все время в 3 раза выше среднего."}]
 """
     try:
         client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY)
@@ -175,6 +185,7 @@ You are a meticulous performance marketing specialist analyzing a single ad set'
 # ──────────────────────────────────────────────────────────────────────────────
 @app.get("/api/adsets")
 async def get_all_adsets_data(date_preset: str = Query("last_7d")):
+    # ... (this endpoint remains the same)
     if not META_TOKEN: raise HTTPException(status_code=500, detail="Token not configured")
     try:
         async with aiohttp.ClientSession() as session:
