@@ -27,8 +27,9 @@ FRONTEND_ORIGINS = ["https://ad-dash-frontend-production.up.railway.app", "http:
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=FRONTEND_ORIGINS, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
-class AdSetIdPayload(BaseModel):
-    adset_id: str
+# --- ИЗМЕНЕНА МОДЕЛЬ ДАННЫХ ---
+class AdSetPayload(BaseModel):
+    adset: dict
 
 # ──────────────────────────────────────────────────────────────────────────────
 # FB API Helpers & Data Builders
@@ -88,15 +89,11 @@ def safe_float(value):
     try: return float(value) if value is not None else 0.0
     except (ValueError, TypeError): return 0.0
 
-async def get_adset_and_account_info(session: aiohttp.ClientSession, adset_id: str) -> dict:
-    url = f"https://graph.facebook.com/{API_VERSION}/{adset_id}"
-    params = {"fields": "name,campaign{name,objective},account{name,id}"}
-    return await fb_request(session, "get", url, params=params)
-
 # ──────────────────────────────────────────────────────────────────────────────
-# AI Analysis Logic (Reworked)
+# AI Analysis Logic
 # ──────────────────────────────────────────────────────────────────────────────
 async def get_ai_analysis(adsets: List[dict]) -> Dict:
+    # ... (эта функция без изменений)
     if not OPENAI_API_KEY: raise HTTPException(status_code=500, detail="OpenAI API key not configured.")
     MAX_ADSETS_FOR_AI, final_adsets = 35, adsets
     if len(adsets) > MAX_ADSETS_FOR_AI:
@@ -105,21 +102,15 @@ async def get_ai_analysis(adsets: List[dict]) -> Dict:
         worst = sorted([a for a in adsets if safe_float(a.get("leads"))==0 and safe_float(a.get("spend"))>0], key=lambda x: safe_float(x.get("spend")), reverse=True)[:5]
         final_adsets = list({d["adset_id"]: d for d in top_by_spend + top_by_leads + worst}.values())
     simplified_adsets = [{"name":f"{d.get('account_name','')} / {d.get('adset_name','N/A')}", "spend":round(safe_float(d.get("spend")),2), "leads":int(safe_float(d.get("leads"))), "cpl":round(safe_float(d.get("cpl")),2), "ctr_link":round((safe_float(d.get("link_clicks"))/safe_float(d.get("impressions"))*100.0) if safe_float(d.get("impressions"))>0 else 0.0, 2)} for d in final_adsets]
-    
-    # --- NEW, SMARTER PROMPT FOR OVERALL ANALYSIS ---
     system_prompt = """
-You are a senior Meta Ads analyst. Your task is to analyze a summary of ad sets from multiple accounts.
-Your response MUST be a valid JSON object in Russian with keys "summary", "insights", and "recommendations".
-
-**IMPORTANT RULE:** All recommendations must be given **within the scope of a single ad account**. Never suggest moving budget between different accounts (e.g., from 'Client A' to 'Client B'). Analyze each account as a separate entity.
-
-- `summary`: A 2-3 sentence executive summary using Markdown. Mention total spend, total leads, and overall CPL.
-- `insights`: A Markdown list of 3-4 key insights. For each major account, identify its best-performing ad set. Also, identify any ad set across all accounts that is spending a lot with poor results.
-- `recommendations`: A list of 2-3 actionable recommendation objects. Each object MUST have `priority` ("high", "medium", or "low") and `text` (the recommendation in Markdown). Recommendations should be specific to one account.
+You are a senior Meta Ads analyst. Analyze a summary of ad sets from multiple accounts. Your response MUST be a valid JSON object in Russian with "summary", "insights", "recommendations".
+**IMPORTANT RULE:** All recommendations must be given **within the scope of a single ad account**. Never suggest moving budget between different accounts (e.g., from 'Client A' to 'Client B').
+- `summary`: 2-3 sentence executive summary (Markdown). Mention total spend, leads, CPL.
+- `insights`: Markdown list of 3-4 key insights. For each major account, identify its best-performing ad set. Identify any ad set spending a lot with poor results.
+- `recommendations`: A list of 2-3 actionable recommendation objects. Each object MUST have `priority` ("high", "medium", or "low") and `text` (recommendation in Markdown).
 """
     total_spend, total_leads = round(sum(safe_float(a.get("spend")) for a in adsets), 2), int(sum(safe_float(a.get("leads")) for a in adsets))
     user_data = {"total_spend": total_spend, "total_leads": total_leads, "adsets_sample": simplified_adsets}
-    
     try:
         client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY)
         response = await client.chat.completions.create(model="gpt-4o", response_format={"type":"json_object"}, messages=[{"role":"system","content":system_prompt}, {"role":"user","content":json.dumps(user_data,ensure_ascii=False)}], temperature=0.5, max_tokens=2000)
@@ -128,30 +119,27 @@ Your response MUST be a valid JSON object in Russian with keys "summary", "insig
         logging.error(f"OpenAI API error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to get AI analysis: {e}")
 
-# --- NEW, MORE RESILIENT DETAILED ANALYSIS ---
-async def get_ai_detailed_analysis(adset_id: str) -> Dict:
+# --- ИЗМЕНЕНА ФУНКЦИЯ ДЕТАЛЬНОГО АНАЛИЗА ---
+async def get_ai_detailed_analysis(adset_info: dict) -> Dict:
     if not OPENAI_API_KEY: raise HTTPException(status_code=500, detail="OpenAI API key not configured.")
+    adset_id = adset_info.get("adset_id")
+    if not adset_id: raise HTTPException(status_code=400, detail="Adset ID is missing in the payload.")
     
-    adset_info, ads_today, ads_yesterday, ads_maximum = [None] * 4
+    ads_today, ads_yesterday, ads_maximum = [], [], []
     async with aiohttp.ClientSession() as session:
-        # Use return_exceptions=True to prevent one failure from stopping all
         results = await asyncio.gather(
-            get_adset_and_account_info(session, adset_id),
             build_ads_payload(session, adset_id, "today"),
             build_ads_payload(session, adset_id, "yesterday"),
             build_ads_payload(session, adset_id, "maximum"),
             return_exceptions=True
         )
     
-    # Check results for errors
-    if isinstance(results[0], Exception):
-        logging.error(f"Failed to fetch adset info for {adset_id}: {results[0]}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to fetch basic adset info from Facebook.")
-    
-    adset_info = results[0]
-    ads_today = [] if isinstance(results[1], Exception) else results[1]
-    ads_yesterday = [] if isinstance(results[2], Exception) else results[2]
-    ads_maximum = [] if isinstance(results[3], Exception) else results[3]
+    if not isinstance(results[0], Exception): ads_today = results[0]
+    else: logging.warning(f"Could not fetch 'today' data for {adset_id}: {results[0]}")
+    if not isinstance(results[1], Exception): ads_yesterday = results[1]
+    else: logging.warning(f"Could not fetch 'yesterday' data for {adset_id}: {results[1]}")
+    if not isinstance(results[2], Exception): ads_maximum = results[2]
+    else: logging.warning(f"Could not fetch 'maximum' data for {adset_id}: {results[2]}")
 
     def summarize_ads(ads_list):
         if not ads_list: return {"total_spend": 0, "total_leads": 0, "cpl": 0, "ads_count": 0}
@@ -160,17 +148,17 @@ async def get_ai_detailed_analysis(adset_id: str) -> Dict:
         return {"total_spend": round(total_spend, 2), "total_leads": int(total_leads), "cpl": round(total_spend / total_leads, 2) if total_leads > 0 else 0, "ads_count": len(ads_list)}
 
     data_for_ai = {
-        "adset_name": adset_info.get("name"), "campaign_name": (adset_info.get("campaign") or {}).get("name"),
-        "objective": (adset_info.get("campaign") or {}).get("objective"),
+        "adset_name": adset_info.get("adset_name"), "campaign_name": adset_info.get("campaign_name"),
+        "objective": adset_info.get("objective"),
         "performance_summary": {"today": summarize_ads(ads_today), "yesterday": summarize_ads(ads_yesterday), "lifetime": summarize_ads(ads_maximum)},
         "top_ads_by_lifetime_cpa": sorted([{"name": ad.get("ad_name"), "leads": ad.get("leads"), "cpa": ad.get("cpa")} for ad in ads_maximum if ad.get("leads", 0) > 0], key=lambda x: x["cpa"])[:5]
     }
 
     system_prompt = """
-You are a meticulous performance marketing specialist analyzing a single ad set's trend data. Your response MUST be a valid JSON object in Russian with keys "summary", "insights", and "recommendations". Use Markdown for formatting.
+You are a meticulous performance marketing specialist analyzing trend data for a single ad set. Your response MUST be a valid JSON object in Russian with "summary", "insights", "recommendations". Use Markdown.
 - `summary`: Summarize the ad set's current performance (Today vs Yesterday) and its overall historical performance (Lifetime).
-- `insights`: Provide detailed bullet points. Compare Today's CPL vs. Yesterday's CPL to identify trends (improving/declining?). Identify the best and worst performing *ads* within the set based on their Lifetime CPA.
-- `recommendations`: A list of concrete, numbered recommendation objects. Each MUST have `priority` ("high", "medium", "low") and `text` (string). Examples: [{"priority": "high", "text": "1. **Приостановить объявление 'X':** Его CPA за все время в 3 раза выше среднего."}]
+- `insights`: Provide detailed bullet points. Compare Today's CPL vs. Yesterday's CPL to identify trends. Identify the best and worst performing *ads* based on their Lifetime CPA.
+- `recommendations`: A list of concrete, numbered recommendation objects. Each MUST have `priority` ("high", "medium", "low") and `text` (string).
 """
     try:
         client = openai.AsyncOpenAI(api_key=OPENAI_API_KEY)
@@ -185,7 +173,7 @@ You are a meticulous performance marketing specialist analyzing a single ad set'
 # ──────────────────────────────────────────────────────────────────────────────
 @app.get("/api/adsets")
 async def get_all_adsets_data(date_preset: str = Query("last_7d")):
-    # ... (this endpoint remains the same)
+    # ... (эта функция без изменений)
     if not META_TOKEN: raise HTTPException(status_code=500, detail="Token not configured")
     try:
         async with aiohttp.ClientSession() as session:
@@ -215,10 +203,12 @@ async def analyze_adsets_endpoint(adsets: List[dict] = Body(...)):
     if not adsets: raise HTTPException(status_code=400, detail="Adset data is required.")
     return await get_ai_analysis(adsets)
 
+# --- ИЗМЕНЕН ЭНДПОИНТ ДЕТАЛЬНОГО АНАЛИЗА ---
 @app.post("/api/analyze-adset-details")
-async def analyze_adset_details_endpoint(payload: AdSetIdPayload):
-    if not payload.adset_id: raise HTTPException(status_code=400, detail="Adset ID is required.")
-    return await get_ai_detailed_analysis(payload.adset_id)
+async def analyze_adset_details_endpoint(payload: AdSetPayload):
+    if not payload.adset:
+        raise HTTPException(status_code=400, detail="Adset data is required.")
+    return await get_ai_detailed_analysis(payload.adset)
 
 @app.post("/api/adsets/{adset_id}/update-status")
 async def update_adset_status(adset_id: str, payload: Dict = Body(...)):
