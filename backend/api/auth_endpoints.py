@@ -1,5 +1,3 @@
-# backend/api/auth_endpoints.py
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import create_engine, text
@@ -11,6 +9,7 @@ router = APIRouter()
 
 # --- Pydantic Models ---
 class UserCreate(BaseModel):
+    name: str # Добавлено поле для имени
     email: str
     password: str
 
@@ -43,15 +42,22 @@ def create_user(user: UserCreate, db = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Email already registered")
 
     hashed_password = get_password_hash(user.password)
-    insert_query = text("INSERT INTO users (email, hashed_password) VALUES (:email, :hashed_password)")
-    db.execute(insert_query, {"email": user.email, "hashed_password": hashed_password})
+    
+    # Изменено: Добавляем 'name' в запрос на создание пользователя
+    insert_query = text(
+        "INSERT INTO users (name, email, hashed_password) VALUES (:name, :email, :hashed_password)"
+    )
+    db.execute(insert_query, {"name": user.name, "email": user.email, "hashed_password": hashed_password})
     db.commit()
-    return {"message": "User created successfully"}
+    
+    # Изменено: Сообщение об успехе теперь указывает на необходимость подтверждения
+    return {"message": "User created successfully. Awaiting admin approval."}
 
 
 @router.post("/token", response_model=Token)
 def login_for_access_token(form_data: UserLogin, db = Depends(get_db)):
-    query = text("SELECT email, hashed_password FROM users WHERE email = :email")
+    # Изменено: Запрашиваем из базы данных поле 'is_active'
+    query = text("SELECT email, hashed_password, is_active FROM users WHERE email = :email")
     user = db.execute(query, {"email": form_data.email}).mappings().first()
 
     if not user or not verify_password(form_data.password, user['hashed_password']):
@@ -60,5 +66,13 @@ def login_for_access_token(form_data: UserLogin, db = Depends(get_db)):
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    
+    # Добавлено: Проверка, активен ли аккаунт пользователя
+    if not user['is_active']:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is not active. Please contact administrator.",
+        )
+        
     access_token = create_access_token(subject=user['email'])
     return {"access_token": access_token, "token_type": "bearer"}
