@@ -1,7 +1,10 @@
-// frontend/src/components/Tables/Tables.js
+// frontend/src/components/Tables/Tables.js (Full updated code)
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { Box, Flex, Select, Table, Tbody, Td, Text, Th, Thead, Tr, useToast, HStack, Icon, IconButton, Button, Spacer } from "@chakra-ui/react";
+import {
+  Box, Flex, Select, Table, Tbody, Td, Text, Th, Thead, Tr,
+  useToast, HStack, Icon, IconButton, Button, Spacer, keyframes // Добавляем keyframes
+} from "@chakra-ui/react";
 import { TriangleDownIcon, TriangleUpIcon, RepeatIcon } from "@chakra-ui/icons";
 import { FaSave, FaMagic } from "react-icons/fa";
 import Card from "components/Card/Card.js";
@@ -9,6 +12,11 @@ import CardHeader from "components/Card/CardHeader.js";
 import CardBody from "components/Card/CardBody.js";
 import TablesTableRow from "components/Tables/TablesTableRow";
 import AnalysisModal from "components/Tables/AnalysisModal";
+
+// --- НОВАЯ АНИМАЦИЯ МИГАНИЯ ---
+const blinkAnimation = keyframes`
+  50% { opacity: 0.3; }
+`;
 
 function useStickyState(defaultValue, key) {
   const [value, setValue] = useState(() => {
@@ -20,6 +28,7 @@ function useStickyState(defaultValue, key) {
 }
 
 function Tables() {
+  // ... (все стейты остаются без изменений)
   const [allAdsets, setAllAdsets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -36,6 +45,7 @@ function Tables() {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [tick, setTick] = useState(0);
 
+  // ... (все функции остаются без изменений)
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 60_000);
     return () => clearInterval(id);
@@ -116,11 +126,32 @@ function Tables() {
   const objectives = useMemo(() => ["all", ...new Set(allAdsets.map((a) => a.objective || "N/A"))], [allAdsets]);
   const requestSort = (key) => { let direction = "ascending"; if (sortConfig.key === key && sortConfig.direction === "ascending") direction = "descending"; setSortConfig({ key, direction }); };
   const SortableTh = ({ children, sortKey }) => (<Th color="white" cursor="pointer" onClick={() => requestSort(sortKey)}><Flex align="center">{children}{sortConfig.key === sortKey && <Icon as={sortConfig.direction === "ascending" ? TriangleUpIcon : TriangleDownIcon} w={3} h={3} ml={2} />}</Flex></Th>);
+  
+  // --- ИЗМЕНЕНА ЛОГИКА ОТОБРАЖЕНИЯ ЗАГРУЗКИ ---
   const renderTableBody = () => {
-    if (loading) return <Tr><Td colSpan={13} textAlign="center">Loading ad sets...</Td></Tr>;
+    const animation = `${blinkAnimation} 1.5s ease-in-out infinite`;
+    if (loading)
+      return (
+        <Tr>
+          <Td colSpan={13} textAlign="center">
+            <Flex justify="center" align="center" py={4}>
+                <Text fontSize="lg" animation={animation}>⌛ Loading ad sets...</Text>
+            </Flex>
+          </Td>
+        </Tr>
+      );
     if (error) return <Tr><Td colSpan={13} textAlign="center">Error: {error}</Td></Tr>;
     if (!processedAdsets.length) return <Tr><Td colSpan={13} textAlign="center">No ad sets found.</Td></Tr>;
-    return processedAdsets.map((adset) => <TablesTableRow key={adset.adset_id} adset={adset} onStatusChange={handleStatusChange} isUpdating={updatingId === adset.adset_id} datePreset={datePreset} />);
+    
+    return processedAdsets.map((adset) => (
+      <TablesTableRow 
+        key={adset.adset_id} 
+        adset={adset} 
+        onStatusChange={handleStatusChange} 
+        isUpdating={updatingId === adset.adset_id} 
+        datePreset={datePreset}
+      />
+    ));
   };
 
   const SEPARATOR = "rgba(255,255,255,0.10)";
