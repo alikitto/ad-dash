@@ -1,4 +1,4 @@
-# --- main_backend.py (Final Corrected Version for Error 400) ---
+# --- main_backend.py (Definitive Final Version) ---
 
 import os
 import asyncio
@@ -54,13 +54,14 @@ async def get_all_adsets_from_account(session: aiohttp.ClientSession, account_id
 async def get_insights_for_adsets(session: aiohttp.ClientSession, account_id: str, adset_ids: list, date_preset: str) -> List[dict]:
     url = f"https://graph.facebook.com/{API_VERSION}/act_{account_id}/insights"
     
-    # --- *** ГЛАВНОЕ ИСПРАВЛЕНИЕ ОШИБКИ 400 *** ---
-    # Создаем JSON-строку без лишних пробелов, чтобы URL был корректным
+    # --- *** ВОТ ОНО, ФИНАЛЬНОЕ ИСПРАВЛЕНИЕ *** ---
+    # Создаем JSON-строку без лишних пробелов
     adset_ids_json = json.dumps(adset_ids, separators=(',', ':'))
     
     params = {
         "level":"adset",
         "fields":"adset_id,spend,actions,cpm,ctr,clicks,impressions,frequency,inline_link_clicks",
+        # ИСПОЛЬЗУЕМ ИСПРАВЛЕННУЮ ПЕРЕМЕННУЮ `adset_ids_json`
         "filtering":f'[{{"field":"adset.id","operator":"IN","value":{adset_ids_json}}}]',
         "limit":5000
     }
