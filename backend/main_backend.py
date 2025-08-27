@@ -1,4 +1,4 @@
-# --- main_backend.py (Final Corrected Version) ---
+# --- main_backend.py (Final Corrected Version for Error 400) ---
 
 import os
 import asyncio
@@ -54,8 +54,8 @@ async def get_all_adsets_from_account(session: aiohttp.ClientSession, account_id
 async def get_insights_for_adsets(session: aiohttp.ClientSession, account_id: str, adset_ids: list, date_preset: str) -> List[dict]:
     url = f"https://graph.facebook.com/{API_VERSION}/act_{account_id}/insights"
     
-    # --- ИСПРАВЛЕНИЕ ОШИБКИ 400 ---
-    # Создаем JSON-строку без лишних пробелов
+    # --- *** ГЛАВНОЕ ИСПРАВЛЕНИЕ ОШИБКИ 400 *** ---
+    # Создаем JSON-строку без лишних пробелов, чтобы URL был корректным
     adset_ids_json = json.dumps(adset_ids, separators=(',', ':'))
     
     params = {
@@ -109,7 +109,6 @@ def safe_float(value):
     try: return float(value) if value is not None else 0.0
     except (ValueError, TypeError): return 0.0
 
-# ... (остальной код, включая AI-функции и эндпоинты, остается таким же, как в моем предыдущем ответе)
 # ──────────────────────────────────────────────────────────────────────────────
 # AI Analysis Logic
 # ──────────────────────────────────────────────────────────────────────────────
@@ -125,9 +124,9 @@ async def get_ai_analysis(adsets: List[dict]) -> Dict:
     
     system_prompt = """
 You are a senior Meta Ads analyst. Analyze a summary of ad sets from multiple accounts. Your response MUST be a valid JSON object in Russian with "summary", "insights", "recommendations".
-**IMPORTANT RULE:** All recommendations must be given **within the scope of a single ad account**. Never suggest moving budget between different accounts (e.g., from 'Client A' to 'Client B').
+**IMPORTANT RULE:** All recommendations must be given **within the scope of a single ad account**. Never suggest moving budget between different accounts.
 - `summary`: 2-3 sentence executive summary (Markdown). Mention total spend, leads, CPL.
-- `insights`: Markdown list of 3-4 key insights. For each major account, identify its best-performing ad set. Identify any ad set spending a lot with poor results.
+- `insights`: Markdown list of 3-4 key insights. For each major account, identify its best-performing ad set.
 - `recommendations`: A list of 2-3 actionable recommendation objects. Each object MUST have `priority` ("high", "medium", "low") and `text` (recommendation in Markdown).
 """
     total_spend, total_leads = round(sum(safe_float(a.get("spend")) for a in adsets), 2), int(sum(safe_float(a.get("leads")) for a in adsets))
@@ -187,6 +186,7 @@ You are a meticulous performance marketing specialist analyzing trend data for a
     except Exception as e:
         logging.error(f"OpenAI detailed analysis error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Detailed AI analysis failed: {e}")
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Endpoints
 # ──────────────────────────────────────────────────────────────────────────────
@@ -209,9 +209,7 @@ async def get_all_adsets_data(date_preset: str = Query("last_7d")):
 
                 for adset in adsets:
                     ins = insights_map.get(adset["id"])
-                    
                     if not ins:
-                        # Возвращаем старую логику: пропускаем адсеты без инсайтов
                         continue
                     
                     spend = float(ins.get("spend", 0) or 0)
