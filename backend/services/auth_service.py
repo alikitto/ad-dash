@@ -23,3 +23,16 @@ def create_access_token(subject: Union[str, Any], expires_delta: int = None) -> 
     to_encode = {"exp": expires_delta, "sub": str(subject)}
     encoded_jwt = jwt.encode(to_encode, JWT_SECRET_KEY, JWT_ALGORITHM)
     return encoded_jwt
+
+
+from jose import JWTError
+
+def get_email_from_token(token: str):
+    try:
+        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            return None
+        return email
+    except JWTError:
+        return None
