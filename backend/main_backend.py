@@ -54,21 +54,20 @@ async def get_all_adsets_from_account(session: aiohttp.ClientSession, account_id
 async def get_insights_for_adsets(session: aiohttp.ClientSession, account_id: str, adset_ids: list, date_preset: str) -> List[dict]:
     url = f"https://graph.facebook.com/{API_VERSION}/act_{account_id}/insights"
     
-    # --- *** ФИНАЛЬНОЕ ИСПРАВЛЕНИЕ ОШИБКИ 400 *** ---
-    # 1. Создаем объект фильтрации как Python-словарь
+    # --- *** ВОТ ОНО, ФИНАЛЬНОЕ ИСПРАВЛЕНИЕ ОШИБКИ 400 *** ---
+    # 1. Создаем правильный объект для фильтрации
     filtering_object = [{
         "field": "adset.id",
         "operator": "IN",
         "value": adset_ids
     }]
-    
-    # 2. Превращаем весь объект в компактную JSON-строку
+    # 2. Превращаем ВЕСЬ объект в компактную JSON-строку без пробелов
     filtering_json_string = json.dumps(filtering_object, separators=(',', ':'))
-
+    
     params = {
         "level":"adset",
         "fields":"adset_id,spend,actions,cpm,ctr,clicks,impressions,frequency,inline_link_clicks",
-        "filtering": filtering_json_string, # 3. Используем безопасную строку
+        "filtering": filtering_json_string, # 3. Используем эту безопасную строку
         "limit":5000
     }
     
@@ -116,6 +115,7 @@ def safe_float(value):
     try: return float(value) if value is not None else 0.0
     except (ValueError, TypeError): return 0.0
 
+# ... (Остальной код, включая AI-функции и эндпоинты, остается без изменений)
 # ──────────────────────────────────────────────────────────────────────────────
 # AI Analysis Logic
 # ──────────────────────────────────────────────────────────────────────────────
@@ -221,7 +221,7 @@ async def get_all_adsets_data(date_preset: str = Query("last_7d")):
                     
                     spend = float(ins.get("spend", 0) or 0)
                     leads = sum(int(a.get("value", 0)) for a in ins.get("actions", []) or [] if LEAD_ACTION_TYPE in a.get("action_type", ""))
-                    all_data.append({"account_id":acc_id, "account_name":acc_name, "avatarUrl":resolve_avatar_url(acc_id,acc_name), "adset_id":adset["id"], "adset_name":adset.get("name"), "campaign_name":(adset.get("campaign")or{}).get("name"), "status":adset.get("effective_status"), "objective":(adget.get("campaign")or{}).get("objective","N/A"), "spend":spend, "leads":leads, "cpl":(spend/leads) if leads>0 else 0.0, "cpm":float(ins.get("cpm",0)or 0), "ctr_all":float(ins.get("ctr",0)or 0), "link_clicks":int(ins.get("inline_link_clicks",0)or 0), "impressions":int(ins.get("impressions",0)or 0), "frequency":float(ins.get("frequency",0)or 0)})
+                    all_data.append({"account_id":acc_id, "account_name":acc_name, "avatarUrl":resolve_avatar_url(acc_id,acc_name), "adset_id":adset["id"], "adset_name":adset.get("name"), "campaign_name":(adset.get("campaign")or{}).get("name"), "status":adset.get("effective_status"), "objective":(adset.get("campaign")or{}).get("objective","N/A"), "spend":spend, "leads":leads, "cpl":(spend/leads) if leads>0 else 0.0, "cpm":float(ins.get("cpm",0)or 0), "ctr_all":float(ins.get("ctr",0)or 0), "link_clicks":int(ins.get("inline_link_clicks",0)or 0), "impressions":int(ins.get("impressions",0)or 0), "frequency":float(ins.get("frequency",0)or 0)})
             return all_data
     except Exception as e:
         logging.error(f"!!! API ERROR: {e} !!!", exc_info=True)
