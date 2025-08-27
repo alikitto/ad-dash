@@ -18,14 +18,14 @@
 
 // import
 import Dashboard from "views/Dashboard/Dashboard.js";
-import Tables from "views/Dashboard/index.js";
+import Tables from "views/Dashboard/index.js"; // Наша страница со статистикой
 import Billing from "views/Dashboard/Billing.js";
 import RTLPage from "views/RTL/RTLPage.js";
 import Profile from "views/Dashboard/Profile.js";
 import SignIn from "views/Pages/SignIn.js";
 import SignUp from "views/Pages/SignUp.js";
 import { SettingsIcon } from "@chakra-ui/icons";
-import Settings from "views/Dashboard/Settings.js"; // Наш новый компонент
+import Settings from "views/Dashboard/Settings.js";
 
 import {
   HomeIcon,
@@ -44,7 +44,7 @@ var dashRoutes = [
     rtlName: "لوحة القيادة",
     icon: <HomeIcon color='inherit' />,
     component: Dashboard,
-    layout: "/admin",
+    layout: "/admin", // Этот роут будет защищен
   },
   {
     path: "/stats",
@@ -52,7 +52,7 @@ var dashRoutes = [
     rtlName: "لوحة القيادة",
     icon: <StatsIcon color='inherit' />,
     component: Tables,
-    layout: "/admin",
+    layout: "/admin", // Этот роут будет защищен
   },
   {
     path: "/billing",
@@ -60,7 +60,7 @@ var dashRoutes = [
     rtlName: "لوحة القيادة",
     icon: <CreditIcon color='inherit' />,
     component: Billing,
-    layout: "/admin",
+    layout: "/admin", // Этот роут будет защищен
   },
   {
     path: "/rtl-support-page",
@@ -68,14 +68,14 @@ var dashRoutes = [
     rtlName: "آرتيإل",
     icon: <SupportIcon color='inherit' />,
     component: RTLPage,
-    layout: "/rtl",
+    layout: "/rtl", // Этот роут НЕ будет защищен, т.к. его обрабатывает другой layout
   },
   {
     path: "/settings",
     name: "Settings",
     icon: <SettingsIcon color="inherit" />,
     component: Settings,
-    layout: "/admin",
+    layout: "/admin", // Этот роут будет защищен
   },
   {
     name: "ACCOUNT PAGES",
@@ -90,7 +90,7 @@ var dashRoutes = [
         icon: <PersonIcon color='inherit' />,
         secondaryNavbar: true,
         component: Profile,
-        layout: "/admin",
+        layout: "/admin", // Этот роут будет защищен
       },
       {
         path: "/signin",
@@ -98,7 +98,7 @@ var dashRoutes = [
         rtlName: "لوحة القيادة",
         icon: <DocumentIcon color='inherit' />,
         component: SignIn,
-        layout: "/auth",
+        layout: "/auth", // Этот роут НЕ будет защищен
       },
       {
         path: "/signup",
@@ -107,7 +107,7 @@ var dashRoutes = [
         icon: <RocketIcon color='inherit' />,
         secondaryNavbar: true,
         component: SignUp,
-        layout: "/auth",
+        layout: "/auth", // Этот роут НЕ будет защищен
       },
     ],
   },
