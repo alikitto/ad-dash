@@ -1,13 +1,15 @@
+# --- main_backend.py (Final, Corrected Version) ---
+
 import os
 import asyncio
 import aiohttp
 import json
 import logging
+from datetime import datetime # <--- Добавлен импорт
 from dotenv import load_dotenv
 from fastapi import FastAPI, Body, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, List, Optional
-from pydantic import BaseModel
 import openai
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -25,12 +27,10 @@ FRONTEND_ORIGINS = ["https://ad-dash-frontend-production.up.railway.app", "http:
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=FRONTEND_ORIGINS, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
+# ... (Остальные Pydantic модели и хелперы остаются без изменений)
 class AdSetPayload(BaseModel):
     adset: dict
 
-# ──────────────────────────────────────────────────────────────────────────────
-# FB API Helpers & Data Builders
-# ──────────────────────────────────────────────────────────────────────────────
 async def fb_request(session: aiohttp.ClientSession, method: str, url: str, params: dict = None, data: dict = None):
     if params is None: params = {}
     params["access_token"] = META_TOKEN
@@ -48,12 +48,28 @@ async def get_all_adsets_from_account(session: aiohttp.ClientSession, account_id
     params = {"fields": "id,name,campaign{name,objective},effective_status", "limit": 500}
     return (await fb_request(session, "get", url, params=params)).get("data", []) or []
 
+# --- ИЗМЕНЕНА ЭТА ФУНКЦИЯ ---
 async def get_insights_for_adsets(session: aiohttp.ClientSession, account_id: str, adset_ids: list, date_preset: str) -> List[dict]:
     url = f"https://graph.facebook.com/{API_VERSION}/act_{account_id}/insights"
-    params = {"level":"adset", "fields":"adset_id,spend,actions,cpm,ctr,clicks,impressions,frequency,inline_link_clicks", "filtering":f'[{{"field":"adset.id","operator":"IN","value":{json.dumps(adset_ids)}}}]', "limit":5000}
-    if date_preset != "maximum": params["date_preset"] = date_preset
+    params = {
+        "level":"adset",
+        "fields":"adset_id,spend,actions,cpm,ctr,clicks,impressions,frequency,inline_link_clicks",
+        "filtering":f'[{{"field":"adset.id","operator":"IN","value":{json.dumps(adset_ids)}}}]',
+        "limit":5000
+    }
+    
+    # Новая логика для обработки дат
+    if date_preset == "maximum":
+        today_str = datetime.now().strftime('%Y-%m-%d')
+        # Явно задаем диапазон с 2015 года по сегодня
+        params["time_range"] = f'{{"since":"2015-01-01","until":"{today_str}"}}'
+    else:
+        # Для остальных пресетов используем стандартный параметр
+        params["date_preset"] = date_preset
+        
     return (await fb_request(session, "get", url, params=params)).get("data", []) or []
 
+# ... (остальные функции до эндпоинтов остаются без изменений)
 async def get_ads_metadata(session: aiohttp.ClientSession, adset_id: str) -> List[dict]:
     url = f"https://graph.facebook.com/{API_VERSION}/{adset_id}/ads"
     params = {"fields": "id,name,status,effective_status,creative{thumbnail_url,image_url}", "limit": 200}
@@ -62,7 +78,14 @@ async def get_ads_metadata(session: aiohttp.ClientSession, adset_id: str) -> Lis
 async def get_ads_insights(session: aiohttp.ClientSession, adset_id: str, date_preset: str) -> List[dict]:
     url = f"https://graph.facebook.com/{API_VERSION}/{adset_id}/insights"
     params = {"level":"ad", "fields":"ad_id,spend,impressions,clicks,inline_link_clicks,ctr,cpm,frequency,actions", "limit":5000}
-    if date_preset != "maximum": params["date_preset"] = date_preset
+    
+    # Применяем ту же логику и здесь для консистентности
+    if date_preset == "maximum":
+        today_str = datetime.now().strftime('%Y-%m-%d')
+        params["time_range"] = f'{{"since":"2015-01-01","until":"{today_str}"}}'
+    else:
+        params["date_preset"] = date_preset
+
     return (await fb_request(session, "get", url, params=params)).get("data", []) or []
 
 async def build_ads_payload(session: aiohttp.ClientSession, adset_id: str, date_preset: str) -> List[dict]:
@@ -181,7 +204,6 @@ async def get_all_adsets_data(date_preset: str = Query("last_7d")):
                 adsets = await get_all_adsets_from_account(session, acc_id)
                 if not adsets: continue
                 
-                # --- ИСПРАВЛЕНИЕ ЛОГИКИ ФИЛЬТРАЦИИ ---
                 insights = await get_insights_for_adsets(session, acc_id, [a["id"] for a in adsets], date_preset)
                 insights_map = {row["adset_id"]: row for row in insights}
 
@@ -189,7 +211,6 @@ async def get_all_adsets_data(date_preset: str = Query("last_7d")):
                     ins = insights_map.get(adset["id"])
                     
                     if not ins:
-                         # Создаем пустые инсайты, если адсет активен, но не имеет статистики за период
                         ins = { "spend": 0, "actions": [], "cpm": 0, "ctr": 0, "clicks": 0, "inline_link_clicks": 0, "impressions": 0, "frequency": 0 }
                     
                     spend = float(ins.get("spend", 0) or 0)
@@ -207,8 +228,7 @@ async def analyze_adsets_endpoint(adsets: List[dict] = Body(...)):
 
 @app.post("/api/analyze-adset-details")
 async def analyze_adset_details_endpoint(payload: AdSetPayload):
-    if not payload.adset:
-        raise HTTPException(status_code=400, detail="Adset data is required.")
+    if not payload.adset: raise HTTPException(status_code=400, detail="Adset data is required.")
     return await get_ai_detailed_analysis(payload.adset)
 
 @app.post("/api/adsets/{adset_id}/update-status")
