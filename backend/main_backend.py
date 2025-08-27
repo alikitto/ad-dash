@@ -189,7 +189,12 @@ async def get_all_adsets_data(date_preset: str = Query("last_7d")):
                 insights_map = {row["adset_id"]: row for row in insights}
                 for adset in adsets:
                     ins = insights_map.get(adset["id"])
-                    if not ins: continue
+                    if not ins: 
+                            ins = {
+                            "spend": 0, "actions": [], "cpm": 0, "ctr": 0,
+                            "clicks": 0, "inline_link_clicks": 0, "impressions": 0,
+                            "frequency": 0
+                        }
                     spend = float(ins.get("spend", 0) or 0)
                     leads = sum(int(a.get("value", 0)) for a in ins.get("actions", []) or [] if LEAD_ACTION_TYPE in a.get("action_type", ""))
                     all_data.append({"account_id":acc_id, "account_name":acc_name, "avatarUrl":resolve_avatar_url(acc_id,acc_name), "adset_id":adset["id"], "adset_name":adset.get("name"), "campaign_name":(adset.get("campaign")or{}).get("name"), "status":adset.get("effective_status"), "objective":(adset.get("campaign")or{}).get("objective","N/A"), "spend":spend, "leads":leads, "cpl":(spend/leads) if leads>0 else 0.0, "cpm":float(ins.get("cpm",0)or 0), "ctr_all":float(ins.get("ctr",0)or 0), "link_clicks":int(ins.get("inline_link_clicks",0)or 0), "impressions":int(ins.get("impressions",0)or 0), "frequency":float(ins.get("frequency",0)or 0)})
