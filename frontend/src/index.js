@@ -21,4 +21,4 @@ ReactDOM.render(
     </HashRouter>
   </AuthProvider> {/* <-- Закрываем его */}
   document.getElementById("root")
-);
+); 
