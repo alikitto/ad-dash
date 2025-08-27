@@ -29,3 +29,8 @@ FRONTEND_ORIGINS = [
 CLIENT_AVATARS = {
     "act_284902192299330": "https://video.karal.az/avatars/ahadnazim.jpg"
 }
+
+DATABASE_URL = os.getenv("DATABASE_URL") # Убедись, что эта переменная есть в твоем окружении на Railway
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "K6787326###1gHjTrA") # Замени на сложный ключ
+JWT_ALGORITHM = "HS256"
+JWT_EXPIRE_MINUTES = 60 * 24 # 24 часа
