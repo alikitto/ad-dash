@@ -1,4 +1,4 @@
-// src/views/Dashboard/index.js (Это твой бывший Table.js)
+// src/views/Dashboard/index.js (Финальная версия)
 
 import React, { useState, useEffect, useMemo } from "react";
 import { Flex, Text, useToast } from "@chakra-ui/react";
@@ -6,14 +6,17 @@ import { useAdsets } from "hooks/useAdsets";
 import * as api from "api/adsets";
 import { formatLastUpdated } from "utils/formatters";
 
+// 👇 ВОТ НУЖНЫЕ ИМПОРТЫ 👇
 import Card from "components/Card/Card.js";
 import CardHeader from "components/Card/CardHeader.js";
 import CardBody from "components/Card/CardBody.js";
+// 👆 -------------------- 👆
+
 import AdsetFilters from "components/Tables/AdsetFilters";
 import AdsetTable from "components/Tables/AdsetTable";
 import AnalysisModal from "components/Tables/AnalysisModal";
 
-function Dashboard() { // Можно переименовать функцию для ясности
+function Dashboard() {
   const {
     processedAdsets, accounts, objectives,
     loading, error, updatingId, lastUpdated,
@@ -21,7 +24,8 @@ function Dashboard() { // Можно переименовать функцию �
     sortConfig, requestSort,
     fetchData, handleStatusChange
   } = useAdsets();
-  
+
+  // ... остальная логика (хуки, хендлеры) ...
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -52,23 +56,30 @@ function Dashboard() { // Можно переименовать функцию �
     }
   };
 
+
   return (
     <Flex direction="column" pt={{ base: "120px", md: "75px" }}>
       <Card>
+        {/* 👇 И ВОТ ЗДЕСЬ ОН ИСПОЛЬЗУЕТСЯ 👇 */}
         <CardHeader mb="4">
-          <Text fontSize="xl" color="white" fontWeight="bold">Active Ad Sets</Text>
-          <AdsetFilters
-            filters={filters}
-            setters={setters}
-            accounts={accounts}
-            objectives={objectives}
-            onRefresh={fetchData}
-            onAnalyze={handleAnalysisClick}
-            isRefreshing={loading}
-            isAnalyzing={isAnalyzing}
-            lastUpdatedLabel={lastUpdatedLabel}
-          />
+          <Flex direction="column">
+            <Text fontSize="xl" color="white" fontWeight="bold" mb="4">
+              Active Ad Sets
+            </Text>
+            <AdsetFilters
+              filters={filters}
+              setters={setters}
+              accounts={accounts}
+              objectives={objectives}
+              onRefresh={fetchData}
+              onAnalyze={handleAnalysisClick}
+              isRefreshing={loading}
+              isAnalyzing={isAnalyzing}
+              lastUpdatedLabel={lastUpdatedLabel}
+            />
+          </Flex>
         </CardHeader>
+        {/* 👆 -------------------------- 👆 */}
         <CardBody pt="0">
           <AdsetTable
             adsets={processedAdsets}
