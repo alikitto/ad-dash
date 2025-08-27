@@ -33,6 +33,8 @@ import FixedPlugin from "../components/FixedPlugin/FixedPlugin";
 import MainPanel from "../components/Layout/MainPanel";
 import PanelContainer from "../components/Layout/PanelContainer";
 import PanelContent from "../components/Layout/PanelContent";
+import ProtectedRoute from "components/ProtectedRoute"; // <-- ИЗМЕНЕНИЕ 1: Импортируем наш защищенный роут
+
 export default function Dashboard(props) {
   const { ...rest } = props;
   // states and functions
@@ -97,8 +99,9 @@ export default function Dashboard(props) {
         return getRoutes(prop.views);
       }
       if (prop.layout === "/admin") {
+        // 👇 ИЗМЕНЕНИЕ 2: Заменяем <Route> на <ProtectedRoute>
         return (
-          <Route
+          <ProtectedRoute
             path={prop.layout + prop.path}
             component={prop.component}
             key={key}
