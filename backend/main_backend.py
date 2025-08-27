@@ -1,4 +1,4 @@
-# --- main_backend.py (Full Merged Version) ---
+# --- main_backend.py (Full Corrected Version) ---
 
 import os
 import asyncio
@@ -53,12 +53,24 @@ async def get_all_adsets_from_account(session: aiohttp.ClientSession, account_id
 
 async def get_insights_for_adsets(session: aiohttp.ClientSession, account_id: str, adset_ids: list, date_preset: str) -> List[dict]:
     url = f"https://graph.facebook.com/{API_VERSION}/act_{account_id}/insights"
-    params = {"level":"adset", "fields":"adset_id,spend,actions,cpm,ctr,clicks,impressions,frequency,inline_link_clicks", "filtering":f'[{{"field":"adset.id","operator":"IN","value":{json.dumps(adset_ids)}}}]', "limit":5000}
+    
+    # --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
+    # Убираем пробелы из JSON, чтобы URL был корректным
+    adset_ids_json = json.dumps(adset_ids, separators=(',', ':'))
+    
+    params = {
+        "level":"adset",
+        "fields":"adset_id,spend,actions,cpm,ctr,clicks,impressions,frequency,inline_link_clicks",
+        "filtering":f'[{{"field":"adset.id","operator":"IN","value":{adset_ids_json}}}]',
+        "limit":5000
+    }
+    
     if date_preset == "maximum":
         today_str = datetime.now().strftime('%Y-%m-%d')
         params["time_range"] = f'{{"since":"2015-01-01","until":"{today_str}"}}'
     else:
         params["date_preset"] = date_preset
+        
     return (await fb_request(session, "get", url, params=params)).get("data", []) or []
 
 async def get_ads_metadata(session: aiohttp.ClientSession, adset_id: str) -> List[dict]:
@@ -101,6 +113,7 @@ def safe_float(value):
 # AI Analysis Logic
 # ──────────────────────────────────────────────────────────────────────────────
 async def get_ai_analysis(adsets: List[dict]) -> Dict:
+    # ... (эта функция без изменений)
     if not OPENAI_API_KEY: raise HTTPException(status_code=500, detail="OpenAI API key not configured.")
     MAX_ADSETS_FOR_AI, final_adsets = 35, adsets
     if len(adsets) > MAX_ADSETS_FOR_AI:
@@ -109,7 +122,6 @@ async def get_ai_analysis(adsets: List[dict]) -> Dict:
         worst = sorted([a for a in adsets if safe_float(a.get("leads"))==0 and safe_float(a.get("spend"))>0], key=lambda x: safe_float(x.get("spend")), reverse=True)[:5]
         final_adsets = list({d["adset_id"]: d for d in top_by_spend + top_by_leads + worst}.values())
     simplified_adsets = [{"name":f"{d.get('account_name','')} / {d.get('adset_name','N/A')}", "spend":round(safe_float(d.get("spend")),2), "leads":int(safe_float(d.get("leads"))), "cpl":round(safe_float(d.get("cpl")),2), "ctr_link":round((safe_float(d.get("link_clicks"))/safe_float(d.get("impressions"))*100.0) if safe_float(d.get("impressions"))>0 else 0.0, 2)} for d in final_adsets]
-    
     system_prompt = """
 You are a senior Meta Ads analyst. Analyze a summary of ad sets from multiple accounts. Your response MUST be a valid JSON object in Russian with "summary", "insights", "recommendations".
 **IMPORTANT RULE:** All recommendations must be given **within the scope of a single ad account**. Never suggest moving budget between different accounts (e.g., from 'Client A' to 'Client B').
@@ -128,39 +140,25 @@ You are a senior Meta Ads analyst. Analyze a summary of ad sets from multiple ac
         raise HTTPException(status_code=500, detail=f"Failed to get AI analysis: {e}")
 
 async def get_ai_detailed_analysis(adset_info: dict) -> Dict:
+    # ... (эта функция без изменений)
     if not OPENAI_API_KEY: raise HTTPException(status_code=500, detail="OpenAI API key not configured.")
     adset_id = adset_info.get("adset_id")
     if not adset_id: raise HTTPException(status_code=400, detail="Adset ID is missing in the payload.")
-    
     ads_today, ads_yesterday, ads_maximum = [], [], []
     async with aiohttp.ClientSession() as session:
-        results = await asyncio.gather(
-            build_ads_payload(session, adset_id, "today"),
-            build_ads_payload(session, adset_id, "yesterday"),
-            build_ads_payload(session, adset_id, "maximum"),
-            return_exceptions=True
-        )
-    
+        results = await asyncio.gather(build_ads_payload(session, adset_id, "today"), build_ads_payload(session, adset_id, "yesterday"), build_ads_payload(session, adset_id, "maximum"), return_exceptions=True)
     if not isinstance(results[0], Exception): ads_today = results[0]
     else: logging.warning(f"Could not fetch 'today' data for {adset_id}: {results[0]}")
     if not isinstance(results[1], Exception): ads_yesterday = results[1]
     else: logging.warning(f"Could not fetch 'yesterday' data for {adset_id}: {results[1]}")
     if not isinstance(results[2], Exception): ads_maximum = results[2]
     else: logging.warning(f"Could not fetch 'maximum' data for {adset_id}: {results[2]}")
-
     def summarize_ads(ads_list):
         if not ads_list: return {"total_spend": 0, "total_leads": 0, "cpl": 0, "ads_count": 0}
         total_spend = sum(safe_float(ad.get("spend")) for ad in ads_list)
         total_leads = sum(safe_float(ad.get("leads")) for ad in ads_list)
         return {"total_spend": round(total_spend, 2), "total_leads": int(total_leads), "cpl": round(total_spend / total_leads, 2) if total_leads > 0 else 0, "ads_count": len(ads_list)}
-
-    data_for_ai = {
-        "adset_name": adset_info.get("adset_name"), "campaign_name": adset_info.get("campaign_name"),
-        "objective": adset_info.get("objective"),
-        "performance_summary": {"today": summarize_ads(ads_today), "yesterday": summarize_ads(ads_yesterday), "lifetime": summarize_ads(ads_maximum)},
-        "top_ads_by_lifetime_cpa": sorted([{"name": ad.get("ad_name"), "leads": ad.get("leads"), "cpa": ad.get("cpa")} for ad in ads_maximum if ad.get("leads", 0) > 0], key=lambda x: x["cpa"])[:5]
-    }
-
+    data_for_ai = {"adset_name": adset_info.get("adset_name"), "campaign_name": adset_info.get("campaign_name"), "objective": adset_info.get("objective"), "performance_summary": {"today": summarize_ads(ads_today), "yesterday": summarize_ads(ads_yesterday), "lifetime": summarize_ads(ads_maximum)}, "top_ads_by_lifetime_cpa": sorted([{"name": ad.get("ad_name"), "leads": ad.get("leads"), "cpa": ad.get("cpa")} for ad in ads_maximum if ad.get("leads", 0) > 0], key=lambda x: x["cpa"])[:5]}
     system_prompt = """
 You are a meticulous performance marketing specialist analyzing trend data for a single ad set. Your response MUST be a valid JSON object in Russian with "summary", "insights", "recommendations". Use Markdown.
 - `summary`: Summarize the ad set's current performance (Today vs Yesterday) and its overall historical performance (Lifetime).
@@ -191,17 +189,12 @@ async def get_all_adsets_data(date_preset: str = Query("last_7d")):
                 if not acc_id: continue
                 adsets = await get_all_adsets_from_account(session, acc_id)
                 if not adsets: continue
-                
                 insights = await get_insights_for_adsets(session, acc_id, [a["id"] for a in adsets], date_preset)
                 insights_map = {row["adset_id"]: row for row in insights}
-
-                # --- ВОЗВРАЩАЕМ СТАРУЮ ЛОГИКУ ФИЛЬТРАЦИИ ---
                 for adset in adsets:
                     ins = insights_map.get(adset["id"])
-                    # Если у адсета нет статистики за период, мы его пропускаем
                     if not ins:
-                        continue
-                    
+                        ins = { "spend": 0, "actions": [], "cpm": 0, "ctr": 0, "clicks": 0, "inline_link_clicks": 0, "impressions": 0, "frequency": 0 }
                     spend = float(ins.get("spend", 0) or 0)
                     leads = sum(int(a.get("value", 0)) for a in ins.get("actions", []) or [] if LEAD_ACTION_TYPE in a.get("action_type", ""))
                     all_data.append({"account_id":acc_id, "account_name":acc_name, "avatarUrl":resolve_avatar_url(acc_id,acc_name), "adset_id":adset["id"], "adset_name":adset.get("name"), "campaign_name":(adset.get("campaign")or{}).get("name"), "status":adset.get("effective_status"), "objective":(adset.get("campaign")or{}).get("objective","N/A"), "spend":spend, "leads":leads, "cpl":(spend/leads) if leads>0 else 0.0, "cpm":float(ins.get("cpm",0)or 0), "ctr_all":float(ins.get("ctr",0)or 0), "link_clicks":int(ins.get("inline_link_clicks",0)or 0), "impressions":int(ins.get("impressions",0)or 0), "frequency":float(ins.get("frequency",0)or 0)})
@@ -217,8 +210,7 @@ async def analyze_adsets_endpoint(adsets: List[dict] = Body(...)):
 
 @app.post("/api/analyze-adset-details")
 async def analyze_adset_details_endpoint(payload: AdSetPayload):
-    if not payload.adset:
-        raise HTTPException(status_code=400, detail="Adset data is required.")
+    if not payload.adset: raise HTTPException(status_code=400, detail="Adset data is required.")
     return await get_ai_detailed_analysis(payload.adset)
 
 @app.post("/api/adsets/{adset_id}/update-status")
