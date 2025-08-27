@@ -7,6 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.endpoints import router as api_router
 from core.config import FRONTEND_ORIGINS
 from api.auth_endpoints import router as auth_router
+from api.user_endpoints import router as user_router
+
 
 app = FastAPI(
     title="Ad-Dash Backend API",
@@ -31,3 +33,4 @@ app.include_router(api_router, prefix="/api")
 def read_root():
     return {"status": "ok", "message": "Welcome to the Ad-Dash API!"}
 app.include_router(auth_router, prefix="/auth")
+app.include_router(user_router, prefix="/users")
