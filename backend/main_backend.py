@@ -1,4 +1,4 @@
-# --- main_backend.py (Definitive Final Version for Error 400) ---
+# --- main_backend.py (Definitive Final Version) ---
 
 import os
 import asyncio
@@ -54,20 +54,14 @@ async def get_all_adsets_from_account(session: aiohttp.ClientSession, account_id
 async def get_insights_for_adsets(session: aiohttp.ClientSession, account_id: str, adset_ids: list, date_preset: str) -> List[dict]:
     url = f"https://graph.facebook.com/{API_VERSION}/act_{account_id}/insights"
     
-    # --- *** ВОТ ОНО, ФИНАЛЬНОЕ ИСПРАВЛЕНИЕ ОШИБКИ 400 *** ---
-    # 1. Создаем правильный объект для фильтрации
-    filtering_object = [{
-        "field": "adset.id",
-        "operator": "IN",
-        "value": adset_ids
-    }]
-    # 2. Превращаем ВЕСЬ объект в компактную JSON-строку без пробелов
+    # --- *** ФИНАЛЬНОЕ ИСПРАВЛЕНИЕ ОШИБКИ 400 *** ---
+    filtering_object = [{"field": "adset.id", "operator": "IN", "value": adset_ids}]
     filtering_json_string = json.dumps(filtering_object, separators=(',', ':'))
     
     params = {
         "level":"adset",
         "fields":"adset_id,spend,actions,cpm,ctr,clicks,impressions,frequency,inline_link_clicks",
-        "filtering": filtering_json_string, # 3. Используем эту безопасную строку
+        "filtering": filtering_json_string,
         "limit":5000
     }
     
@@ -115,7 +109,6 @@ def safe_float(value):
     try: return float(value) if value is not None else 0.0
     except (ValueError, TypeError): return 0.0
 
-# ... (Остальной код, включая AI-функции и эндпоинты, остается без изменений)
 # ──────────────────────────────────────────────────────────────────────────────
 # AI Analysis Logic
 # ──────────────────────────────────────────────────────────────────────────────
@@ -217,7 +210,7 @@ async def get_all_adsets_data(date_preset: str = Query("last_7d")):
                 for adset in adsets:
                     ins = insights_map.get(adset["id"])
                     if not ins:
-                        continue
+                        continue # СТРОГАЯ ФИЛЬТРАЦИЯ КАК В СТАРОМ ФАЙЛЕ
                     
                     spend = float(ins.get("spend", 0) or 0)
                     leads = sum(int(a.get("value", 0)) for a in ins.get("actions", []) or [] if LEAD_ACTION_TYPE in a.get("action_type", ""))
