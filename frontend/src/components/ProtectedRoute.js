@@ -1,9 +1,10 @@
 // src/components/ProtectedRoute.js
 import React from 'react';
 import { Route, Redirect } from 'react-router-dom';
+import { useAuth } from 'context/AuthContext'; // Импортируем наш хук
 
 const ProtectedRoute = ({ component: Component, ...rest }) => {
-  const isAuthenticated = !!localStorage.getItem('authToken');
+  const { isAuthenticated } = useAuth(); // Получаем статус аутентификации из контекста
 
   return (
     <Route
