@@ -19,6 +19,6 @@ ReactDOM.render(
         <Redirect from={`/`} to='/admin/stats' />
       </Switch>
     </HashRouter>
-  </AuthProvider>, {/* <-- Закрываем его */}
+  </AuthProvider> {/* <-- Закрываем его */}
   document.getElementById("root")
 );
