@@ -43,6 +43,7 @@ import signUpImage from "assets/img/signUpImage.png";
 function SignUp() {
   const titleColor = "white";
   const textColor = "gray.400";
+  const [name, setName] = useState(""); // <-- 1. Добавили состояние для имени
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -56,7 +57,7 @@ function SignUp() {
       const response = await fetch("https://ad-dash-backend-production.up.railway.app/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ name, email, password }), // <-- 2. Добавили имя в тело запроса
       });
 
       if (!response.ok) {
@@ -110,8 +111,8 @@ function SignUp() {
           </Flex>
           <GradientBorder p='2px' me={{ base: "none", lg: "30px", xl: "none" }}>
             <Flex
-              as="form" // Превращаем в форму
-              onSubmit={handleSubmit} // Добавляем обработчик
+              as="form"
+              onSubmit={handleSubmit}
               background='transparent' borderRadius='30px' direction='column' p='40px'
               minW={{ base: "unset", md: "430px", xl: "450px" }} w='100%' mx={{ base: "0px" }}
               bg={{ base: "rgb(19,21,56)" }}>
@@ -119,9 +120,20 @@ function SignUp() {
                 Create Account
               </Heading>
               <FormControl>
-                <FormLabel color={titleColor} ms='4px' fontSize='sm' fontWeight='normal'>
-                  Email
-                </FormLabel>
+                {/* 👇 -- 3. Вернули поле "Имя" в форму -- 👇 */}
+                <FormLabel color={titleColor} ms='4px' fontSize='sm' fontWeight='normal'>Name</FormLabel>
+                <GradientBorder mb='24px' h='50px' w='100%' borderRadius='20px'>
+                  <Input
+                    color={titleColor} bg={{ base: "rgb(19,21,54)" }} border='transparent'
+                    borderRadius='20px' fontSize='sm' size='lg' w='100%' h='46px'
+                    type='text' placeholder='Your name'
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    isRequired
+                  />
+                </GradientBorder>
+                {/* 👆 -------------------------------- 👆 */}
+                <FormLabel color={titleColor} ms='4px' fontSize='sm' fontWeight='normal'>Email</FormLabel>
                 <GradientBorder mb='24px' h='50px' w='100%' borderRadius='20px'>
                   <Input
                     color={titleColor} bg={{ base: "rgb(19,21,54)" }} border='transparent'
@@ -132,9 +144,7 @@ function SignUp() {
                     isRequired
                   />
                 </GradientBorder>
-                <FormLabel color={titleColor} ms='4px' fontSize='sm' fontWeight='normal'>
-                  Password
-                </FormLabel>
+                <FormLabel color={titleColor} ms='4px' fontSize='sm' fontWeight='normal'>Password</FormLabel>
                 <GradientBorder mb='24px' h='50px' w='100%' borderRadius='20px'>
                   <Input
                     color={titleColor} bg={{ base: "rgb(19,21,54)" }} border='transparent'
@@ -157,8 +167,8 @@ function SignUp() {
                 <Text color={textColor} fontWeight='medium'>
                   Already have an account?
                   <Link
-                    as={RouterLink} // Используем роутер для навигации
-                    to="/auth/signin" // Указываем путь
+                    as={RouterLink}
+                    to="/auth/signin"
                     color={titleColor}
                     ms='5px'
                     fontWeight='bold'>
