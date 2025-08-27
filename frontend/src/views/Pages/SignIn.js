@@ -29,17 +29,17 @@ function SignIn() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || "Failed to sign in");
+        const errorData = await response.json().catch(() => ({ detail: "Failed to sign in" }));
+        throw new Error(errorData.detail);
       }
 
       const data = await response.json();
       localStorage.setItem("authToken", data.access_token); // Сохраняем токен
-      toast({ title: "Successfully signed in!", status: "success", duration: 2000, isClosable: true });
+      toast({ title: "Successfully signed in!", status: "success", duration: 2000, isClosable: true, position: "top" });
       history.push("/admin/stats"); // Редирект на главную страницу
       
     } catch (error) {
-        toast({ title: "Sign in failed", description: error.message, status: "error", duration: 3000, isClosable: true });
+        toast({ title: "Sign in failed", description: error.message, status: "error", duration: 3000, isClosable: true, position: "top" });
     } finally {
         setIsLoading(false);
     }
@@ -47,12 +47,28 @@ function SignIn() {
 
   return (
     <Flex position='relative'>
-      <Flex /* ... остальная верстка без изменений ... */ >
-        <Flex /* ... */ >
-          <Flex as="form" onSubmit={handleSubmit} direction='column' w='100%' /* ... */>
-            {/* ... Заголовки ... */}
+      <Flex
+        minH='100vh' h={{ base: "120vh", lg: "fit-content" }} w='100%' maxW='1044px' mx='auto'
+        pt={{ sm: "100px", md: "0px" }} flexDirection='column' me={{ base: "auto", lg: "50px", xl: "auto" }}>
+        <Flex
+          alignItems='center' justifyContent='start' style={{ userSelect: "none" }} mx={{ base: "auto", lg: "unset" }}
+          ms={{ base: "auto", lg: "auto" }} w={{ base: "100%", md: "50%", lg: "450px" }} px='50px'>
+          <Flex
+            as="form" // Превращаем Flex в форму
+            onSubmit={handleSubmit} // Добавляем обработчик
+            direction='column' w='100%' background='transparent'
+            mt={{ base: "50px", md: "150px", lg: "160px", xl: "245px" }}
+            mb={{ base: "60px", lg: "95px" }}>
+            <Heading color={titleColor} fontSize='32px' mb='10px'>
+              Nice to see you!
+            </Heading>
+            <Text mb='36px' ms='4px' color={textColor} fontWeight='bold' fontSize='14px'>
+              Enter your email and password to sign in
+            </Text>
             <FormControl>
-              <FormLabel ms='4px' fontSize='sm' fontWeight='normal' color='white'>Email</FormLabel>
+              <FormLabel ms='4px' fontSize='sm' fontWeight='normal' color='white'>
+                Email
+              </FormLabel>
               <GradientBorder mb='24px' w={{ base: "100%", lg: "fit-content" }} borderRadius='20px'>
                 <Input
                   color='white' bg='rgb(19,21,54)' border='transparent' borderRadius='20px'
@@ -66,7 +82,9 @@ function SignIn() {
               </GradientBorder>
             </FormControl>
             <FormControl>
-              <FormLabel ms='4px' fontSize='sm' fontWeight='normal' color='white'>Password</FormLabel>
+              <FormLabel ms='4px' fontSize='sm' fontWeight='normal' color='white'>
+                Password
+              </FormLabel>
               <GradientBorder mb='24px' w={{ base: "100%", lg: "fit-content" }} borderRadius='20px'>
                 <Input
                   color='white' bg='rgb(19,21,54)' border='transparent' borderRadius='20px'
@@ -79,17 +97,53 @@ function SignIn() {
                 />
               </GradientBorder>
             </FormControl>
-            {/* ... Remember me ... */}
+            <FormControl display='flex' alignItems='center'>
+              <DarkMode>
+                <Switch id='remember-login' colorScheme='brand' me='10px' />
+              </DarkMode>
+              <FormLabel htmlFor='remember-login' mb='0' ms='1' fontWeight='normal' color='white'>
+                Remember me
+              </FormLabel>
+            </FormControl>
             <Button
-              variant='brand' fontSize='10px' type='submit' w='100%'
-              maxW='350px' h='45' mb='20px' mt='20px'
-              isLoading={isLoading}>
+              variant='brand' fontSize='10px' type='submit' w='100%' maxW='350px'
+              h='45' mb='20px' mt='20px' isLoading={isLoading}>
               SIGN IN
             </Button>
-            {/* ... Sign Up Link ... */}
+            <Flex
+              flexDirection='column' justifyContent='center' alignItems='center'
+              maxW='100%' mt='0px'>
+              <Text color={textColor} fontWeight='medium'>
+                Don't have an account?
+                <Link href="/auth/signup" color={titleColor} as='span' ms='5px' fontWeight='bold'>
+                  Sign Up
+                </Link>
+              </Text>
+            </Flex>
           </Flex>
         </Flex>
-        {/* ... Footer и правый блок с картинкой ... */}
+        <Box w={{ base: "335px", md: "450px" }} mx={{ base: "auto", lg: "unset" }} ms={{ base: "auto", lg: "auto" }} mb='80px'>
+          <AuthFooter />
+        </Box>
+        <Box
+          display={{ base: "none", lg: "block" }} overflowX='hidden' h='100%'
+          maxW={{ md: "50vw", lg: "50vw" }} minH='100vh' w='960px' position='absolute' left='0px'>
+          <Box
+            bgImage={signInImage} w='100%' h='100%' bgSize='cover' bgPosition='50%'
+            position='absolute' display='flex' flexDirection='column' justifyContent='center'
+            alignItems='center'>
+            <Text
+              textAlign='center' color='white' letterSpacing='8px'
+              fontSize='20px' fontWeight='500'>
+              INSPIRED BY THE FUTURE:
+            </Text>
+            <Text
+              textAlign='center' color='transparent' letterSpacing='8px' fontSize='36px'
+              fontWeight='bold' bgClip='text !important' bg='linear-gradient(94.56deg, #FFFFFF 79.99%, #21242F 102.65%)'>
+              THE VISION UI DASHBOARD
+            </Text>
+          </Box>
+        </Box>
       </Flex>
     </Flex>
   );
