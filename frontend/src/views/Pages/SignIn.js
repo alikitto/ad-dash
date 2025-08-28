@@ -113,12 +113,12 @@ function SignIn() {
             <Flex
               flexDirection='column' justifyContent='center' alignItems='center'
               maxW='100%' mt='0px'>
-              <Text color={textColor} fontWeight='medium'>
-                Don't have an account?
-                <Link href="/auth/signup" color={titleColor} as='span' ms='5px' fontWeight='bold'>
-                  Sign Up
-                </Link>
-              </Text>
+        <Text color={textColor} fontWeight='medium'>
+          Don't have an account?
+            <Link as={RouterLink} to="/auth/signup" color={titleColor} ms='5px' fontWeight='bold'>
+              Sign Up
+            </Link>
+        </Text>
             </Flex>
           </Flex>
         </Flex>
