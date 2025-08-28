@@ -1,6 +1,22 @@
-// src/views/Pages/SignIn.js
+/*!
+
+=========================================================
+* Vision UI Free Chakra - v1.0.0
+=========================================================
+
+* Product Page: https://www.creative-tim.com/product/vision-ui-free-chakra
+* Copyright 2021 Creative Tim (https://www.creative-tim.com/)
+* Licensed under MIT (https://github.com/creativetimofficial/vision-ui-free-chakra/blob/master LICENSE.md)
+
+* Design and Coded by Simmmple & Creative Tim
+
+=========================================================
+
+* The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+*/
+
 import React, { useState } from "react";
-import { useHistory } from "react-router-dom"; // Для редиректа
 import {
   Box, Flex, Button, FormControl, FormLabel, Heading, Input,
   Link, Switch, Text, DarkMode, useToast
@@ -8,6 +24,8 @@ import {
 import signInImage from "assets/img/signInImage.png";
 import AuthFooter from "components/Footer/AuthFooter";
 import GradientBorder from "components/GradientBorder/GradientBorder";
+
+// ИЗМЕНЕНИЕ: Объединили два импорта в один
 import { useHistory, Link as RouterLink } from "react-router-dom";
 
 function SignIn() {
@@ -55,8 +73,8 @@ function SignIn() {
           alignItems='center' justifyContent='start' style={{ userSelect: "none" }} mx={{ base: "auto", lg: "unset" }}
           ms={{ base: "auto", lg: "auto" }} w={{ base: "100%", md: "50%", lg: "450px" }} px='50px'>
           <Flex
-            as="form" // Превращаем Flex в форму
-            onSubmit={handleSubmit} // Добавляем обработчик
+            as="form" 
+            onSubmit={handleSubmit}
             direction='column' w='100%' background='transparent'
             mt={{ base: "50px", md: "150px", lg: "160px", xl: "245px" }}
             mb={{ base: "60px", lg: "95px" }}>
@@ -114,12 +132,12 @@ function SignIn() {
             <Flex
               flexDirection='column' justifyContent='center' alignItems='center'
               maxW='100%' mt='0px'>
-        <Text color={textColor} fontWeight='medium'>
-          Don't have an account?
-            <Link as={RouterLink} to="/auth/signup" color={titleColor} ms='5px' fontWeight='bold'>
-              Sign Up
-            </Link>
-        </Text>
+            <Text color={textColor} fontWeight='medium'>
+              Don't have an account?
+                <Link as={RouterLink} to="/auth/signup" color={titleColor} ms='5px' fontWeight='bold'>
+                  Sign Up
+                </Link>
+            </Text>
             </Flex>
           </Flex>
         </Flex>
