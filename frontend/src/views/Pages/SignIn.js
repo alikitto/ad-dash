@@ -8,6 +8,7 @@ import {
 import signInImage from "assets/img/signInImage.png";
 import AuthFooter from "components/Footer/AuthFooter";
 import GradientBorder from "components/GradientBorder/GradientBorder";
+import { useHistory, Link as RouterLink } from "react-router-dom";
 
 function SignIn() {
   const titleColor = "white";
