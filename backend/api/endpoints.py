@@ -127,7 +127,7 @@ async def test_facebook_api():
 
 @router.get("/adsets/{adset_id}/stats")
 async def get_adset_stats(adset_id: str):
-    """Get detailed statistics for a specific adset across different time periods"""
+    """Get detailed statistics for a specific adset with daily breakdown"""
     if not META_TOKEN:
         raise HTTPException(status_code=500, detail="Token not configured")
     
@@ -135,116 +135,84 @@ async def get_adset_stats(adset_id: str):
     
     try:
         import aiohttp
-        from services.facebook_service import get_ad_accounts, get_insights_for_adsets
         from utils.helpers import safe_float
         from core.config import LEAD_ACTION_TYPE
-        
-        # Define time periods to fetch
         from datetime import datetime, timedelta
         
         today = datetime.now()
-        yesterday = today - timedelta(days=1)
-        day_before_yesterday = today - timedelta(days=2)
-        
-        periods = [
-            {"value": "today", "label": "Сегодня", "date_preset": "today"},
-            {"value": "yesterday", "label": "Вчера", "date_preset": "yesterday"}, 
-            {"value": "day_before_yesterday", "label": f"Позавчера ({day_before_yesterday.strftime('%d.%m.%Y')})", "date_preset": "yesterday", "days_back": 2},
-            {"value": "all_time", "label": "За все время", "date_preset": "maximum"}
-        ]
         
         stats_data = []
         
         async with aiohttp.ClientSession() as session:
-            # Get insights for each period directly from adset
-            for period in periods:
-                try:
-                    # Handle special case for day before yesterday
-                    if period["value"] == "day_before_yesterday":
-                        # Get data for specific date 2 days ago
-                        start_date = (today - timedelta(days=2)).strftime("%Y-%m-%d")
-                        end_date = (today - timedelta(days=2)).strftime("%Y-%m-%d")
-                        url = f"https://graph.facebook.com/{API_VERSION}/{adset_id}/insights"
-                        params = {
-                            "access_token": META_TOKEN,
-                            "time_range": f'{{"since":"{start_date}","until":"{end_date}"}}',
-                            "fields": "spend,impressions,clicks,link_clicks,actions,cost_per_action_type,cpm,ctr,frequency"
-                        }
-                    else:
-                        url = f"https://graph.facebook.com/{API_VERSION}/{adset_id}/insights"
-                        params = {
-                            "access_token": META_TOKEN,
-                            "date_preset": period["date_preset"],
-                            "fields": "spend,impressions,clicks,link_clicks,actions,cost_per_action_type,cpm,ctr,frequency"
-                        }
+            # First, get daily breakdown for maximum period
+            url = f"https://graph.facebook.com/{API_VERSION}/{adset_id}/insights"
+            params = {
+                "access_token": META_TOKEN,
+                "date_preset": "maximum",
+                "time_increment": 1,  # Daily breakdown
+                "fields": "spend,impressions,clicks,link_clicks,actions,cost_per_action_type,cpm,ctr,frequency,date_start"
+            }
+            
+            async with session.get(url, params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    insights = data.get("data", [])
                     
-                    async with session.get(url, params=params) as response:
-                        if response.status == 200:
-                            data = await response.json()
-                            insights = data.get("data", [])
-                            
-                            if insights:
-                                insight = insights[0]  # Should be only one for this adset
-                                logging.info(f"Found insights for {period['value']}: {insight}")
-                                
-                                # Use the same logic as main dashboard
-                                spend = safe_float(insight.get("spend", 0))
-                                leads = sum(int(safe_float(a.get("value", 0))) for a in insight.get("actions", []) or [] if LEAD_ACTION_TYPE in a.get("action_type", ""))
-                                impressions = int(safe_float(insight.get("impressions", 0)))
-                                
-                                logging.info(f"Processed data for {period['value']}: spend={spend}, leads={leads}, impressions={impressions}")
-                                logging.info(f"Actions: {insight.get('actions', [])}")
-                                
-                                # Always add data if insights exist
-                                stats_data.append({
-                                    "period": period["value"],
-                                    "label": period["label"],
-                                    "leads": leads,
-                                    "cpl": (spend / leads) if leads > 0 else 0.0,
-                                    "cpm": safe_float(insight.get("cpm", 0)),
-                                    "ctr": safe_float(insight.get("ctr", 0)),
-                                    "frequency": safe_float(insight.get("frequency", 0)),
-                                    "spent": spend,
-                                    "impressions": impressions
-                                })
-                            else:
-                                # No insights for this period - add empty data
-                                stats_data.append({
-                                    "period": period["value"],
-                                    "label": period["label"],
-                                    "leads": 0,
-                                    "cpl": 0,
-                                    "cpm": 0,
-                                    "ctr": 0,
-                                    "frequency": 0,
-                                    "spent": 0,
-                                    "impressions": 0
-                                })
-                        else:
-                            # Response not 200 - add empty data
-                            stats_data.append({
-                                "period": period["value"],
-                                "label": period["label"],
-                                "leads": 0,
-                                "cpl": 0,
-                                "cpm": 0,
-                                "ctr": 0,
-                                "frequency": 0,
-                                "spent": 0,
-                                "impressions": 0
-                            })
+                    logging.info(f"Found {len(insights)} daily insights for adset {adset_id}")
+                    
+                    # Process each daily insight
+                    for insight in insights:
+                        date_str = insight.get("date_start", "")
                         
-                except Exception as e:
-                    logging.error(f"Error fetching stats for period {period['value']}: {e}")
-                    # If it's a 403 error, the adset might not be accessible
-                    if "403" in str(e) or "Forbidden" in str(e):
-                        logging.error(f"Access denied for adset {adset_id} in account {target_account_id}")
-                    # Don't add empty data - let frontend handle missing periods
+                        # Parse date
+                        try:
+                            insight_date = datetime.strptime(date_str, "%Y-%m-%d")
+                        except:
+                            continue
+                        
+                        # Calculate spend and leads
+                        spend = safe_float(insight.get("spend", 0))
+                        leads = sum(int(safe_float(a.get("value", 0))) for a in insight.get("actions", []) or [] if LEAD_ACTION_TYPE in a.get("action_type", ""))
+                        impressions = int(safe_float(insight.get("impressions", 0)))
+                        
+                        # Skip if no activity
+                        if spend == 0 and leads == 0 and impressions == 0:
+                            continue
+                        
+                        # Determine label
+                        days_diff = (today.date() - insight_date.date()).days
+                        
+                        if days_diff == 0:
+                            label = f"Сегодня ({today.strftime('%d.%m.%Y')})"
+                        elif days_diff == 1:
+                            label = f"Вчера ({(today - timedelta(days=1)).strftime('%d.%m.%Y')})"
+                        else:
+                            label = insight_date.strftime("%d.%m.%Y")
+                        
+                        stats_data.append({
+                            "date": date_str,
+                            "label": label,
+                            "leads": leads,
+                            "cpl": (spend / leads) if leads > 0 else 0.0,
+                            "cpm": safe_float(insight.get("cpm", 0)),
+                            "ctr": safe_float(insight.get("ctr", 0)),
+                            "frequency": safe_float(insight.get("frequency", 0)),
+                            "spent": spend,
+                            "impressions": impressions
+                        })
+                    
+                    # Sort by date descending (most recent first)
+                    stats_data.sort(key=lambda x: x["date"], reverse=True)
+                    
+                    logging.info(f"Returning {len(stats_data)} stats records")
+                else:
+                    error_text = await response.text()
+                    logging.error(f"Error response from Facebook API: {response.status} - {error_text}")
         
         return stats_data
         
     except Exception as e:
-        logging.error(f"Error fetching adset stats: {e}")
+        logging.error(f"Error fetching adset stats: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to fetch adset stats: {str(e)}")
 
 @router.post("/analyze-adsets")

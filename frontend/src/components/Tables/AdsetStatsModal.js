@@ -21,26 +21,16 @@ import {
   Flex,
   Icon,
   Button,
-  Select,
 } from "@chakra-ui/react";
-import { FaChartLine, FaCalendarAlt } from "react-icons/fa";
+import { FaChartLine } from "react-icons/fa";
 
 const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
   const [statsData, setStatsData] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [selectedPeriod, setSelectedPeriod] = useState("last_7d");
   
   const bgColor = useColorModeValue("white", "gray.800");
   const textColor = useColorModeValue("gray.800", "white");
   const borderColor = useColorModeValue("gray.200", "gray.600");
-
-  const periodOptions = [
-    { value: "today", label: "Сегодня" },
-    { value: "yesterday", label: "Вчера" },
-    { value: "last_3d", label: "Позавчера" },
-    { value: "last_7d", label: "Неделя" },
-    { value: "last_30d", label: "Все время" },
-  ];
 
   useEffect(() => {
     if (isOpen && adset) {
@@ -48,7 +38,7 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
       console.log("Adset ID:", adset.adset_id);
       fetchAdsetStats();
     }
-  }, [isOpen, adset, selectedPeriod]);
+  }, [isOpen, adset]);
 
   const fetchAdsetStats = async () => {
     if (!adset?.adset_id) {
@@ -59,7 +49,7 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
     console.log("Fetching stats for adset_id:", adset.adset_id);
     setLoading(true);
     try {
-      const url = `https://ad-dash-backend-production.up.railway.app/api/adsets/${adset.adset_id}/stats?date_preset=${selectedPeriod}`;
+      const url = `https://ad-dash-backend-production.up.railway.app/api/adsets/${adset.adset_id}/stats`;
       console.log("Request URL:", url);
       
       const response = await fetch(url);
@@ -94,11 +84,6 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
     return `${value.toFixed(2)}%`;
   };
 
-  const getPeriodLabel = (value) => {
-    const option = periodOptions.find(opt => opt.value === value);
-    return option ? option.label : value;
-  };
-
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="xl" isCentered>
       <ModalOverlay />
@@ -115,67 +100,51 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
         <ModalCloseButton />
         
         <ModalBody pb={6}>
-          <Box mb={4}>
-            <Flex align="center" gap={3} mb={3}>
-              <Icon as={FaCalendarAlt} color="gray.500" />
-              <Text fontSize="sm" color="gray.600">
-                Период:
-              </Text>
-              <Select
-                value={selectedPeriod}
-                onChange={(e) => setSelectedPeriod(e.target.value)}
-                size="sm"
-                width="150px"
-              >
-                {periodOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </Select>
-            </Flex>
-          </Box>
 
           {loading ? (
             <Flex justify="center" align="center" py={8}>
               <Spinner size="lg" color="purple.500" />
               <Text ml={3}>Загрузка данных...</Text>
             </Flex>
-          ) : statsData ? (
+          ) : statsData && statsData.length > 0 ? (
             <TableContainer>
               <Table variant="simple" size="sm">
                 <Thead>
                   <Tr>
-                    <Th borderColor={borderColor} color={textColor}>Период</Th>
+                    <Th borderColor={borderColor} color={textColor}>Дата</Th>
                     <Th borderColor={borderColor} color={textColor} isNumeric>Leads</Th>
                     <Th borderColor={borderColor} color={textColor} isNumeric>CPL</Th>
                     <Th borderColor={borderColor} color={textColor} isNumeric>CPM</Th>
                     <Th borderColor={borderColor} color={textColor} isNumeric>CTR</Th>
+                    <Th borderColor={borderColor} color={textColor} isNumeric>Частота</Th>
                     <Th borderColor={borderColor} color={textColor} isNumeric>Spent</Th>
                   </Tr>
                 </Thead>
                 <Tbody>
-                  {statsData.map((period, index) => (
+                  {statsData.map((dayData, index) => (
                     <Tr key={index}>
                       <Td borderColor={borderColor} color={textColor}>
                         <Text fontWeight="medium">
-                          {getPeriodLabel(period.period)}
+                          {dayData.label}
                         </Text>
                       </Td>
                       <Td borderColor={borderColor} color={textColor} isNumeric>
-                        {formatNumber(period.leads)}
+                        {formatNumber(dayData.leads)}
                       </Td>
                       <Td borderColor={borderColor} color={textColor} isNumeric>
-                        {formatMoney(period.cpl)}
+                        {formatMoney(dayData.cpl)}
                       </Td>
                       <Td borderColor={borderColor} color={textColor} isNumeric>
-                        {formatMoney(period.cpm)}
+                        {formatMoney(dayData.cpm)}
                       </Td>
                       <Td borderColor={borderColor} color={textColor} isNumeric>
-                        {formatPercentage(period.ctr)}
+                        {formatPercentage(dayData.ctr)}
                       </Td>
                       <Td borderColor={borderColor} color={textColor} isNumeric>
-                        {formatMoney(period.spent)}
+                        {dayData.frequency ? dayData.frequency.toFixed(3) : "0.000"}
+                      </Td>
+                      <Td borderColor={borderColor} color={textColor} isNumeric>
+                        {formatMoney(dayData.spent)}
                       </Td>
                     </Tr>
                   ))}
@@ -185,7 +154,7 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
           ) : (
             <Box textAlign="center" py={8}>
               <Text color="gray.500">
-                Не удалось загрузить данные статистики
+                {statsData === null ? "Не удалось загрузить данные статистики" : "Нет данных для отображения"}
               </Text>
               <Button
                 mt={3}
