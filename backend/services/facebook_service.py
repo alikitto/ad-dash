@@ -13,7 +13,20 @@ async def fb_request(session: aiohttp.ClientSession, method: str, url: str, para
     """A generic helper for making requests to the Facebook Graph API."""
     if params is None: params = {}
     params["access_token"] = META_TOKEN
+    
+    if not META_TOKEN:
+        raise Exception("Meta access token is not configured")
+    
     async with session.request(method, url, params=params, json=data) as response:
+        if response.status == 400:
+            error_data = await response.json()
+            if "error" in error_data:
+                error_msg = error_data["error"].get("message", "Unknown Facebook API error")
+                if "expired" in error_msg.lower() or "invalid" in error_msg.lower():
+                    raise Exception(f"Facebook API token expired or invalid: {error_msg}")
+                else:
+                    raise Exception(f"Facebook API error: {error_msg}")
+        
         response.raise_for_status()
         return await response.json()
 

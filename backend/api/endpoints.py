@@ -22,7 +22,131 @@ async def get_all_adsets_data(
         return await facebook_service.fetch_and_process_all_adsets(date_preset, start_date, end_date)
     except Exception as e:
         logging.error(f"!!! API ERROR: {e} !!!", exc_info=True)
+        # Return empty list instead of raising error to prevent frontend crashes
+        if "expired" in str(e).lower() or "invalid" in str(e).lower():
+            return []
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/token-status")
+async def check_token_status():
+    """Check if Meta API token is valid"""
+    if not META_TOKEN:
+        return {"status": "error", "message": "Token not configured"}
+    
+    try:
+        import aiohttp
+        async with aiohttp.ClientSession() as session:
+            url = f"https://graph.facebook.com/{API_VERSION}/me"
+            params = {"access_token": META_TOKEN}
+            async with session.get(url, params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    return {"status": "valid", "user_id": data.get("id"), "name": data.get("name")}
+                else:
+                    error_data = await response.json()
+                    return {"status": "invalid", "error": error_data.get("error", {}).get("message", "Unknown error")}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@router.get("/adsets/{adset_id}/stats")
+async def get_adset_stats(adset_id: str, date_preset: str = Query("last_7d")):
+    """Get detailed statistics for a specific adset across different time periods"""
+    if not META_TOKEN:
+        raise HTTPException(status_code=500, detail="Token not configured")
+    
+    try:
+        import aiohttp
+        
+        # Define time periods to fetch
+        periods = [
+            {"value": "today", "label": "Сегодня"},
+            {"value": "yesterday", "label": "Вчера"}, 
+            {"value": "last_3d", "label": "Позавчера"},
+            {"value": "last_7d", "label": "Неделя"},
+            {"value": "last_30d", "label": "Все время"}
+        ]
+        
+        stats_data = []
+        
+        async with aiohttp.ClientSession() as session:
+            for period in periods:
+                try:
+                    # Get insights for the adset
+                    url = f"https://graph.facebook.com/{API_VERSION}/{adset_id}/insights"
+                    params = {
+                        "access_token": META_TOKEN,
+                        "date_preset": period["value"],
+                        "fields": "spend,impressions,clicks,link_clicks,actions,cost_per_action_type,cpm,ctr"
+                    }
+                    
+                    async with session.get(url, params=params) as response:
+                        if response.status == 200:
+                            data = await response.json()
+                            insights = data.get("data", [])
+                            
+                            if insights:
+                                insight = insights[0]
+                                
+                                # Extract leads from actions
+                                leads = 0
+                                cpl = 0
+                                actions = insight.get("actions", [])
+                                for action in actions:
+                                    if action.get("action_type") == "lead":
+                                        leads = int(action.get("value", 0))
+                                        break
+                                
+                                # Calculate CPL
+                                spend = float(insight.get("spend", 0))
+                                if leads > 0:
+                                    cpl = spend / leads
+                                
+                                stats_data.append({
+                                    "period": period["value"],
+                                    "leads": leads,
+                                    "cpl": cpl,
+                                    "cpm": float(insight.get("cpm", 0)),
+                                    "ctr": float(insight.get("ctr", 0)),
+                                    "spent": spend
+                                })
+                            else:
+                                # No data for this period
+                                stats_data.append({
+                                    "period": period["value"],
+                                    "leads": 0,
+                                    "cpl": 0,
+                                    "cpm": 0,
+                                    "ctr": 0,
+                                    "spent": 0
+                                })
+                        else:
+                            # Error for this period, add empty data
+                            stats_data.append({
+                                "period": period["value"],
+                                "leads": 0,
+                                "cpl": 0,
+                                "cpm": 0,
+                                "ctr": 0,
+                                "spent": 0
+                            })
+                            
+                except Exception as e:
+                    logging.error(f"Error fetching stats for period {period['value']}: {e}")
+                    # Add empty data for failed period
+                    stats_data.append({
+                        "period": period["value"],
+                        "leads": 0,
+                        "cpl": 0,
+                        "cpm": 0,
+                        "ctr": 0,
+                        "spent": 0
+                    })
+        
+        return stats_data
+        
+    except Exception as e:
+        logging.error(f"Error fetching adset stats: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch adset stats: {str(e)}")
 
 @router.post("/analyze-adsets")
 async def analyze_adsets_endpoint(adsets: List[dict] = Body(...)):
