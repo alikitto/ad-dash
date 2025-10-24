@@ -147,3 +147,15 @@ def init_database_endpoint(db = Depends(get_db)):
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Database initialization failed: {str(e)}")
+
+@router.get("/debug-env")
+def debug_environment():
+    """Debug environment variables"""
+    import os
+    return {
+        "DATABASE_URL": os.getenv("DATABASE_URL"),
+        "DATABASE_PUBLIC_URL": os.getenv("DATABASE_PUBLIC_URL"),
+        "RAILWAY_DATABASE_URL": os.getenv("RAILWAY_DATABASE_URL"),
+        "POSTGRES_URL": os.getenv("POSTGRES_URL"),
+        "all_env_keys": [key for key in os.environ.keys() if "DATABASE" in key or "POSTGRES" in key]
+    }
