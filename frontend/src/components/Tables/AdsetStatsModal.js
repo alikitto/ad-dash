@@ -890,14 +890,24 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
                         {timeInsights.best_hours && timeInsights.best_hours.length > 0 ? (
                           <Box>
                             {timeInsights.best_hours.slice(0, 3).map((hour, index) => (
-                              <Flex key={index} justify="space-between" align="center" py={1}>
-                                <Text fontSize="sm">
-                                  {hour.hour}:00 - {hour.hour + 1}:00
-                                </Text>
-                                <Text fontSize="sm" fontWeight="bold" color="green.600">
-                                  {formatNumber(hour.total_leads)} leads
-                                </Text>
-                              </Flex>
+                              <Box key={index} py={2} borderBottom={index < 2 ? "1px solid" : "none"} borderColor="green.200">
+                                <Flex justify="space-between" align="center" mb={1}>
+                                  <Text fontSize="sm" fontWeight="semibold">
+                                    {hour.hour}:00 - {hour.hour + 1}:00
+                                  </Text>
+                                  <Text fontSize="sm" fontWeight="bold" color="green.600">
+                                    {formatNumber(hour.total_leads)} leads
+                                  </Text>
+                                </Flex>
+                                <Flex justify="space-between" align="center">
+                                  <Text fontSize="xs" color="gray.600">
+                                    {formatMoney(hour.total_spend)} потрачено
+                                  </Text>
+                                  <Text fontSize="xs" color="gray.600">
+                                    {formatNumber(hour.total_impressions)} показов
+                                  </Text>
+                                </Flex>
+                              </Box>
                             ))}
                           </Box>
                         ) : (
@@ -912,14 +922,24 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
                         {timeInsights.worst_hours && timeInsights.worst_hours.length > 0 ? (
                           <Box>
                             {timeInsights.worst_hours.slice(0, 3).map((hour, index) => (
-                              <Flex key={index} justify="space-between" align="center" py={1}>
-                                <Text fontSize="sm">
-                                  {hour.hour}:00 - {hour.hour + 1}:00
-                                </Text>
-                                <Text fontSize="sm" fontWeight="bold" color="red.600">
-                                  {formatNumber(hour.total_leads)} leads
-                                </Text>
-                              </Flex>
+                              <Box key={index} py={2} borderBottom={index < 2 ? "1px solid" : "none"} borderColor="red.200">
+                                <Flex justify="space-between" align="center" mb={1}>
+                                  <Text fontSize="sm" fontWeight="semibold">
+                                    {hour.hour}:00 - {hour.hour + 1}:00
+                                  </Text>
+                                  <Text fontSize="sm" fontWeight="bold" color="red.600">
+                                    {formatNumber(hour.total_leads)} leads
+                                  </Text>
+                                </Flex>
+                                <Flex justify="space-between" align="center">
+                                  <Text fontSize="xs" color="gray.600">
+                                    {formatMoney(hour.total_spend)} потрачено
+                                  </Text>
+                                  <Text fontSize="xs" color="gray.600">
+                                    {formatNumber(hour.total_impressions)} показов
+                                  </Text>
+                                </Flex>
+                              </Box>
                             ))}
                           </Box>
                         ) : (
@@ -944,9 +964,17 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
                         )}
                       </Flex>
                       <Box p={4} bg={useColorModeValue("gray.50", "gray.700")} borderRadius="md">
-                        <Flex wrap="wrap" gap={2}>
-                          {timeInsights.hourly_averages && Object.keys(timeInsights.hourly_averages).length > 0 ? (
-                            Object.values(timeInsights.hourly_averages)
+                        {timeInsights.hourly_averages && Object.keys(timeInsights.hourly_averages).length > 0 ? (
+                          <Box
+                            display="grid"
+                            gridTemplateColumns={{
+                              base: "repeat(4, 1fr)", // 4 columns on mobile
+                              md: "repeat(6, 1fr)",    // 6 columns on tablet
+                              lg: "repeat(12, 1fr)"    // 12 columns on desktop
+                            }}
+                            gap={2}
+                          >
+                            {Object.values(timeInsights.hourly_averages)
                               .sort((a, b) => a.hour - b.hour)
                               .map((hour) => {
                                 const maxLeads = Math.max(...Object.values(timeInsights.hourly_averages).map(h => h.total_leads));
@@ -959,13 +987,16 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
                                     p={2}
                                     bg={bgColor}
                                     borderRadius="md"
-                                    minW="60px"
                                     textAlign="center"
+                                    minH="80px"
+                                    display="flex"
+                                    flexDirection="column"
+                                    justifyContent="center"
                                   >
-                                    <Text fontSize="xs" fontWeight="bold">
+                                    <Text fontSize="xs" fontWeight="bold" mb={1}>
                                       {hour.hour}:00
                                     </Text>
-                                    <Text fontSize="xs">
+                                    <Text fontSize="xs" fontWeight="semibold" mb={1}>
                                       {formatNumber(hour.total_leads)}
                                     </Text>
                                     <Text fontSize="xs" color="gray.600">
@@ -973,11 +1004,11 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
                                     </Text>
                                   </Box>
                                 );
-                              })
-                          ) : (
-                            <Text fontSize="sm" color="gray.500">Нет данных по часам</Text>
-                          )}
-                        </Flex>
+                              })}
+                          </Box>
+                        ) : (
+                          <Text fontSize="sm" color="gray.500">Нет данных по часам</Text>
+                        )}
                       </Box>
                     </Box>
                   </Box>
