@@ -211,6 +211,105 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
     return statsData[currentIndex + 1][field];
   };
 
+  // AI Recommendations based on data analysis
+  const generateAIRecommendations = () => {
+    if (!statsData || statsData.length === 0) return [];
+    
+    const recommendations = [];
+    const totals = calculateTotals();
+    const avgCpl = totals.cpl;
+    const avgLeads = totals.leads / statsData.length;
+    const avgSpend = totals.spent / statsData.length;
+    
+    // CPL Analysis
+    if (avgCpl > 5) {
+      recommendations.push({
+        type: "warning",
+        icon: "⚠️",
+        title: "Высокий CPL",
+        description: `Средний CPL составляет $${avgCpl.toFixed(2)}. Рекомендуется оптимизировать таргетинг или креативы.`,
+        action: "Оптимизировать таргетинг"
+      });
+    } else if (avgCpl < 1) {
+      recommendations.push({
+        type: "success",
+        icon: "✅",
+        title: "Отличный CPL",
+        description: `Средний CPL $${avgCpl.toFixed(2)} - отличный результат!`,
+        action: "Увеличить бюджет"
+      });
+    }
+    
+    // Leads Analysis
+    if (avgLeads < 2) {
+      recommendations.push({
+        type: "warning",
+        icon: "📉",
+        title: "Низкое количество лидов",
+        description: `Среднее количество лидов в день: ${avgLeads.toFixed(1)}. Рекомендуется расширить аудиторию.`,
+        action: "Расширить аудиторию"
+      });
+    } else if (avgLeads > 10) {
+      recommendations.push({
+        type: "success",
+        icon: "🚀",
+        title: "Высокая конверсия",
+        description: `Отличное количество лидов: ${avgLeads.toFixed(1)} в день!`,
+        action: "Масштабировать кампанию"
+      });
+    }
+    
+    // Trend Analysis
+    if (statsData.length >= 2) {
+      const recentLeads = statsData[0].leads;
+      const previousLeads = statsData[1].leads;
+      const trend = ((recentLeads - previousLeads) / previousLeads) * 100;
+      
+      if (trend < -20) {
+        recommendations.push({
+          type: "error",
+          icon: "🔴",
+          title: "Падение лидов",
+          description: `Количество лидов упало на ${Math.abs(trend).toFixed(1)}% за последний день.`,
+          action: "Проверить настройки"
+        });
+      } else if (trend > 50) {
+        recommendations.push({
+          type: "success",
+          icon: "📈",
+          title: "Рост лидов",
+          description: `Количество лидов выросло на ${trend.toFixed(1)}%!`,
+          action: "Увеличить бюджет"
+        });
+      }
+    }
+    
+    // Budget Analysis
+    if (avgSpend < 5) {
+      recommendations.push({
+        type: "info",
+        icon: "💰",
+        title: "Низкий бюджет",
+        description: `Средний дневной бюджет: $${avgSpend.toFixed(2)}. Рекомендуется увеличить для лучших результатов.`,
+        action: "Увеличить бюджет"
+      });
+    }
+    
+    // Time Efficiency Analysis
+    if (timeInsights && timeInsights.best_hours && timeInsights.best_hours.length > 0) {
+      const bestHour = timeInsights.best_hours[0];
+      recommendations.push({
+        type: "info",
+        icon: "⏰",
+        title: "Оптимальное время",
+        description: `Лучший час для показа: ${bestHour.hour}:00-${bestHour.hour + 1}:00 (${bestHour.total_leads} лидов).`,
+        action: "Сфокусировать показы"
+      });
+    }
+    
+    return recommendations.slice(0, 4); // Limit to 4 recommendations
+  };
+
   // Функции для сортировки
   const handleSort = (key) => {
     let direction = 'asc';
@@ -288,6 +387,71 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
         <ModalCloseButton />
         
         <ModalBody pb={6}>
+          {/* AI Recommendations */}
+          {statsData && statsData.length > 0 && (
+            <Box mb={6}>
+              <Text fontSize="lg" fontWeight="bold" mb={3} color={textColor}>
+                🤖 AI-рекомендации
+              </Text>
+              
+              <Flex wrap="wrap" gap={3}>
+                {generateAIRecommendations().map((rec, index) => (
+                  <Box
+                    key={index}
+                    p={4}
+                    bg={useColorModeValue(
+                      rec.type === "error" ? "red.50" : 
+                      rec.type === "warning" ? "yellow.50" : 
+                      rec.type === "success" ? "green.50" : "blue.50",
+                      rec.type === "error" ? "red.900" : 
+                      rec.type === "warning" ? "yellow.900" : 
+                      rec.type === "success" ? "green.900" : "blue.900"
+                    )}
+                    borderRadius="md"
+                    borderLeft="4px solid"
+                    borderLeftColor={
+                      rec.type === "error" ? "red.500" : 
+                      rec.type === "warning" ? "yellow.500" : 
+                      rec.type === "success" ? "green.500" : "blue.500"
+                    }
+                    flex="1"
+                    minW="300px"
+                  >
+                    <Flex align="start" gap={3}>
+                      <Text fontSize="lg">{rec.icon}</Text>
+                      <Box flex={1}>
+                        <Text fontSize="sm" fontWeight="bold" color={
+                          rec.type === "error" ? "red.600" : 
+                          rec.type === "warning" ? "yellow.600" : 
+                          rec.type === "success" ? "green.600" : "blue.600"
+                        }>
+                          {rec.title}
+                        </Text>
+                        <Text fontSize="xs" color="gray.600" mt={1} mb={2}>
+                          {rec.description}
+                        </Text>
+                        <Button
+                          size="xs"
+                          colorScheme={
+                            rec.type === "error" ? "red" : 
+                            rec.type === "warning" ? "yellow" : 
+                            rec.type === "success" ? "green" : "blue"
+                          }
+                          variant="outline"
+                          onClick={() => {
+                            // TODO: Implement action
+                            console.log("Action:", rec.action);
+                          }}
+                        >
+                          {rec.action}
+                        </Button>
+                      </Box>
+                    </Flex>
+                  </Box>
+                ))}
+              </Flex>
+            </Box>
+          )}
 
           {loading ? (
             <Flex justify="center" align="center" py={8}>
