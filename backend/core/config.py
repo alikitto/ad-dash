@@ -32,7 +32,15 @@ CLIENT_AVATARS = {
     "act_284902192299330": "https://video.karal.az/avatars/ahadnazim.jpg"
 }
 
-DATABASE_URL = os.getenv("DATABASE_URL") or os.getenv("DATABASE_PUBLIC_URL") # Railway uses DATABASE_PUBLIC_URL
+# Try multiple possible database URL variables for Railway
+DATABASE_URL = (
+    os.getenv("DATABASE_URL") or 
+    os.getenv("DATABASE_PUBLIC_URL") or 
+    os.getenv("RAILWAY_DATABASE_URL") or 
+    os.getenv("POSTGRES_URL") or 
+    os.getenv("POSTGRES_PRIVATE_URL") or
+    "sqlite:///./ad_dash.db"  # fallback to SQLite
+)
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "K6787326###1gHjTrA") # Замени на сложный ключ
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_MINUTES = 60 * 24 # 24 часа
