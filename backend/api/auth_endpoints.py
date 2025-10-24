@@ -170,3 +170,13 @@ def test_database(db = Depends(get_db)):
         return {"status": "success", "test_value": test_value, "database_url": database_url}
     except Exception as e:
         return {"status": "error", "error": str(e), "database_url": database_url}
+
+@router.get("/test-signup")
+def test_signup_simple():
+    """Test signup without database"""
+    return {"message": "Signup endpoint is working", "test": "ok"}
+
+@router.post("/test-signup-post")
+def test_signup_post(user: UserCreate):
+    """Test signup POST without database"""
+    return {"message": "Signup POST is working", "user": user.name, "email": user.email}
