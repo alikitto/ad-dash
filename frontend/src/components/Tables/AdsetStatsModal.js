@@ -215,11 +215,14 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
   const generateAIRecommendations = () => {
     if (!statsData || statsData.length === 0) return [];
     
-    const recommendations = [];
-    const totals = calculateTotals();
-    const avgCpl = totals.cpl;
-    const avgLeads = totals.leads / statsData.length;
-    const avgSpend = totals.spent / statsData.length;
+    try {
+      const recommendations = [];
+      const totals = calculateTotals();
+      if (!totals) return [];
+      
+      const avgCpl = totals.cpl || 0;
+      const avgLeads = statsData.length > 0 ? totals.leads / statsData.length : 0;
+      const avgSpend = statsData.length > 0 ? totals.spent / statsData.length : 0;
     
     // CPL Analysis
     if (avgCpl > 5) {
@@ -261,9 +264,9 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
     
     // Trend Analysis
     if (statsData.length >= 2) {
-      const recentLeads = statsData[0].leads;
-      const previousLeads = statsData[1].leads;
-      const trend = ((recentLeads - previousLeads) / previousLeads) * 100;
+      const recentLeads = statsData[0].leads || 0;
+      const previousLeads = statsData[1].leads || 0;
+      const trend = previousLeads > 0 ? ((recentLeads - previousLeads) / previousLeads) * 100 : 0;
       
       if (trend < -20) {
         recommendations.push({
@@ -307,7 +310,11 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
       });
     }
     
-    return recommendations.slice(0, 4); // Limit to 4 recommendations
+      return recommendations.slice(0, 4); // Limit to 4 recommendations
+    } catch (error) {
+      console.error("Error generating AI recommendations:", error);
+      return [];
+    }
   };
 
   // Функции для сортировки
@@ -776,13 +783,13 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
                             
                             {/* Data points and lines */}
                             {(() => {
-                              const maxLeads = Math.max(...statsData.map(d => d.leads));
-                              const minLeads = Math.min(...statsData.map(d => d.leads));
+                              const maxLeads = Math.max(...statsData.map(d => d.leads || 0));
+                              const minLeads = Math.min(...statsData.map(d => d.leads || 0));
                               const range = maxLeads - minLeads || 1;
                               
                               return statsData.map((day, index) => {
-                                const x = (index / (statsData.length - 1)) * 100;
-                                const y = ((maxLeads - day.leads) / range) * 100;
+                                const x = statsData.length > 1 ? (index / (statsData.length - 1)) * 100 : 50;
+                                const y = ((maxLeads - (day.leads || 0)) / range) * 100;
                                 
                                 return (
                                   <Box key={index}>
@@ -825,11 +832,11 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
                                     </Text>
                                     
                                     {/* Connecting line - simplified */}
-                                    {index > 0 && (
+                                    {index > 0 && statsData.length > 1 && (
                                       <Box
                                         position="absolute"
                                         left={`${((index - 1) / (statsData.length - 1)) * 100}%`}
-                                        top={`${((maxLeads - statsData[index - 1].leads) / range) * 100}%`}
+                                        top={`${((maxLeads - (statsData[index - 1].leads || 0)) / range) * 100}%`}
                                         w={`${100 / (statsData.length - 1)}%`}
                                         h="2px"
                                         bg="purple.300"
