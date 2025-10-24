@@ -192,20 +192,31 @@ async def get_adset_stats(adset_id: str):
                         leads = sum(int(safe_float(a.get("value", 0))) for a in insight.get("actions", []) or [] if LEAD_ACTION_TYPE in a.get("action_type", ""))
                         impressions = int(safe_float(insight.get("impressions", 0)))
                         
-                        # Only add data if there's actual activity
-                        if spend > 0 or leads > 0 or impressions > 0:
-                            stats_data.append({
-                                "period": period["value"],
-                                "label": period["label"],
-                                "leads": leads,
-                                "cpl": (spend / leads) if leads > 0 else 0.0,
-                                "cpm": safe_float(insight.get("cpm", 0)),
-                                "ctr": safe_float(insight.get("ctr", 0)),
-                                "frequency": safe_float(insight.get("frequency", 0)),
-                                "spent": spend,
-                                "impressions": impressions
-                            })
-                    # Don't add empty data - let frontend filter it out
+                        # Always add data if insights exist
+                        stats_data.append({
+                            "period": period["value"],
+                            "label": period["label"],
+                            "leads": leads,
+                            "cpl": (spend / leads) if leads > 0 else 0.0,
+                            "cpm": safe_float(insight.get("cpm", 0)),
+                            "ctr": safe_float(insight.get("ctr", 0)),
+                            "frequency": safe_float(insight.get("frequency", 0)),
+                            "spent": spend,
+                            "impressions": impressions
+                        })
+                    else:
+                        # No insights for this period - add empty data
+                        stats_data.append({
+                            "period": period["value"],
+                            "label": period["label"],
+                            "leads": 0,
+                            "cpl": 0,
+                            "cpm": 0,
+                            "ctr": 0,
+                            "frequency": 0,
+                            "spent": 0,
+                            "impressions": 0
+                        })
                         
                 except Exception as e:
                     logging.error(f"Error fetching stats for period {period['value']}: {e}")
