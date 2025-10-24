@@ -321,6 +321,11 @@ async def get_adset_time_insights(adset_id: str):
                         stats = hourly_stats[hour]
                         if stats["days_count"] > 0:
                             cpl = (stats["total_spend"] / stats["total_leads"]) if stats["total_leads"] > 0 else 0
+                            
+                            # Log CPL calculation for debugging
+                            if hour in [9, 12, 15, 18, 21]:  # Log sample hours
+                                logging.info(f"Hour {hour}: spend={stats['total_spend']:.2f}, leads={stats['total_leads']:.1f}, cpl={cpl:.2f}")
+                            
                             hourly_averages[str(hour)] = {
                                 "hour": hour,
                                 "avg_spend": round(stats["total_spend"] / stats["days_count"], 2),
@@ -370,16 +375,33 @@ def get_fallback_time_insights():
         else:  # Night/early morning
             leads = random.randint(0, 4)
         
-        if leads > 0:  # Only include hours with activity
-            fallback_data[str(hour)] = {
-                "hour": hour,
-                "avg_spend": leads * random.uniform(1.5, 3.0),
-                "avg_leads": leads,
-                "avg_impressions": leads * random.randint(50, 200),
-                "total_spend": leads * random.uniform(2.0, 4.0),
-                "total_leads": leads,
-                "total_impressions": leads * random.randint(200, 600)
-            }
+        # Always include all hours, even with zero activity
+        # Vary CPL based on hour - business hours typically have lower CPL
+        if leads > 0:
+            if 9 <= hour <= 17:  # Business hours - lower CPL
+                base_cpl = random.uniform(1.5, 3.0)
+            elif 19 <= hour <= 22:  # Evening - medium CPL
+                base_cpl = random.uniform(2.0, 4.0)
+            else:  # Night/early morning - higher CPL
+                base_cpl = random.uniform(3.0, 6.0)
+            
+            total_spend = leads * base_cpl
+            cpl = base_cpl
+        else:
+            total_spend = 0
+            cpl = 0
+        
+        fallback_data[str(hour)] = {
+            "hour": hour,
+            "avg_spend": round(total_spend / 7, 2),  # Average per day
+            "avg_leads": round(leads / 7, 1),
+            "avg_impressions": round(leads * random.randint(50, 200) / 7, 0),
+            "total_spend": round(total_spend, 2),
+            "total_leads": leads,
+            "total_impressions": leads * random.randint(200, 600),
+            "total_clicks": leads * random.randint(10, 50),
+            "cpl": round(cpl, 2)
+        }
     
     best_hours = sorted(fallback_data.values(), key=lambda x: x["total_leads"], reverse=True)[:5]
     worst_hours = sorted(fallback_data.values(), key=lambda x: x["total_leads"])[:3]
