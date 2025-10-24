@@ -930,9 +930,19 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
                     
                     {/* Hourly Performance Chart */}
                     <Box>
-                      <Text fontSize="md" fontWeight="bold" mb={3} color={textColor}>
-                        Производительность по часам (последние 7 дней)
-                      </Text>
+                      <Flex justify="space-between" align="center" mb={3}>
+                        <Text fontSize="md" fontWeight="bold" color={textColor}>
+                          Производительность по часам (за все время)
+                        </Text>
+                        {timeInsights.total_days > 0 && (
+                          <Text fontSize="sm" color="gray.500">
+                            Проанализировано {timeInsights.total_days} дней
+                            {timeInsights.date_range?.start && timeInsights.date_range?.end && (
+                              <span> ({timeInsights.date_range.start} - {timeInsights.date_range.end})</span>
+                            )}
+                          </Text>
+                        )}
+                      </Flex>
                       <Box p={4} bg={useColorModeValue("gray.50", "gray.700")} borderRadius="md">
                         <Flex wrap="wrap" gap={2}>
                           {timeInsights.hourly_averages && Object.keys(timeInsights.hourly_averages).length > 0 ? (
