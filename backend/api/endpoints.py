@@ -202,43 +202,26 @@ async def get_adset_stats(adset_id: str):
                         # Use the same logic as main dashboard
                         spend = safe_float(insight.get("spend", 0))
                         leads = sum(int(safe_float(a.get("value", 0))) for a in insight.get("actions", []) or [] if LEAD_ACTION_TYPE in a.get("action_type", ""))
+                        impressions = int(safe_float(insight.get("impressions", 0)))
                         
-                        stats_data.append({
-                            "period": period["value"],
-                            "label": period["label"],
-                            "leads": leads,
-                            "cpl": (spend / leads) if leads > 0 else 0.0,
-                            "cpm": safe_float(insight.get("cpm", 0)),
-                            "ctr": safe_float(insight.get("ctr", 0)),
-                            "frequency": safe_float(insight.get("frequency", 0)),
-                            "spent": spend
-                        })
-                    else:
-                        # No data for this period
-                        stats_data.append({
-                            "period": period["value"],
-                            "label": period["label"],
-                            "leads": 0,
-                            "cpl": 0,
-                            "cpm": 0,
-                            "ctr": 0,
-                            "frequency": 0,
-                            "spent": 0
-                        })
+                        # Only add data if there's actual activity
+                        if spend > 0 or leads > 0 or impressions > 0:
+                            stats_data.append({
+                                "period": period["value"],
+                                "label": period["label"],
+                                "leads": leads,
+                                "cpl": (spend / leads) if leads > 0 else 0.0,
+                                "cpm": safe_float(insight.get("cpm", 0)),
+                                "ctr": safe_float(insight.get("ctr", 0)),
+                                "frequency": safe_float(insight.get("frequency", 0)),
+                                "spent": spend,
+                                "impressions": impressions
+                            })
+                    # Don't add empty data - let frontend filter it out
                         
                 except Exception as e:
                     logging.error(f"Error fetching stats for period {period['value']}: {e}")
-                    # Add empty data for failed period
-                    stats_data.append({
-                        "period": period["value"],
-                        "label": period["label"],
-                        "leads": 0,
-                        "cpl": 0,
-                        "cpm": 0,
-                        "ctr": 0,
-                        "frequency": 0,
-                        "spent": 0
-                    })
+                    # Don't add empty data - let frontend handle missing periods
         
         return stats_data
         
