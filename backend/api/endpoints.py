@@ -48,6 +48,55 @@ async def check_token_status():
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
+@router.get("/adsets-list")
+async def get_adsets_list():
+    """Get list of all adsets for debugging"""
+    if not META_TOKEN:
+        return {"error": "Token not configured"}
+    
+    try:
+        import aiohttp
+        async with aiohttp.ClientSession() as session:
+            # Get ad accounts first
+            accounts_url = f"https://graph.facebook.com/{API_VERSION}/me/adaccounts"
+            accounts_params = {
+                "access_token": META_TOKEN,
+                "fields": "name,account_id",
+                "limit": 5
+            }
+            
+            async with session.get(accounts_url, params=accounts_params) as accounts_response:
+                if accounts_response.status != 200:
+                    return {"error": "Failed to get ad accounts"}
+                
+                accounts_data = await accounts_response.json()
+                accounts = accounts_data.get("data", [])
+                
+                if not accounts:
+                    return {"error": "No ad accounts found"}
+                
+                # Get adsets from first account
+                account_id = accounts[0]["account_id"]
+                adsets_url = f"https://graph.facebook.com/{API_VERSION}/act_{account_id}/adsets"
+                adsets_params = {
+                    "access_token": META_TOKEN,
+                    "fields": "id,name,status",
+                    "limit": 10
+                }
+                
+                async with session.get(adsets_url, params=adsets_params) as adsets_response:
+                    if adsets_response.status != 200:
+                        return {"error": "Failed to get adsets"}
+                    
+                    adsets_data = await adsets_response.json()
+                    return {
+                        "account": accounts[0],
+                        "adsets": adsets_data.get("data", [])
+                    }
+                    
+    except Exception as e:
+        return {"error": str(e)}
+
 @router.get("/test-facebook-api")
 async def test_facebook_api():
     """Test Facebook API connection"""
@@ -82,6 +131,8 @@ async def get_adset_stats(adset_id: str, date_preset: str = Query("last_7d")):
     if not META_TOKEN:
         raise HTTPException(status_code=500, detail="Token not configured")
     
+    logging.info(f"Getting stats for adset_id: {adset_id}")
+    
     try:
         import aiohttp
         
@@ -97,6 +148,20 @@ async def get_adset_stats(adset_id: str, date_preset: str = Query("last_7d")):
         stats_data = []
         
         async with aiohttp.ClientSession() as session:
+            # First, check if adset exists
+            try:
+                check_url = f"https://graph.facebook.com/{API_VERSION}/{adset_id}"
+                check_params = {"access_token": META_TOKEN, "fields": "id,name,status"}
+                async with session.get(check_url, params=check_params) as check_response:
+                    if check_response.status != 200:
+                        logging.error(f"Adset {adset_id} not found or inaccessible: {check_response.status}")
+                        return []
+                    adset_info = await check_response.json()
+                    logging.info(f"Adset info: {adset_info}")
+            except Exception as e:
+                logging.error(f"Error checking adset {adset_id}: {e}")
+                return []
+            
             for period in periods:
                 try:
                     # Get insights for the adset
