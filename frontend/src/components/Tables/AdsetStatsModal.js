@@ -163,184 +163,186 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
               <Text ml={3}>Загрузка данных...</Text>
             </Flex>
           ) : statsData && statsData.length > 0 ? (
-            <TableContainer>
-              <Table variant="simple" size="sm">
-                <Thead>
-                  <Tr>
-                    <Th borderColor={borderColor} color={textColor}>Дата</Th>
-                    <Th borderColor={borderColor} color={textColor} isNumeric>Leads</Th>
-                    <Th borderColor={borderColor} color={textColor} isNumeric>CPL</Th>
-                    <Th borderColor={borderColor} color={textColor} isNumeric>CPM</Th>
-                    <Th borderColor={borderColor} color={textColor} isNumeric>CTR</Th>
-                    <Th borderColor={borderColor} color={textColor} isNumeric>Частота</Th>
-                    <Th borderColor={borderColor} color={textColor} isNumeric>Spent</Th>
-                  </Tr>
-                </Thead>
-                <Tbody>
-                  {statsData.map((dayData, index) => (
-                    <Tr key={index}>
-                      <Td borderColor={borderColor} color={textColor}>
-                        <Text fontWeight="medium">
-                          {dayData.label}
-                        </Text>
-                      </Td>
-                      <Td borderColor={borderColor} color={textColor} isNumeric>
-                        {formatNumber(dayData.leads)}
-                      </Td>
-                      <Td borderColor={borderColor} color={textColor} isNumeric>
-                        {formatMoney(dayData.cpl)}
-                      </Td>
-                      <Td borderColor={borderColor} color={textColor} isNumeric>
-                        {formatMoney(dayData.cpm)}
-                      </Td>
-                      <Td borderColor={borderColor} color={textColor} isNumeric>
-                        {formatPercentage(dayData.ctr)}
-                      </Td>
-                      <Td borderColor={borderColor} color={textColor} isNumeric>
-                        {dayData.frequency ? dayData.frequency.toFixed(2) : "0.00"}
-                      </Td>
-                      <Td borderColor={borderColor} color={textColor} isNumeric>
-                        {formatMoney(dayData.spent)}
-                      </Td>
-                    </Tr>
-                  ))}
-                </Tbody>
-              </Table>
-            </TableContainer>
-            
-            {/* Totals row */}
-            {calculateTotals() && (
-              <Box mt={4} pt={4} borderTop="1px solid" borderColor={borderColor}>
+            <>
+              <TableContainer>
                 <Table variant="simple" size="sm">
-                  <Tbody>
-                    <Tr bg={totalsBgColor}>
-                      <Td borderColor={borderColor} color={textColor}>
-                        <Text fontWeight="bold" fontSize="sm">
-                          Всего
-                        </Text>
-                      </Td>
-                      <Td borderColor={borderColor} color={textColor} isNumeric>
-                        <Text fontWeight="bold" fontSize="sm">
-                          {formatNumber(calculateTotals().leads)}
-                        </Text>
-                      </Td>
-                      <Td borderColor={borderColor} color={textColor} isNumeric>
-                        <Text fontWeight="bold" fontSize="sm">
-                          {formatMoney(calculateTotals().cpl)}
-                        </Text>
-                      </Td>
-                      <Td borderColor={borderColor} color={textColor} isNumeric>
-                        <Text fontWeight="bold" fontSize="sm">
-                          {formatMoney(calculateTotals().cpm)}
-                        </Text>
-                      </Td>
-                      <Td borderColor={borderColor} color={textColor} isNumeric>
-                        <Text fontWeight="bold" fontSize="sm">
-                          {formatPercentage(calculateTotals().ctr)}
-                        </Text>
-                      </Td>
-                      <Td borderColor={borderColor} color={textColor} isNumeric>
-                        <Text fontWeight="bold" fontSize="sm">
-                          {calculateTotals().frequency.toFixed(2)}
-                        </Text>
-                      </Td>
-                      <Td borderColor={borderColor} color={textColor} isNumeric>
-                        <Text fontWeight="bold" fontSize="sm">
-                          {formatMoney(calculateTotals().spent)}
-                        </Text>
-                      </Td>
+                  <Thead>
+                    <Tr>
+                      <Th borderColor={borderColor} color={textColor}>Дата</Th>
+                      <Th borderColor={borderColor} color={textColor} isNumeric>Leads</Th>
+                      <Th borderColor={borderColor} color={textColor} isNumeric>CPL</Th>
+                      <Th borderColor={borderColor} color={textColor} isNumeric>CPM</Th>
+                      <Th borderColor={borderColor} color={textColor} isNumeric>CTR</Th>
+                      <Th borderColor={borderColor} color={textColor} isNumeric>Частота</Th>
+                      <Th borderColor={borderColor} color={textColor} isNumeric>Spent</Th>
                     </Tr>
+                  </Thead>
+                  <Tbody>
+                    {statsData.map((dayData, index) => (
+                      <Tr key={index}>
+                        <Td borderColor={borderColor} color={textColor}>
+                          <Text fontWeight="medium">
+                            {dayData.label}
+                          </Text>
+                        </Td>
+                        <Td borderColor={borderColor} color={textColor} isNumeric>
+                          {formatNumber(dayData.leads)}
+                        </Td>
+                        <Td borderColor={borderColor} color={textColor} isNumeric>
+                          {formatMoney(dayData.cpl)}
+                        </Td>
+                        <Td borderColor={borderColor} color={textColor} isNumeric>
+                          {formatMoney(dayData.cpm)}
+                        </Td>
+                        <Td borderColor={borderColor} color={textColor} isNumeric>
+                          {formatPercentage(dayData.ctr)}
+                        </Td>
+                        <Td borderColor={borderColor} color={textColor} isNumeric>
+                          {dayData.frequency ? dayData.frequency.toFixed(2) : "0.00"}
+                        </Td>
+                        <Td borderColor={borderColor} color={textColor} isNumeric>
+                          {formatMoney(dayData.spent)}
+                        </Td>
+                      </Tr>
+                    ))}
                   </Tbody>
                 </Table>
-              </Box>
-            )}
-            
-            {/* Creatives Table */}
-            <Box mt={6}>
-              <Text fontSize="lg" fontWeight="bold" mb={3} color={textColor}>
-                Креативы
-              </Text>
+              </TableContainer>
               
-              {creativesLoading ? (
-                <Flex justify="center" align="center" py={4}>
-                  <Spinner size="md" color="purple.500" />
-                  <Text ml={3}>Загрузка креативов...</Text>
-                </Flex>
-              ) : creativesData && creativesData.length > 0 ? (
-                <TableContainer>
+              {/* Totals row */}
+              {calculateTotals() && (
+                <Box mt={4} pt={4} borderTop="1px solid" borderColor={borderColor}>
                   <Table variant="simple" size="sm">
-                    <Thead>
-                      <Tr>
-                        <Th borderColor={borderColor} color={textColor}>Креатив</Th>
-                        <Th borderColor={borderColor} color={textColor}>Статус</Th>
-                        <Th borderColor={borderColor} color={textColor} isNumeric>Leads</Th>
-                        <Th borderColor={borderColor} color={textColor} isNumeric>CPA</Th>
-                        <Th borderColor={borderColor} color={textColor} isNumeric>CPM</Th>
-                        <Th borderColor={borderColor} color={textColor} isNumeric>CTR</Th>
-                        <Th borderColor={borderColor} color={textColor} isNumeric>Частота</Th>
-                        <Th borderColor={borderColor} color={textColor} isNumeric>Spent</Th>
-                      </Tr>
-                    </Thead>
                     <Tbody>
-                      {creativesData.map((creative, index) => (
-                        <Tr key={index}>
-                          <Td borderColor={borderColor} color={textColor}>
-                            <Flex align="center" gap={3}>
-                              {creative.thumbnail_url ? (
-                                <Image 
-                                  src={creative.thumbnail_url} 
-                                  alt="" 
-                                  boxSize="40px" 
-                                  borderRadius="md" 
-                                  objectFit="cover" 
-                                />
-                              ) : (
-                                <Avatar size="sm" name={creative.ad_name} />
-                              )}
-                              <Text fontSize="sm" noOfLines={2}>
-                                {creative.ad_name}
-                              </Text>
-                            </Flex>
-                          </Td>
-                          <Td borderColor={borderColor} color={textColor}>
-                            <Badge 
-                              colorScheme={creative.status === "ACTIVE" ? "green" : "red"} 
-                              size="sm"
-                            >
-                              {creative.status}
-                            </Badge>
-                          </Td>
-                          <Td borderColor={borderColor} color={textColor} isNumeric>
-                            {formatNumber(creative.leads)}
-                          </Td>
-                          <Td borderColor={borderColor} color={textColor} isNumeric>
-                            {formatMoney(creative.cpa)}
-                          </Td>
-                          <Td borderColor={borderColor} color={textColor} isNumeric>
-                            {formatMoney(creative.cpm)}
-                          </Td>
-                          <Td borderColor={borderColor} color={textColor} isNumeric>
-                            {formatPercentage(creative.ctr)}
-                          </Td>
-                          <Td borderColor={borderColor} color={textColor} isNumeric>
-                            {creative.frequency ? creative.frequency.toFixed(2) : "0.00"}
-                          </Td>
-                          <Td borderColor={borderColor} color={textColor} isNumeric>
-                            {formatMoney(creative.spend)}
-                          </Td>
-                        </Tr>
-                      ))}
+                      <Tr bg={totalsBgColor}>
+                        <Td borderColor={borderColor} color={textColor}>
+                          <Text fontWeight="bold" fontSize="sm">
+                            Всего
+                          </Text>
+                        </Td>
+                        <Td borderColor={borderColor} color={textColor} isNumeric>
+                          <Text fontWeight="bold" fontSize="sm">
+                            {formatNumber(calculateTotals().leads)}
+                          </Text>
+                        </Td>
+                        <Td borderColor={borderColor} color={textColor} isNumeric>
+                          <Text fontWeight="bold" fontSize="sm">
+                            {formatMoney(calculateTotals().cpl)}
+                          </Text>
+                        </Td>
+                        <Td borderColor={borderColor} color={textColor} isNumeric>
+                          <Text fontWeight="bold" fontSize="sm">
+                            {formatMoney(calculateTotals().cpm)}
+                          </Text>
+                        </Td>
+                        <Td borderColor={borderColor} color={textColor} isNumeric>
+                          <Text fontWeight="bold" fontSize="sm">
+                            {formatPercentage(calculateTotals().ctr)}
+                          </Text>
+                        </Td>
+                        <Td borderColor={borderColor} color={textColor} isNumeric>
+                          <Text fontWeight="bold" fontSize="sm">
+                            {calculateTotals().frequency.toFixed(2)}
+                          </Text>
+                        </Td>
+                        <Td borderColor={borderColor} color={textColor} isNumeric>
+                          <Text fontWeight="bold" fontSize="sm">
+                            {formatMoney(calculateTotals().spent)}
+                          </Text>
+                        </Td>
+                      </Tr>
                     </Tbody>
                   </Table>
-                </TableContainer>
-              ) : (
-                <Box textAlign="center" py={4}>
-                  <Text color="gray.500" fontSize="sm">
-                    Нет креативов для отображения
-                  </Text>
                 </Box>
               )}
-            </Box>
+              
+              {/* Creatives Table */}
+              <Box mt={6}>
+                <Text fontSize="lg" fontWeight="bold" mb={3} color={textColor}>
+                  Креативы
+                </Text>
+                
+                {creativesLoading ? (
+                  <Flex justify="center" align="center" py={4}>
+                    <Spinner size="md" color="purple.500" />
+                    <Text ml={3}>Загрузка креативов...</Text>
+                  </Flex>
+                ) : creativesData && creativesData.length > 0 ? (
+                  <TableContainer>
+                    <Table variant="simple" size="sm">
+                      <Thead>
+                        <Tr>
+                          <Th borderColor={borderColor} color={textColor}>Креатив</Th>
+                          <Th borderColor={borderColor} color={textColor}>Статус</Th>
+                          <Th borderColor={borderColor} color={textColor} isNumeric>Leads</Th>
+                          <Th borderColor={borderColor} color={textColor} isNumeric>CPA</Th>
+                          <Th borderColor={borderColor} color={textColor} isNumeric>CPM</Th>
+                          <Th borderColor={borderColor} color={textColor} isNumeric>CTR</Th>
+                          <Th borderColor={borderColor} color={textColor} isNumeric>Частота</Th>
+                          <Th borderColor={borderColor} color={textColor} isNumeric>Spent</Th>
+                        </Tr>
+                      </Thead>
+                      <Tbody>
+                        {creativesData.map((creative, index) => (
+                          <Tr key={index}>
+                            <Td borderColor={borderColor} color={textColor}>
+                              <Flex align="center" gap={3}>
+                                {creative.thumbnail_url ? (
+                                  <Image 
+                                    src={creative.thumbnail_url} 
+                                    alt="" 
+                                    boxSize="40px" 
+                                    borderRadius="md" 
+                                    objectFit="cover" 
+                                  />
+                                ) : (
+                                  <Avatar size="sm" name={creative.ad_name} />
+                                )}
+                                <Text fontSize="sm" noOfLines={2}>
+                                  {creative.ad_name}
+                                </Text>
+                              </Flex>
+                            </Td>
+                            <Td borderColor={borderColor} color={textColor}>
+                              <Badge 
+                                colorScheme={creative.status === "ACTIVE" ? "green" : "red"} 
+                                size="sm"
+                              >
+                                {creative.status}
+                              </Badge>
+                            </Td>
+                            <Td borderColor={borderColor} color={textColor} isNumeric>
+                              {formatNumber(creative.leads)}
+                            </Td>
+                            <Td borderColor={borderColor} color={textColor} isNumeric>
+                              {formatMoney(creative.cpa)}
+                            </Td>
+                            <Td borderColor={borderColor} color={textColor} isNumeric>
+                              {formatMoney(creative.cpm)}
+                            </Td>
+                            <Td borderColor={borderColor} color={textColor} isNumeric>
+                              {formatPercentage(creative.ctr)}
+                            </Td>
+                            <Td borderColor={borderColor} color={textColor} isNumeric>
+                              {creative.frequency ? creative.frequency.toFixed(2) : "0.00"}
+                            </Td>
+                            <Td borderColor={borderColor} color={textColor} isNumeric>
+                              {formatMoney(creative.spend)}
+                            </Td>
+                          </Tr>
+                        ))}
+                      </Tbody>
+                    </Table>
+                  </TableContainer>
+                ) : (
+                  <Box textAlign="center" py={4}>
+                    <Text color="gray.500" fontSize="sm">
+                      Нет креативов для отображения
+                    </Text>
+                  </Box>
+                )}
+              </Box>
+            </>
           ) : (
             <Box textAlign="center" py={8}>
               <Text color="gray.500">
