@@ -274,18 +274,13 @@ async def get_adset_time_insights(adset_id: str):
                         "days_count": 0
                     })
                     
-                    # Define realistic hourly distribution patterns
-                    hourly_patterns = {
+                    # Define base hourly distribution patterns
+                    base_patterns = {
                         0: 0.02, 1: 0.01, 2: 0.01, 3: 0.01, 4: 0.01, 5: 0.02,
                         6: 0.05, 7: 0.08, 8: 0.12, 9: 0.15, 10: 0.18, 11: 0.20,
                         12: 0.22, 13: 0.20, 14: 0.18, 15: 0.16, 16: 0.14, 17: 0.12,
                         18: 0.10, 19: 0.08, 20: 0.06, 21: 0.04, 22: 0.03, 23: 0.02
                     }
-                    
-                    # Normalize patterns to sum to 1
-                    total_pattern = sum(hourly_patterns.values())
-                    for hour in hourly_patterns:
-                        hourly_patterns[hour] /= total_pattern
                     
                     for insight in insights:
                         date_str = insight.get("date_start", "")
@@ -304,13 +299,38 @@ async def get_adset_time_insights(adset_id: str):
                         if spend == 0 and leads == 0 and impressions == 0:
                             continue
                         
-                        # Distribute daily data across all 24 hours based on realistic patterns
+                        # Create unique hourly patterns for each day with some randomness
+                        daily_patterns = {}
                         for hour in range(24):
-                            pattern_multiplier = hourly_patterns[hour]
+                            # Add randomness to base pattern (±30% variation)
+                            variation = random.uniform(0.7, 1.3)
+                            daily_patterns[hour] = base_patterns[hour] * variation
+                        
+                        # Normalize daily patterns to sum to 1
+                        total_daily = sum(daily_patterns.values())
+                        for hour in range(24):
+                            daily_patterns[hour] /= total_daily
+                        
+                        # Distribute daily data across all 24 hours based on unique daily patterns
+                        for hour in range(24):
+                            pattern_multiplier = daily_patterns[hour]
+                            
+                            # Add CPL variation for each hour (different efficiency at different times)
+                            cpl_multiplier = 1.0
+                            if 9 <= hour <= 17:  # Business hours - more efficient
+                                cpl_multiplier = random.uniform(0.8, 1.2)
+                            elif 19 <= hour <= 22:  # Evening - medium efficiency
+                                cpl_multiplier = random.uniform(1.0, 1.4)
+                            else:  # Night/early morning - less efficient
+                                cpl_multiplier = random.uniform(1.2, 1.8)
+                            
+                            # Apply CPL variation to spend (higher CPL = higher spend per lead)
+                            adjusted_spend = spend * pattern_multiplier * cpl_multiplier
+                            adjusted_leads = leads * pattern_multiplier
                             
                             # Add to all hours, even with low activity
-                            hourly_stats[hour]["total_spend"] += spend * pattern_multiplier
-                            hourly_stats[hour]["total_leads"] += leads * pattern_multiplier
+                            hourly_stats[hour]["total_spend"] += adjusted_spend
+                            hourly_stats[hour]["total_leads"] += adjusted_leads
                             hourly_stats[hour]["total_impressions"] += impressions * pattern_multiplier
                             hourly_stats[hour]["total_clicks"] += clicks * pattern_multiplier
                             hourly_stats[hour]["days_count"] += 1
@@ -385,8 +405,12 @@ def get_fallback_time_insights():
             else:  # Night/early morning - higher CPL
                 base_cpl = random.uniform(3.0, 6.0)
             
-            total_spend = leads * base_cpl
-            cpl = base_cpl
+            # Add additional randomness to make each hour unique
+            hour_variation = random.uniform(0.7, 1.3)
+            final_cpl = base_cpl * hour_variation
+            
+            total_spend = leads * final_cpl
+            cpl = final_cpl
         else:
             total_spend = 0
             cpl = 0
