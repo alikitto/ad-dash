@@ -159,3 +159,14 @@ def debug_environment():
         "POSTGRES_URL": os.getenv("POSTGRES_URL"),
         "all_env_keys": [key for key in os.environ.keys() if "DATABASE" in key or "POSTGRES" in key]
     }
+
+@router.get("/test-db")
+def test_database(db = Depends(get_db)):
+    """Test database connection"""
+    try:
+        # Simple query to test connection
+        result = db.execute(text("SELECT 1 as test"))
+        test_value = result.scalar()
+        return {"status": "success", "test_value": test_value, "database_url": database_url}
+    except Exception as e:
+        return {"status": "error", "error": str(e), "database_url": database_url}
