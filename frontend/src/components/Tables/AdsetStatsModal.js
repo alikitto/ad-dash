@@ -31,6 +31,7 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
   const [loading, setLoading] = useState(false);
   const [creativesData, setCreativesData] = useState(null);
   const [creativesLoading, setCreativesLoading] = useState(false);
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   
   const bgColor = useColorModeValue("white", "gray.800");
   const textColor = useColorModeValue("gray.800", "white");
@@ -140,17 +141,116 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
     };
   };
 
+  // Функции для определения трендов и цветов
+  const getTrendIndicator = (current, previous) => {
+    if (!previous || previous === 0) return { icon: "→", color: "gray.500" };
+    const change = ((current - previous) / previous) * 100;
+    if (change > 10) return { icon: "↗", color: "green.500" };
+    if (change > 0) return { icon: "↗", color: "green.400" };
+    if (change < -10) return { icon: "↘", color: "red.500" };
+    if (change < 0) return { icon: "↘", color: "red.400" };
+    return { icon: "→", color: "gray.500" };
+  };
+
+  const getPerformanceColor = (value, type) => {
+    if (type === 'leads') {
+      if (value >= 10) return "green.500";
+      if (value >= 5) return "green.400";
+      if (value >= 1) return "yellow.500";
+      return "red.500";
+    }
+    if (type === 'cpl') {
+      if (value <= 1) return "green.500";
+      if (value <= 2) return "green.400";
+      if (value <= 5) return "yellow.500";
+      return "red.500";
+    }
+    if (type === 'ctr') {
+      if (value >= 5) return "green.500";
+      if (value >= 2) return "green.400";
+      if (value >= 1) return "yellow.500";
+      return "red.500";
+    }
+    return "gray.500";
+  };
+
+  const getPreviousDayValue = (currentIndex, field) => {
+    if (currentIndex >= statsData.length - 1) return null;
+    return statsData[currentIndex + 1][field];
+  };
+
+  // Функции для сортировки
+  const handleSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const getSortedData = () => {
+    if (!statsData || !sortConfig.key) return statsData;
+    
+    return [...statsData].sort((a, b) => {
+      const aValue = a[sortConfig.key];
+      const bValue = b[sortConfig.key];
+      
+      if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  };
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="6xl" isCentered>
       <ModalOverlay />
       <ModalContent bg={bgColor} maxW="1200px">
         <ModalHeader>
-          <Flex align="center" gap={2}>
-            <Icon as={FaChartLine} color="purple.500" />
-            <Text>Детальная статистика</Text>
-            <Badge colorScheme="purple" ml={2}>
-              {adset?.adset_name || "Adset"}
-            </Badge>
+          <Flex align="center" justify="space-between" w="full">
+            <Flex align="center" gap={2}>
+              <Icon as={FaChartLine} color="purple.500" />
+              <Text>Детальная статистика</Text>
+              <Badge colorScheme="purple" ml={2}>
+                {adset?.adset_name || "Adset"}
+              </Badge>
+            </Flex>
+            
+            {/* Quick Actions */}
+            <Flex gap={2}>
+              <Button
+                size="sm"
+                colorScheme={adset?.status === "ACTIVE" ? "red" : "green"}
+                variant="outline"
+                onClick={() => {
+                  // TODO: Implement pause/resume functionality
+                  console.log("Toggle status for", adset?.adset_id);
+                }}
+              >
+                {adset?.status === "ACTIVE" ? "Пауза" : "Запуск"}
+              </Button>
+              <Button
+                size="sm"
+                colorScheme="blue"
+                variant="outline"
+                onClick={() => {
+                  // TODO: Implement budget increase
+                  console.log("Increase budget for", adset?.adset_id);
+                }}
+              >
+                + Бюджет
+              </Button>
+              <Button
+                size="sm"
+                colorScheme="purple"
+                variant="outline"
+                onClick={() => {
+                  // TODO: Implement duplicate functionality
+                  console.log("Duplicate", adset?.adset_id);
+                }}
+              >
+                Дублировать
+              </Button>
+            </Flex>
           </Flex>
         </ModalHeader>
         <ModalCloseButton />
@@ -165,48 +265,131 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
           ) : statsData && statsData.length > 0 ? (
             <>
               <TableContainer>
-                <Table variant="simple" size="sm">
-                  <Thead>
-                    <Tr>
-                      <Th borderColor={borderColor} color={textColor}>Дата</Th>
-                      <Th borderColor={borderColor} color={textColor} isNumeric>Leads</Th>
-                      <Th borderColor={borderColor} color={textColor} isNumeric>CPL</Th>
-                      <Th borderColor={borderColor} color={textColor} isNumeric>CPM</Th>
-                      <Th borderColor={borderColor} color={textColor} isNumeric>CTR</Th>
-                      <Th borderColor={borderColor} color={textColor} isNumeric>Частота</Th>
-                      <Th borderColor={borderColor} color={textColor} isNumeric>Spent</Th>
-                    </Tr>
-                  </Thead>
-                  <Tbody>
-                    {statsData.map((dayData, index) => (
-                      <Tr key={index}>
-                        <Td borderColor={borderColor} color={textColor}>
-                          <Text fontWeight="medium">
-                            {dayData.label}
-                          </Text>
-                        </Td>
-                        <Td borderColor={borderColor} color={textColor} isNumeric>
-                          {formatNumber(dayData.leads)}
-                        </Td>
-                        <Td borderColor={borderColor} color={textColor} isNumeric>
-                          {formatMoney(dayData.cpl)}
-                        </Td>
-                        <Td borderColor={borderColor} color={textColor} isNumeric>
-                          {formatMoney(dayData.cpm)}
-                        </Td>
-                        <Td borderColor={borderColor} color={textColor} isNumeric>
-                          {formatPercentage(dayData.ctr)}
-                        </Td>
-                        <Td borderColor={borderColor} color={textColor} isNumeric>
-                          {dayData.frequency ? dayData.frequency.toFixed(2) : "0.00"}
-                        </Td>
-                        <Td borderColor={borderColor} color={textColor} isNumeric>
-                          {formatMoney(dayData.spent)}
-                        </Td>
+                  <Table variant="simple" size="sm">
+                    <Thead>
+                      <Tr>
+                        <Th 
+                          borderColor={borderColor} 
+                          color={textColor}
+                          cursor="pointer"
+                          onClick={() => handleSort('date')}
+                        >
+                          Дата {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                        </Th>
+                        <Th 
+                          borderColor={borderColor} 
+                          color={textColor} 
+                          isNumeric
+                          cursor="pointer"
+                          onClick={() => handleSort('leads')}
+                        >
+                          Leads {sortConfig.key === 'leads' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                        </Th>
+                        <Th 
+                          borderColor={borderColor} 
+                          color={textColor} 
+                          isNumeric
+                          cursor="pointer"
+                          onClick={() => handleSort('cpl')}
+                        >
+                          CPL {sortConfig.key === 'cpl' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                        </Th>
+                        <Th 
+                          borderColor={borderColor} 
+                          color={textColor} 
+                          isNumeric
+                          cursor="pointer"
+                          onClick={() => handleSort('cpm')}
+                        >
+                          CPM {sortConfig.key === 'cpm' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                        </Th>
+                        <Th 
+                          borderColor={borderColor} 
+                          color={textColor} 
+                          isNumeric
+                          cursor="pointer"
+                          onClick={() => handleSort('ctr')}
+                        >
+                          CTR {sortConfig.key === 'ctr' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                        </Th>
+                        <Th 
+                          borderColor={borderColor} 
+                          color={textColor} 
+                          isNumeric
+                          cursor="pointer"
+                          onClick={() => handleSort('frequency')}
+                        >
+                          Частота {sortConfig.key === 'frequency' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                        </Th>
+                        <Th 
+                          borderColor={borderColor} 
+                          color={textColor} 
+                          isNumeric
+                          cursor="pointer"
+                          onClick={() => handleSort('spent')}
+                        >
+                          Spent {sortConfig.key === 'spent' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                        </Th>
                       </Tr>
-                    ))}
-                  </Tbody>
-                </Table>
+                    </Thead>
+                    <Tbody>
+                      {getSortedData().map((dayData, index) => {
+                        const originalIndex = statsData.findIndex(item => item.date === dayData.date);
+                        const leadsTrend = getTrendIndicator(dayData.leads, getPreviousDayValue(originalIndex, 'leads'));
+                        const cplTrend = getTrendIndicator(dayData.cpl, getPreviousDayValue(originalIndex, 'cpl'));
+                        const ctrTrend = getTrendIndicator(dayData.ctr, getPreviousDayValue(originalIndex, 'ctr'));
+                        
+                        return (
+                          <Tr key={index}>
+                            <Td borderColor={borderColor} color={textColor}>
+                              <Text fontWeight="medium">
+                                {dayData.label}
+                              </Text>
+                            </Td>
+                            <Td borderColor={borderColor} color={textColor} isNumeric>
+                              <Flex align="center" justify="flex-end" gap={1}>
+                                <Text color={getPerformanceColor(dayData.leads, 'leads')} fontWeight="medium">
+                                  {formatNumber(dayData.leads)}
+                                </Text>
+                                <Text fontSize="sm" color={leadsTrend.color}>
+                                  {leadsTrend.icon}
+                                </Text>
+                              </Flex>
+                            </Td>
+                            <Td borderColor={borderColor} color={textColor} isNumeric>
+                              <Flex align="center" justify="flex-end" gap={1}>
+                                <Text color={getPerformanceColor(dayData.cpl, 'cpl')} fontWeight="medium">
+                                  {formatMoney(dayData.cpl)}
+                                </Text>
+                                <Text fontSize="sm" color={cplTrend.color}>
+                                  {cplTrend.icon}
+                                </Text>
+                              </Flex>
+                            </Td>
+                            <Td borderColor={borderColor} color={textColor} isNumeric>
+                              {formatMoney(dayData.cpm)}
+                            </Td>
+                            <Td borderColor={borderColor} color={textColor} isNumeric>
+                              <Flex align="center" justify="flex-end" gap={1}>
+                                <Text color={getPerformanceColor(dayData.ctr, 'ctr')} fontWeight="medium">
+                                  {formatPercentage(dayData.ctr)}
+                                </Text>
+                                <Text fontSize="sm" color={ctrTrend.color}>
+                                  {ctrTrend.icon}
+                                </Text>
+                              </Flex>
+                            </Td>
+                            <Td borderColor={borderColor} color={textColor} isNumeric>
+                              {dayData.frequency ? dayData.frequency.toFixed(2) : "0.00"}
+                            </Td>
+                            <Td borderColor={borderColor} color={textColor} isNumeric>
+                              {formatMoney(dayData.spent)}
+                            </Td>
+                          </Tr>
+                        );
+                      })}
+                    </Tbody>
+                  </Table>
               </TableContainer>
               
               {/* Totals row */}
