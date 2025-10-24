@@ -168,6 +168,7 @@ async def get_adset_stats(adset_id: str):
                         try:
                             insight_date = datetime.strptime(date_str, "%Y-%m-%d")
                         except:
+                            logging.warning(f"Failed to parse date: {date_str}")
                             continue
                         
                         # Calculate spend and leads
@@ -175,9 +176,12 @@ async def get_adset_stats(adset_id: str):
                         leads = sum(int(safe_float(a.get("value", 0))) for a in insight.get("actions", []) or [] if LEAD_ACTION_TYPE in a.get("action_type", ""))
                         impressions = int(safe_float(insight.get("impressions", 0)))
                         
-                        # Skip if no activity
-                        if spend == 0 and leads == 0 and impressions == 0:
-                            continue
+                        logging.info(f"Processing {date_str}: spend={spend}, leads={leads}, impressions={impressions}")
+                        
+                        # Don't skip any records for now - let frontend decide what to show
+                        # if spend == 0 and leads == 0 and impressions == 0:
+                        #     logging.info(f"Skipping {date_str} - no activity")
+                        #     continue
                         
                         # Determine label
                         days_diff = (today.date() - insight_date.date()).days
@@ -205,9 +209,13 @@ async def get_adset_stats(adset_id: str):
                     stats_data.sort(key=lambda x: x["date"], reverse=True)
                     
                     logging.info(f"Returning {len(stats_data)} stats records")
+                    if stats_data:
+                        logging.info(f"Sample record: {stats_data[0]}")
                 else:
                     error_text = await response.text()
                     logging.error(f"Error response from Facebook API: {response.status} - {error_text}")
+        
+        logging.info(f"Final stats_data length: {len(stats_data)}")
         
         return stats_data
         

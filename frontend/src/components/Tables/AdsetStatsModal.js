@@ -60,6 +60,9 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
       
       const data = await response.json();
       console.log("Received stats data:", data);
+      console.log("Stats data type:", typeof data);
+      console.log("Stats data is array:", Array.isArray(data));
+      console.log("Stats data length:", data?.length);
       setStatsData(data);
     } catch (error) {
       console.error("Error fetching adset stats:", error);
