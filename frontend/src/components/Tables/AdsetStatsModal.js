@@ -209,56 +209,51 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
             </TableContainer>
             
             {/* Totals row */}
-            {(() => {
-              const totals = calculateTotals();
-              if (!totals) return null;
-              
-              return (
-                <Box mt={4} pt={4} borderTop="1px solid" borderColor={borderColor}>
-                  <Table variant="simple" size="sm">
-                    <Tbody>
-                      <Tr bg={totalsBgColor}>
-                        <Td borderColor={borderColor} color={textColor}>
-                          <Text fontWeight="bold" fontSize="sm">
-                            Всего
-                          </Text>
-                        </Td>
-                        <Td borderColor={borderColor} color={textColor} isNumeric>
-                          <Text fontWeight="bold" fontSize="sm">
-                            {formatNumber(totals.leads)}
-                          </Text>
-                        </Td>
-                        <Td borderColor={borderColor} color={textColor} isNumeric>
-                          <Text fontWeight="bold" fontSize="sm">
-                            {formatMoney(totals.cpl)}
-                          </Text>
-                        </Td>
-                        <Td borderColor={borderColor} color={textColor} isNumeric>
-                          <Text fontWeight="bold" fontSize="sm">
-                            {formatMoney(totals.cpm)}
-                          </Text>
-                        </Td>
-                        <Td borderColor={borderColor} color={textColor} isNumeric>
-                          <Text fontWeight="bold" fontSize="sm">
-                            {formatPercentage(totals.ctr)}
-                          </Text>
-                        </Td>
-                        <Td borderColor={borderColor} color={textColor} isNumeric>
-                          <Text fontWeight="bold" fontSize="sm">
-                            {totals.frequency.toFixed(2)}
-                          </Text>
-                        </Td>
-                        <Td borderColor={borderColor} color={textColor} isNumeric>
-                          <Text fontWeight="bold" fontSize="sm">
-                            {formatMoney(totals.spent)}
-                          </Text>
-                        </Td>
-                      </Tr>
-                    </Tbody>
-                  </Table>
-                </Box>
-              );
-            })()}
+            {calculateTotals() && (
+              <Box mt={4} pt={4} borderTop="1px solid" borderColor={borderColor}>
+                <Table variant="simple" size="sm">
+                  <Tbody>
+                    <Tr bg={totalsBgColor}>
+                      <Td borderColor={borderColor} color={textColor}>
+                        <Text fontWeight="bold" fontSize="sm">
+                          Всего
+                        </Text>
+                      </Td>
+                      <Td borderColor={borderColor} color={textColor} isNumeric>
+                        <Text fontWeight="bold" fontSize="sm">
+                          {formatNumber(calculateTotals().leads)}
+                        </Text>
+                      </Td>
+                      <Td borderColor={borderColor} color={textColor} isNumeric>
+                        <Text fontWeight="bold" fontSize="sm">
+                          {formatMoney(calculateTotals().cpl)}
+                        </Text>
+                      </Td>
+                      <Td borderColor={borderColor} color={textColor} isNumeric>
+                        <Text fontWeight="bold" fontSize="sm">
+                          {formatMoney(calculateTotals().cpm)}
+                        </Text>
+                      </Td>
+                      <Td borderColor={borderColor} color={textColor} isNumeric>
+                        <Text fontWeight="bold" fontSize="sm">
+                          {formatPercentage(calculateTotals().ctr)}
+                        </Text>
+                      </Td>
+                      <Td borderColor={borderColor} color={textColor} isNumeric>
+                        <Text fontWeight="bold" fontSize="sm">
+                          {calculateTotals().frequency.toFixed(2)}
+                        </Text>
+                      </Td>
+                      <Td borderColor={borderColor} color={textColor} isNumeric>
+                        <Text fontWeight="bold" fontSize="sm">
+                          {formatMoney(calculateTotals().spent)}
+                        </Text>
+                      </Td>
+                    </Tr>
+                  </Tbody>
+                </Table>
+              </Box>
+            )}
             
             {/* Creatives Table */}
             <Box mt={6}>
