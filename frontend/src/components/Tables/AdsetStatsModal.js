@@ -558,6 +558,138 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
                 )}
               </Box>
               
+              {/* Trend Chart Section */}
+              <Box mt={6}>
+                <Text fontSize="lg" fontWeight="bold" mb={3} color={textColor}>
+                  График динамики
+                </Text>
+                
+                {statsData && statsData.length > 0 ? (
+                  <Box p={4} bg={useColorModeValue("gray.50", "gray.700")} borderRadius="md">
+                    <Text fontSize="sm" color="gray.600" mb={3}>
+                      Тренд по Leads за последние дни
+                    </Text>
+                    
+                    {/* Simple CSS Chart */}
+                    <Box position="relative" h="200px" bg={useColorModeValue("white", "gray.800")} borderRadius="md" p={4}>
+                      <Box position="relative" h="full" w="full">
+                        {/* Y-axis labels */}
+                        <Box position="absolute" left={0} top={0} h="full" w="40px">
+                          {(() => {
+                            const maxLeads = Math.max(...statsData.map(d => d.leads));
+                            const steps = 5;
+                            const stepValue = maxLeads / steps;
+                            return Array.from({ length: steps + 1 }, (_, i) => (
+                              <Text
+                                key={i}
+                                position="absolute"
+                                top={`${(i / steps) * 100}%`}
+                                fontSize="xs"
+                                color="gray.500"
+                                transform="translateY(-50%)"
+                              >
+                                {Math.round(stepValue * (steps - i))}
+                              </Text>
+                            ));
+                          })()}
+                        </Box>
+                        
+                        {/* Chart area */}
+                        <Box position="absolute" left="40px" top={0} right={0} bottom={0}>
+                          <Box position="relative" h="full" w="full">
+                            {/* Grid lines */}
+                            {Array.from({ length: 6 }, (_, i) => (
+                              <Box
+                                key={i}
+                                position="absolute"
+                                top={`${(i / 5) * 100}%`}
+                                left={0}
+                                right={0}
+                                h="1px"
+                                bg="gray.200"
+                              />
+                            ))}
+                            
+                            {/* Data points and lines */}
+                            {(() => {
+                              const maxLeads = Math.max(...statsData.map(d => d.leads));
+                              const minLeads = Math.min(...statsData.map(d => d.leads));
+                              const range = maxLeads - minLeads || 1;
+                              
+                              return statsData.map((day, index) => {
+                                const x = (index / (statsData.length - 1)) * 100;
+                                const y = ((maxLeads - day.leads) / range) * 100;
+                                
+                                return (
+                                  <Box key={index}>
+                                    {/* Data point */}
+                                    <Box
+                                      position="absolute"
+                                      left={`${x}%`}
+                                      top={`${y}%`}
+                                      w="8px"
+                                      h="8px"
+                                      bg="purple.500"
+                                      borderRadius="50%"
+                                      transform="translate(-50%, -50%)"
+                                    />
+                                    
+                                    {/* Data label */}
+                                    <Text
+                                      position="absolute"
+                                      left={`${x}%`}
+                                      top="100%"
+                                      fontSize="xs"
+                                      color="gray.600"
+                                      transform="translateX(-50%)"
+                                      mt={1}
+                                    >
+                                      {day.leads}
+                                    </Text>
+                                    
+                                    {/* Date label */}
+                                    <Text
+                                      position="absolute"
+                                      left={`${x}%`}
+                                      top="100%"
+                                      fontSize="xs"
+                                      color="gray.500"
+                                      transform="translateX(-50%)"
+                                      mt={6}
+                                    >
+                                      {day.label.split(' ')[0]}
+                                    </Text>
+                                    
+                                    {/* Connecting line - simplified */}
+                                    {index > 0 && (
+                                      <Box
+                                        position="absolute"
+                                        left={`${((index - 1) / (statsData.length - 1)) * 100}%`}
+                                        top={`${((maxLeads - statsData[index - 1].leads) / range) * 100}%`}
+                                        w={`${100 / (statsData.length - 1)}%`}
+                                        h="2px"
+                                        bg="purple.300"
+                                        transform="translateY(-50%)"
+                                      />
+                                    )}
+                                  </Box>
+                                );
+                              });
+                            })()}
+                          </Box>
+                        </Box>
+                      </Box>
+                    </Box>
+                  </Box>
+                ) : (
+                  <Box textAlign="center" py={4}>
+                    <Text color="gray.500" fontSize="sm">
+                      Нет данных для графика
+                    </Text>
+                  </Box>
+                )}
+              </Box>
+              
               {/* Time Efficiency Section */}
               <Box mt={6}>
                 <Text fontSize="lg" fontWeight="bold" mb={3} color={textColor}>
