@@ -141,7 +141,7 @@ async def debug_adset_stats(adset_id: str):
                 "access_token": META_TOKEN,
                 "date_preset": "maximum",
                 "time_increment": 1,
-                "fields": "spend,impressions,clicks,link_clicks,actions,cost_per_action_type,cpm,ctr,frequency,date_start"
+                "fields": "spend,impressions,clicks,actions,cost_per_action_type,cpm,ctr,frequency,date_start"
             }
             
             async with session.get(url, params=params) as response:
@@ -195,7 +195,7 @@ async def get_adset_stats(adset_id: str):
                 "access_token": META_TOKEN,
                 "date_preset": "maximum",
                 "time_increment": 1,  # Daily breakdown
-                "fields": "spend,impressions,clicks,link_clicks,actions,cost_per_action_type,cpm,ctr,frequency,date_start"
+                "fields": "spend,impressions,clicks,actions,cost_per_action_type,cpm,ctr,frequency,date_start"
             }
             
             async with session.get(url, params=params) as response:
