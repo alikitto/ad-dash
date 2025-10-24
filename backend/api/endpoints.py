@@ -190,7 +190,15 @@ async def get_adset_stats(adset_id: str, date_preset: str = Query("last_7d")):
                                 # Try different action types for leads
                                 for action in actions:
                                     action_type = action.get("action_type", "")
-                                    if action_type in ["lead", "onsite_conversion.lead_grouped", "offsite_conversion.lead"]:
+                                    # Look for various lead-related actions
+                                    if action_type in [
+                                        "lead", 
+                                        "onsite_conversion.lead_grouped", 
+                                        "offsite_conversion.lead",
+                                        "onsite_conversion.messaging_user_depth_3_message_send",  # This might be a lead
+                                        "onsite_conversion.messaging_conversation_started_7d",
+                                        "onsite_conversion.messaging_conversation_started_7d_click"
+                                    ]:
                                         leads = int(action.get("value", 0))
                                         break
                                 
@@ -212,12 +220,24 @@ async def get_adset_stats(adset_id: str, date_preset: str = Query("last_7d")):
                                 if leads > 0:
                                     cpl = spend / leads
                                 
+                                # Calculate CTR manually if not provided
+                                impressions = float(insight.get("impressions", 0))
+                                clicks = float(insight.get("clicks", 0))
+                                ctr = 0
+                                if impressions > 0:
+                                    ctr = (clicks / impressions) * 100
+                                
+                                # Calculate CPM manually if not provided
+                                cpm = 0
+                                if impressions > 0:
+                                    cpm = (spend / impressions) * 1000
+                                
                                 stats_data.append({
                                     "period": period["value"],
                                     "leads": leads,
                                     "cpl": cpl,
-                                    "cpm": float(insight.get("cpm", 0)),
-                                    "ctr": float(insight.get("ctr", 0)),
+                                    "cpm": cpm,
+                                    "ctr": ctr,
                                     "spent": spend
                                 })
                             else:
