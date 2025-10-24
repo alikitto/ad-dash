@@ -7,7 +7,7 @@ from fastapi import APIRouter, Query, HTTPException, Body
 # Важно: импорты теперь должны работать, так как мы запускаем uvicorn из папки backend
 from services import facebook_service, ai_service
 from models.payloads import AdSetPayload, StatusUpdatePayload
-from core.config import META_TOKEN
+from core.config import META_TOKEN, API_VERSION
 
 router = APIRouter()
 
@@ -48,6 +48,34 @@ async def check_token_status():
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
+@router.get("/test-facebook-api")
+async def test_facebook_api():
+    """Test Facebook API connection"""
+    if not META_TOKEN:
+        return {"error": "Token not configured"}
+    
+    try:
+        import aiohttp
+        async with aiohttp.ClientSession() as session:
+            # Test basic API call
+            url = f"https://graph.facebook.com/{API_VERSION}/me/adaccounts"
+            params = {
+                "access_token": META_TOKEN,
+                "fields": "name,account_id",
+                "limit": 1
+            }
+            
+            async with session.get(url, params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    return {"status": "success", "data": data}
+                else:
+                    error_data = await response.json()
+                    return {"status": "error", "error": error_data}
+                    
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
 @router.get("/adsets/{adset_id}/stats")
 async def get_adset_stats(adset_id: str, date_preset: str = Query("last_7d")):
     """Get detailed statistics for a specific adset across different time periods"""
@@ -84,6 +112,8 @@ async def get_adset_stats(adset_id: str, date_preset: str = Query("last_7d")):
                             data = await response.json()
                             insights = data.get("data", [])
                             
+                            logging.info(f"Facebook API response for {period['value']}: {data}")
+                            
                             if insights:
                                 insight = insights[0]
                                 
@@ -91,10 +121,26 @@ async def get_adset_stats(adset_id: str, date_preset: str = Query("last_7d")):
                                 leads = 0
                                 cpl = 0
                                 actions = insight.get("actions", [])
+                                
+                                # Try different action types for leads
                                 for action in actions:
-                                    if action.get("action_type") == "lead":
+                                    action_type = action.get("action_type", "")
+                                    if action_type in ["lead", "onsite_conversion.lead_grouped", "offsite_conversion.lead"]:
                                         leads = int(action.get("value", 0))
                                         break
+                                
+                                # If no leads found, try to get from cost_per_action_type
+                                if leads == 0:
+                                    cost_per_action = insight.get("cost_per_action_type", [])
+                                    for cost_action in cost_per_action:
+                                        action_type = cost_action.get("action_type", "")
+                                        if action_type in ["lead", "onsite_conversion.lead_grouped", "offsite_conversion.lead"]:
+                                            # Calculate leads from cost and spend
+                                            cost = float(cost_action.get("value", 0))
+                                            spend = float(insight.get("spend", 0))
+                                            if cost > 0:
+                                                leads = int(spend / cost)
+                                            break
                                 
                                 # Calculate CPL
                                 spend = float(insight.get("spend", 0))
