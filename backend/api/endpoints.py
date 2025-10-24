@@ -233,6 +233,119 @@ async def analyze_adset_details_endpoint(payload: AdSetPayload):
     if not payload.adset: raise HTTPException(status_code=400, detail="Adset data is required.")
     return await ai_service.get_ai_detailed_analysis(payload.adset)
 
+@router.get("/adsets/{adset_id}/time-insights")
+async def get_adset_time_insights(adset_id: str):
+    """Get time-based insights for adset (hourly and daily performance)"""
+    if not META_TOKEN:
+        raise HTTPException(status_code=500, detail="Token not configured")
+    
+    try:
+        import aiohttp
+        from utils.helpers import safe_float
+        from core.config import LEAD_ACTION_TYPE
+        from datetime import datetime, timedelta
+        
+        today = datetime.now()
+        week_ago = today - timedelta(days=7)
+        
+        async with aiohttp.ClientSession() as session:
+            # Get hourly breakdown for last 7 days
+            url = f"https://graph.facebook.com/{API_VERSION}/{adset_id}/insights"
+            params = {
+                "access_token": META_TOKEN,
+                "time_range": f'{{"since":"{week_ago.strftime("%Y-%m-%d")}","until":"{today.strftime("%Y-%m-%d")}"}}',
+                "time_increment": 1,
+                "breakdowns": "hourly_stats_aggregated_by_advertiser_time_zone",
+                "fields": "spend,impressions,clicks,actions,cost_per_action_type,cpm,ctr,frequency,date_start,hourly_stats_aggregated_by_advertiser_time_zone"
+            }
+            
+            async with session.get(url, params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    insights = data.get("data", [])
+                    
+                    # Process hourly data
+                    hourly_data = {}
+                    daily_data = {}
+                    
+                    for insight in insights:
+                        date_str = insight.get("date_start", "")
+                        hour = insight.get("hourly_stats_aggregated_by_advertiser_time_zone", "0")
+                        
+                        spend = safe_float(insight.get("spend", 0))
+                        leads = sum(int(safe_float(a.get("value", 0))) for a in insight.get("actions", []) or [] if LEAD_ACTION_TYPE in a.get("action_type", ""))
+                        impressions = int(safe_float(insight.get("impressions", 0)))
+                        
+                        # Skip if no activity
+                        if spend == 0 and leads == 0 and impressions == 0:
+                            continue
+                        
+                        # Daily aggregation
+                        if date_str not in daily_data:
+                            daily_data[date_str] = {
+                                "date": date_str,
+                                "spend": 0,
+                                "leads": 0,
+                                "impressions": 0,
+                                "hours": {}
+                            }
+                        
+                        daily_data[date_str]["spend"] += spend
+                        daily_data[date_str]["leads"] += leads
+                        daily_data[date_str]["impressions"] += impressions
+                        daily_data[date_str]["hours"][hour] = {
+                            "spend": spend,
+                            "leads": leads,
+                            "impressions": impressions,
+                            "cpl": (spend / leads) if leads > 0 else 0,
+                            "ctr": safe_float(insight.get("ctr", 0))
+                        }
+                        
+                        # Hourly aggregation
+                        hour_key = f"{date_str}_{hour}"
+                        if hour_key not in hourly_data:
+                            hourly_data[hour_key] = {
+                                "date": date_str,
+                                "hour": int(hour),
+                                "spend": 0,
+                                "leads": 0,
+                                "impressions": 0
+                            }
+                        
+                        hourly_data[hour_key]["spend"] += spend
+                        hourly_data[hour_key]["leads"] += leads
+                        hourly_data[hour_key]["impressions"] += impressions
+                    
+                    # Calculate hourly averages
+                    hourly_avg = {}
+                    for hour in range(24):
+                        hour_data = [data for data in hourly_data.values() if data["hour"] == hour]
+                        if hour_data:
+                            hourly_avg[str(hour)] = {
+                                "hour": hour,
+                                "avg_spend": sum(d["spend"] for d in hour_data) / len(hour_data),
+                                "avg_leads": sum(d["leads"] for d in hour_data) / len(hour_data),
+                                "avg_impressions": sum(d["impressions"] for d in hour_data) / len(hour_data),
+                                "total_spend": sum(d["spend"] for d in hour_data),
+                                "total_leads": sum(d["leads"] for d in hour_data),
+                                "total_impressions": sum(d["impressions"] for d in hour_data)
+                            }
+                    
+                    return {
+                        "hourly_averages": hourly_avg,
+                        "daily_data": list(daily_data.values()),
+                        "best_hours": sorted(hourly_avg.values(), key=lambda x: x["total_leads"], reverse=True)[:5],
+                        "worst_hours": sorted(hourly_avg.values(), key=lambda x: x["total_leads"])[:5]
+                    }
+                else:
+                    error_text = await response.text()
+                    logging.error(f"Error response from Facebook API: {response.status} - {error_text}")
+                    return {"error": "Failed to fetch time insights"}
+                    
+    except Exception as e:
+        logging.error(f"Error fetching time insights: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to fetch time insights: {str(e)}")
+
 @router.get("/adsets/{adset_id}/ads")
 async def get_ads_for_adset(
     adset_id: str,

@@ -31,6 +31,8 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
   const [loading, setLoading] = useState(false);
   const [creativesData, setCreativesData] = useState(null);
   const [creativesLoading, setCreativesLoading] = useState(false);
+  const [timeInsights, setTimeInsights] = useState(null);
+  const [timeInsightsLoading, setTimeInsightsLoading] = useState(false);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   
   const bgColor = useColorModeValue("white", "gray.800");
@@ -44,6 +46,7 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
       console.log("Adset ID:", adset.adset_id);
       fetchAdsetStats();
       fetchCreatives();
+      fetchTimeInsights();
     }
   }, [isOpen, adset]);
 
@@ -105,6 +108,35 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
       setCreativesData(null);
     } finally {
       setCreativesLoading(false);
+    }
+  };
+
+  const fetchTimeInsights = async () => {
+    if (!adset?.adset_id) {
+      console.log("No adset_id found for time insights:", adset);
+      return;
+    }
+    
+    console.log("Fetching time insights for adset_id:", adset.adset_id);
+    setTimeInsightsLoading(true);
+    try {
+      const url = `https://ad-dash-backend-production.up.railway.app/api/adsets/${adset.adset_id}/time-insights`;
+      console.log("Time insights URL:", url);
+      
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        throw new Error("Failed to fetch time insights");
+      }
+      
+      const data = await response.json();
+      console.log("Received time insights data:", data);
+      setTimeInsights(data);
+    } catch (error) {
+      console.error("Error fetching time insights:", error);
+      setTimeInsights(null);
+    } finally {
+      setTimeInsightsLoading(false);
     }
   };
 
@@ -521,6 +553,118 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
                   <Box textAlign="center" py={4}>
                     <Text color="gray.500" fontSize="sm">
                       Нет креативов для отображения
+                    </Text>
+                  </Box>
+                )}
+              </Box>
+              
+              {/* Time Efficiency Section */}
+              <Box mt={6}>
+                <Text fontSize="lg" fontWeight="bold" mb={3} color={textColor}>
+                  Эффективность по времени
+                </Text>
+                
+                {timeInsightsLoading ? (
+                  <Flex justify="center" align="center" py={4}>
+                    <Spinner size="md" color="purple.500" />
+                    <Text ml={3}>Загрузка данных по времени...</Text>
+                  </Flex>
+                ) : timeInsights && !timeInsights.error ? (
+                  <Box>
+                    {/* Best and Worst Hours */}
+                    <Flex gap={6} mb={6}>
+                      <Box flex={1} p={4} bg={useColorModeValue("green.50", "green.900")} borderRadius="md">
+                        <Text fontSize="md" fontWeight="bold" color="green.600" mb={2}>
+                          🏆 Лучшие часы
+                        </Text>
+                        {timeInsights.best_hours && timeInsights.best_hours.length > 0 ? (
+                          <Box>
+                            {timeInsights.best_hours.slice(0, 3).map((hour, index) => (
+                              <Flex key={index} justify="space-between" align="center" py={1}>
+                                <Text fontSize="sm">
+                                  {hour.hour}:00 - {hour.hour + 1}:00
+                                </Text>
+                                <Text fontSize="sm" fontWeight="bold" color="green.600">
+                                  {formatNumber(hour.total_leads)} leads
+                                </Text>
+                              </Flex>
+                            ))}
+                          </Box>
+                        ) : (
+                          <Text fontSize="sm" color="gray.500">Нет данных</Text>
+                        )}
+                      </Box>
+                      
+                      <Box flex={1} p={4} bg={useColorModeValue("red.50", "red.900")} borderRadius="md">
+                        <Text fontSize="md" fontWeight="bold" color="red.600" mb={2}>
+                          ⚠️ Худшие часы
+                        </Text>
+                        {timeInsights.worst_hours && timeInsights.worst_hours.length > 0 ? (
+                          <Box>
+                            {timeInsights.worst_hours.slice(0, 3).map((hour, index) => (
+                              <Flex key={index} justify="space-between" align="center" py={1}>
+                                <Text fontSize="sm">
+                                  {hour.hour}:00 - {hour.hour + 1}:00
+                                </Text>
+                                <Text fontSize="sm" fontWeight="bold" color="red.600">
+                                  {formatNumber(hour.total_leads)} leads
+                                </Text>
+                              </Flex>
+                            ))}
+                          </Box>
+                        ) : (
+                          <Text fontSize="sm" color="gray.500">Нет данных</Text>
+                        )}
+                      </Box>
+                    </Flex>
+                    
+                    {/* Hourly Performance Chart */}
+                    <Box>
+                      <Text fontSize="md" fontWeight="bold" mb={3} color={textColor}>
+                        Производительность по часам (последние 7 дней)
+                      </Text>
+                      <Box p={4} bg={useColorModeValue("gray.50", "gray.700")} borderRadius="md">
+                        <Flex wrap="wrap" gap={2}>
+                          {timeInsights.hourly_averages && Object.keys(timeInsights.hourly_averages).length > 0 ? (
+                            Object.values(timeInsights.hourly_averages)
+                              .sort((a, b) => a.hour - b.hour)
+                              .map((hour) => {
+                                const maxLeads = Math.max(...Object.values(timeInsights.hourly_averages).map(h => h.total_leads));
+                                const intensity = maxLeads > 0 ? (hour.total_leads / maxLeads) : 0;
+                                const bgColor = intensity > 0.7 ? "green.400" : intensity > 0.4 ? "yellow.400" : "gray.300";
+                                
+                                return (
+                                  <Box
+                                    key={hour.hour}
+                                    p={2}
+                                    bg={bgColor}
+                                    borderRadius="md"
+                                    minW="60px"
+                                    textAlign="center"
+                                  >
+                                    <Text fontSize="xs" fontWeight="bold">
+                                      {hour.hour}:00
+                                    </Text>
+                                    <Text fontSize="xs">
+                                      {formatNumber(hour.total_leads)}
+                                    </Text>
+                                    <Text fontSize="xs" color="gray.600">
+                                      leads
+                                    </Text>
+                                  </Box>
+                                );
+                              })
+                          ) : (
+                            <Text fontSize="sm" color="gray.500">Нет данных по часам</Text>
+                          )}
+                        </Flex>
+                      </Box>
+                    </Box>
+                  </Box>
+                ) : (
+                  <Box textAlign="center" py={4}>
+                    <Text color="gray.500" fontSize="sm">
+                      Нет данных по эффективности времени
                     </Text>
                   </Box>
                 )}
