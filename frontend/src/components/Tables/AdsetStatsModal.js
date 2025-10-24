@@ -131,10 +131,17 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
       
       const data = await response.json();
       console.log("Received time insights data:", data);
-      setTimeInsights(data);
+      
+      // Check if data is valid
+      if (data && (data.hourly_averages || data.best_hours || data.worst_hours)) {
+        setTimeInsights(data);
+      } else {
+        console.warn("Invalid time insights data received:", data);
+        setTimeInsights({ error: "Получены некорректные данные" });
+      }
     } catch (error) {
       console.error("Error fetching time insights:", error);
-      setTimeInsights(null);
+      setTimeInsights({ error: error.message || "Ошибка загрузки данных" });
     } finally {
       setTimeInsightsLoading(false);
     }
@@ -872,7 +879,7 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
                     <Spinner size="md" color="purple.500" />
                     <Text ml={3}>Загрузка данных по времени...</Text>
                   </Flex>
-                ) : timeInsights && !timeInsights.error ? (
+                ) : timeInsights && !timeInsights.error && (timeInsights.hourly_averages && Object.keys(timeInsights.hourly_averages).length > 0) ? (
                   <Box>
                     {/* Best and Worst Hours */}
                     <Flex gap={6} mb={6}>
@@ -966,9 +973,20 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
                   </Box>
                 ) : (
                   <Box textAlign="center" py={4}>
-                    <Text color="gray.500" fontSize="sm">
-                      Нет данных по эффективности времени
+                    <Text color="gray.500" fontSize="sm" mb={2}>
+                      {timeInsights && timeInsights.error 
+                        ? `Ошибка загрузки данных: ${timeInsights.error}` 
+                        : "Нет данных по эффективности времени"
+                      }
                     </Text>
+                    <Button
+                      size="sm"
+                      colorScheme="purple"
+                      variant="outline"
+                      onClick={fetchTimeInsights}
+                    >
+                      Попробовать снова
+                    </Button>
                   </Box>
                 )}
               </Box>
