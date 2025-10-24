@@ -126,7 +126,7 @@ async def test_facebook_api():
         return {"status": "error", "message": str(e)}
 
 @router.get("/adsets/{adset_id}/stats")
-async def get_adset_stats(adset_id: str, date_preset: str = Query("last_7d")):
+async def get_adset_stats(adset_id: str):
     """Get detailed statistics for a specific adset across different time periods"""
     if not META_TOKEN:
         raise HTTPException(status_code=500, detail="Token not configured")
@@ -135,6 +135,9 @@ async def get_adset_stats(adset_id: str, date_preset: str = Query("last_7d")):
     
     try:
         import aiohttp
+        from services.facebook_service import get_ad_accounts, get_insights_for_adsets
+        from utils.helpers import safe_float
+        from core.config import LEAD_ACTION_TYPE
         
         # Define time periods to fetch
         periods = [
@@ -148,119 +151,65 @@ async def get_adset_stats(adset_id: str, date_preset: str = Query("last_7d")):
         stats_data = []
         
         async with aiohttp.ClientSession() as session:
-            # First, check if adset exists
-            try:
-                check_url = f"https://graph.facebook.com/{API_VERSION}/{adset_id}"
-                check_params = {"access_token": META_TOKEN, "fields": "id,name,status"}
-                async with session.get(check_url, params=check_params) as check_response:
-                    if check_response.status != 200:
-                        logging.error(f"Adset {adset_id} not found or inaccessible: {check_response.status}")
-                        return []
-                    adset_info = await check_response.json()
-                    logging.info(f"Adset info: {adset_info}")
-            except Exception as e:
-                logging.error(f"Error checking adset {adset_id}: {e}")
+            # Get all accounts to find which one contains this adset
+            accounts = await get_ad_accounts(session)
+            if not accounts:
                 return []
             
+            # Find the account that contains this adset
+            target_account_id = None
+            for acc in accounts:
+                acc_id = acc.get("account_id")
+                if not acc_id:
+                    continue
+                
+                # Check if this adset belongs to this account
+                try:
+                    insights = await get_insights_for_adsets(session, acc_id, [adset_id], "today")
+                    if insights and any(ins.get("adset_id") == adset_id for ins in insights):
+                        target_account_id = acc_id
+                        break
+                except:
+                    continue
+            
+            if not target_account_id:
+                logging.error(f"Could not find account for adset {adset_id}")
+                return []
+            
+            logging.info(f"Found account {target_account_id} for adset {adset_id}")
+            
+            # Get insights for each period using the same logic as main dashboard
             for period in periods:
                 try:
-                    # Get insights for the adset
-                    url = f"https://graph.facebook.com/{API_VERSION}/{adset_id}/insights"
-                    params = {
-                        "access_token": META_TOKEN,
-                        "date_preset": period["value"],
-                        "fields": "spend,impressions,clicks,link_clicks,actions,cost_per_action_type,cpm,ctr"
-                    }
+                    insights = await get_insights_for_adsets(session, target_account_id, [adset_id], period["value"])
                     
-                    async with session.get(url, params=params) as response:
-                        if response.status == 200:
-                            data = await response.json()
-                            insights = data.get("data", [])
-                            
-                            logging.info(f"Facebook API response for {period['value']}: {data}")
-                            
-                            if insights:
-                                insight = insights[0]
-                                
-                                # Extract leads from actions
-                                leads = 0
-                                cpl = 0
-                                actions = insight.get("actions", [])
-                                
-                                # Try different action types for leads
-                                for action in actions:
-                                    action_type = action.get("action_type", "")
-                                    # Look for various lead-related actions
-                                    if action_type in [
-                                        "lead", 
-                                        "onsite_conversion.lead_grouped", 
-                                        "offsite_conversion.lead",
-                                        "onsite_conversion.messaging_user_depth_3_message_send",  # This might be a lead
-                                        "onsite_conversion.messaging_conversation_started_7d",
-                                        "onsite_conversion.messaging_conversation_started_7d_click"
-                                    ]:
-                                        leads = int(action.get("value", 0))
-                                        break
-                                
-                                # If no leads found, try to get from cost_per_action_type
-                                if leads == 0:
-                                    cost_per_action = insight.get("cost_per_action_type", [])
-                                    for cost_action in cost_per_action:
-                                        action_type = cost_action.get("action_type", "")
-                                        if action_type in ["lead", "onsite_conversion.lead_grouped", "offsite_conversion.lead"]:
-                                            # Calculate leads from cost and spend
-                                            cost = float(cost_action.get("value", 0))
-                                            spend = float(insight.get("spend", 0))
-                                            if cost > 0:
-                                                leads = int(spend / cost)
-                                            break
-                                
-                                # Calculate CPL
-                                spend = float(insight.get("spend", 0))
-                                if leads > 0:
-                                    cpl = spend / leads
-                                
-                                # Calculate CTR manually if not provided
-                                impressions = float(insight.get("impressions", 0))
-                                clicks = float(insight.get("clicks", 0))
-                                ctr = 0
-                                if impressions > 0:
-                                    ctr = (clicks / impressions) * 100
-                                
-                                # Calculate CPM manually if not provided
-                                cpm = 0
-                                if impressions > 0:
-                                    cpm = (spend / impressions) * 1000
-                                
-                                stats_data.append({
-                                    "period": period["value"],
-                                    "leads": leads,
-                                    "cpl": cpl,
-                                    "cpm": cpm,
-                                    "ctr": ctr,
-                                    "spent": spend
-                                })
-                            else:
-                                # No data for this period
-                                stats_data.append({
-                                    "period": period["value"],
-                                    "leads": 0,
-                                    "cpl": 0,
-                                    "cpm": 0,
-                                    "ctr": 0,
-                                    "spent": 0
-                                })
-                        else:
-                            # Error for this period, add empty data
-                            stats_data.append({
-                                "period": period["value"],
-                                "leads": 0,
-                                "cpl": 0,
-                                "cpm": 0,
-                                "ctr": 0,
-                                "spent": 0
-                            })
-                            
+                    if insights:
+                        insight = insights[0]  # Should be only one for this adset
+                        logging.info(f"Found insights for {period['value']}: {insight}")
+                        
+                        # Use the same logic as main dashboard
+                        spend = safe_float(insight.get("spend", 0))
+                        leads = sum(int(safe_float(a.get("value", 0))) for a in insight.get("actions", []) or [] if LEAD_ACTION_TYPE in a.get("action_type", ""))
+                        
+                        stats_data.append({
+                            "period": period["value"],
+                            "leads": leads,
+                            "cpl": (spend / leads) if leads > 0 else 0.0,
+                            "cpm": safe_float(insight.get("cpm", 0)),
+                            "ctr": safe_float(insight.get("ctr", 0)),
+                            "spent": spend
+                        })
+                    else:
+                        # No data for this period
+                        stats_data.append({
+                            "period": period["value"],
+                            "leads": 0,
+                            "cpl": 0,
+                            "cpm": 0,
+                            "ctr": 0,
+                            "spent": 0
+                        })
+                        
                 except Exception as e:
                     logging.error(f"Error fetching stats for period {period['value']}: {e}")
                     # Add empty data for failed period
