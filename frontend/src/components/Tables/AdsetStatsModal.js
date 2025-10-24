@@ -35,6 +35,7 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
   const bgColor = useColorModeValue("white", "gray.800");
   const textColor = useColorModeValue("gray.800", "white");
   const borderColor = useColorModeValue("gray.200", "gray.600");
+  const totalsBgColor = useColorModeValue("gray.50", "gray.700");
 
   useEffect(() => {
     if (isOpen && adset) {
@@ -216,7 +217,7 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
                 <Box mt={4} pt={4} borderTop="1px solid" borderColor={borderColor}>
                   <Table variant="simple" size="sm">
                     <Tbody>
-                      <Tr bg={useColorModeValue("gray.50", "gray.700")}>
+                      <Tr bg={totalsBgColor}>
                         <Td borderColor={borderColor} color={textColor}>
                           <Text fontWeight="bold" fontSize="sm">
                             Всего
