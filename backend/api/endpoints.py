@@ -140,12 +140,17 @@ async def get_adset_stats(adset_id: str):
         from core.config import LEAD_ACTION_TYPE
         
         # Define time periods to fetch
+        from datetime import datetime, timedelta
+        
+        today = datetime.now()
+        yesterday = today - timedelta(days=1)
+        day_before_yesterday = today - timedelta(days=2)
+        
         periods = [
-            {"value": "today", "label": "Сегодня"},
-            {"value": "yesterday", "label": "Вчера"}, 
-            {"value": "last_3d", "label": "Позавчера"},
-            {"value": "last_7d", "label": "Неделя"},
-            {"value": "last_30d", "label": "Все время"}
+            {"value": "today", "label": "Сегодня", "date_preset": "today"},
+            {"value": "yesterday", "label": "Вчера", "date_preset": "yesterday"}, 
+            {"value": "day_before_yesterday", "label": f"Позавчера ({day_before_yesterday.strftime('%d.%m.%Y')})", "date_preset": "yesterday", "days_back": 2},
+            {"value": "all_time", "label": "За все время", "date_preset": "maximum"}
         ]
         
         stats_data = []
@@ -181,7 +186,14 @@ async def get_adset_stats(adset_id: str):
             # Get insights for each period using the same logic as main dashboard
             for period in periods:
                 try:
-                    insights = await get_insights_for_adsets(session, target_account_id, [adset_id], period["value"])
+                    # Handle special case for day before yesterday
+                    if period["value"] == "day_before_yesterday":
+                        # Get data for specific date 2 days ago
+                        start_date = (today - timedelta(days=2)).strftime("%Y-%m-%d")
+                        end_date = (today - timedelta(days=2)).strftime("%Y-%m-%d")
+                        insights = await get_insights_for_adsets(session, target_account_id, [adset_id], "custom", start_date, end_date)
+                    else:
+                        insights = await get_insights_for_adsets(session, target_account_id, [adset_id], period["date_preset"])
                     
                     if insights:
                         insight = insights[0]  # Should be only one for this adset
@@ -193,20 +205,24 @@ async def get_adset_stats(adset_id: str):
                         
                         stats_data.append({
                             "period": period["value"],
+                            "label": period["label"],
                             "leads": leads,
                             "cpl": (spend / leads) if leads > 0 else 0.0,
                             "cpm": safe_float(insight.get("cpm", 0)),
                             "ctr": safe_float(insight.get("ctr", 0)),
+                            "frequency": safe_float(insight.get("frequency", 0)),
                             "spent": spend
                         })
                     else:
                         # No data for this period
                         stats_data.append({
                             "period": period["value"],
+                            "label": period["label"],
                             "leads": 0,
                             "cpl": 0,
                             "cpm": 0,
                             "ctr": 0,
+                            "frequency": 0,
                             "spent": 0
                         })
                         
@@ -215,10 +231,12 @@ async def get_adset_stats(adset_id: str):
                     # Add empty data for failed period
                     stats_data.append({
                         "period": period["value"],
+                        "label": period["label"],
                         "leads": 0,
                         "cpl": 0,
                         "cpm": 0,
                         "ctr": 0,
+                        "frequency": 0,
                         "spent": 0
                     })
         
