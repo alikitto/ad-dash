@@ -125,51 +125,6 @@ async def test_facebook_api():
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
-@router.get("/adsets/{adset_id}/debug")
-async def debug_adset_stats(adset_id: str):
-    """Debug endpoint to see raw Facebook API response"""
-    if not META_TOKEN:
-        raise HTTPException(status_code=500, detail="Token not configured")
-    
-    try:
-        import aiohttp
-        from core.config import LEAD_ACTION_TYPE
-        
-        async with aiohttp.ClientSession() as session:
-            url = f"https://graph.facebook.com/{API_VERSION}/{adset_id}/insights"
-            params = {
-                "access_token": META_TOKEN,
-                "date_preset": "maximum",
-                "time_increment": 1,
-                "fields": "spend,impressions,clicks,actions,cost_per_action_type,cpm,ctr,frequency,date_start"
-            }
-            
-            async with session.get(url, params=params) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    return {
-                        "status": "success",
-                        "adset_id": adset_id,
-                        "lead_action_type": LEAD_ACTION_TYPE,
-                        "raw_data": data,
-                        "insights_count": len(data.get("data", [])),
-                        "sample_insight": data.get("data", [{}])[0] if data.get("data") else None
-                    }
-                else:
-                    error_text = await response.text()
-                    return {
-                        "status": "error",
-                        "adset_id": adset_id,
-                        "response_status": response.status,
-                        "error": error_text
-                    }
-    except Exception as e:
-        return {
-            "status": "exception",
-            "adset_id": adset_id,
-            "error": str(e)
-        }
-
 @router.get("/adsets/{adset_id}/stats")
 async def get_adset_stats(adset_id: str):
     """Get detailed statistics for a specific adset with daily breakdown"""

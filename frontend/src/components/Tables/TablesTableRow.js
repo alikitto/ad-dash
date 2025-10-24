@@ -137,7 +137,7 @@ function TablesTableRow(props) {
         <Td><Text fontSize="xs">{shortObjective(adset.objective)}</Text></Td>
         <Td><Text fontSize="sm">{fmtMoney(adset.spend)}</Text></Td>
         <Td><Text fontSize="sm">{fmtNum(adset.impressions)}</Text></Td>
-        <Td><Text fontSize="sm">{adset.frequency?.toFixed(3)}</Text></Td>
+        <Td><Text fontSize="sm">{adset.frequency?.toFixed(2)}</Text></Td>
         <Td><Text fontSize="sm">{fmtNum(adset.leads)}</Text></Td>
         <Td><Text fontSize="sm">{fmtMoney(adset.cpl)}</Text></Td>
         <Td><Text fontSize="sm">{fmtMoney(adset.cpm)}</Text></Td>
@@ -145,7 +145,7 @@ function TablesTableRow(props) {
         <Td><Text fontSize="sm">{fmtPct(ctrLinkClick)}</Text></Td>
         <Td><Text fontSize="sm">{fmtNum(adset.link_clicks)}</Text></Td>
       </Tr>
-      {expanded && (adsLoading ? (<Tr><Td colSpan={13}><Flex py={3} justify="center" align="center"><Spinner size="sm" mr={2} />Loading ads…</Flex></Td></Tr>) : ads.length === 0 ? (<Tr><Td colSpan={13}><Text color="gray.300" fontSize="sm" py={3} pl="68px">No ads found for this ad set.</Text></Td></Tr>) : (ads.map((ad) => (<Tr key={ad.ad_id} bg={AD_ROW_BG}><Td position="sticky" left="0" zIndex="1" py={2}><Flex align="center" gap={3} pl="48px">{ad.thumbnail_url ? <Image src={ad.thumbnail_url} alt="" boxSize="32px" borderRadius="md" objectFit="cover" /> : <Avatar size="sm" name={ad.ad_name} />}<Text noOfLines={1}>{ad.ad_name}</Text></Flex></Td><Td>{updatingAdId === ad.ad_id ? <Spinner size="xs" /> : <Switch size="sm" colorScheme="teal" isChecked={ad.status === "ACTIVE"} onChange={() => updateAdStatus(ad.ad_id, ad.status)} />}</Td><Td></Td><Td><Text fontSize="xs">—</Text></Td><Td>{fmtMoney(ad.spend)}</Td><Td>{fmtNum(ad.impressions)}</Td><Td>{ad.frequency?.toFixed(3)}</Td><Td>{fmtNum(ad.leads)}</Td><Td>{fmtMoney(ad.cpa)}</Td><Td>{fmtMoney(ad.cpm)}</Td><Td>{fmtPct(ad.ctr)}</Td><Td>{fmtPct(ad.ctr_link)}</Td><Td>{fmtNum(ad.link_clicks)}</Td></Tr>))))}
+      {expanded && (adsLoading ? (<Tr><Td colSpan={13}><Flex py={3} justify="center" align="center"><Spinner size="sm" mr={2} />Loading ads…</Flex></Td></Tr>) : ads.length === 0 ? (<Tr><Td colSpan={13}><Text color="gray.300" fontSize="sm" py={3} pl="68px">No ads found for this ad set.</Text></Td></Tr>) : (ads.map((ad) => (<Tr key={ad.ad_id} bg={AD_ROW_BG}><Td position="sticky" left="0" zIndex="1" py={2}><Flex align="center" gap={3} pl="48px">{ad.thumbnail_url ? <Image src={ad.thumbnail_url} alt="" boxSize="32px" borderRadius="md" objectFit="cover" /> : <Avatar size="sm" name={ad.ad_name} />}<Text noOfLines={1}>{ad.ad_name}</Text></Flex></Td><Td>{updatingAdId === ad.ad_id ? <Spinner size="xs" /> : <Switch size="sm" colorScheme="teal" isChecked={ad.status === "ACTIVE"} onChange={() => updateAdStatus(ad.ad_id, ad.status)} />}</Td><Td></Td><Td><Text fontSize="xs">—</Text></Td><Td>{fmtMoney(ad.spend)}</Td><Td>{fmtNum(ad.impressions)}</Td><Td>{ad.frequency?.toFixed(2)}</Td><Td>{fmtNum(ad.leads)}</Td><Td>{fmtMoney(ad.cpa)}</Td><Td>{fmtMoney(ad.cpm)}</Td><Td>{fmtPct(ad.ctr)}</Td><Td>{fmtPct(ad.ctr_link)}</Td><Td>{fmtNum(ad.link_clicks)}</Td></Tr>))))}
       {rowAnalysisResult && <AnalysisModal isOpen={isRowModalOpen} onClose={() => setIsRowModalOpen(false)} data={rowAnalysisResult} />}
       <AdsetStatsModal 
         isOpen={isStatsModalOpen} 
