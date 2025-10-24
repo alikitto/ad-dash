@@ -192,6 +192,9 @@ async def get_adset_stats(adset_id: str):
                                 leads = sum(int(safe_float(a.get("value", 0))) for a in insight.get("actions", []) or [] if LEAD_ACTION_TYPE in a.get("action_type", ""))
                                 impressions = int(safe_float(insight.get("impressions", 0)))
                                 
+                                logging.info(f"Processed data for {period['value']}: spend={spend}, leads={leads}, impressions={impressions}")
+                                logging.info(f"Actions: {insight.get('actions', [])}")
+                                
                                 # Always add data if insights exist
                                 stats_data.append({
                                     "period": period["value"],
