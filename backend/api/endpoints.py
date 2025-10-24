@@ -156,34 +156,7 @@ async def get_adset_stats(adset_id: str):
         stats_data = []
         
         async with aiohttp.ClientSession() as session:
-            # Get all accounts to find which one contains this adset
-            accounts = await get_ad_accounts(session)
-            if not accounts:
-                return []
-            
-            # Find the account that contains this adset
-            target_account_id = None
-            for acc in accounts:
-                acc_id = acc.get("account_id")
-                if not acc_id:
-                    continue
-                
-                # Check if this adset belongs to this account
-                try:
-                    insights = await get_insights_for_adsets(session, acc_id, [adset_id], "today")
-                    if insights and any(ins.get("adset_id") == adset_id for ins in insights):
-                        target_account_id = acc_id
-                        break
-                except:
-                    continue
-            
-            if not target_account_id:
-                logging.error(f"Could not find account for adset {adset_id}")
-                return []
-            
-            logging.info(f"Found account {target_account_id} for adset {adset_id}")
-            
-            # Get insights for each period using the same logic as main dashboard
+            # Get insights for each period directly from adset
             for period in periods:
                 try:
                     # Handle special case for day before yesterday
@@ -191,9 +164,24 @@ async def get_adset_stats(adset_id: str):
                         # Get data for specific date 2 days ago
                         start_date = (today - timedelta(days=2)).strftime("%Y-%m-%d")
                         end_date = (today - timedelta(days=2)).strftime("%Y-%m-%d")
-                        insights = await get_insights_for_adsets(session, target_account_id, [adset_id], "custom", start_date, end_date)
+                        url = f"https://graph.facebook.com/{API_VERSION}/{adset_id}/insights"
+                        params = {
+                            "access_token": META_TOKEN,
+                            "time_range": f'{{"since":"{start_date}","until":"{end_date}"}}',
+                            "fields": "spend,impressions,clicks,link_clicks,actions,cost_per_action_type,cpm,ctr,frequency"
+                        }
                     else:
-                        insights = await get_insights_for_adsets(session, target_account_id, [adset_id], period["date_preset"])
+                        url = f"https://graph.facebook.com/{API_VERSION}/{adset_id}/insights"
+                        params = {
+                            "access_token": META_TOKEN,
+                            "date_preset": period["date_preset"],
+                            "fields": "spend,impressions,clicks,link_clicks,actions,cost_per_action_type,cpm,ctr,frequency"
+                        }
+                    
+                    async with session.get(url, params=params) as response:
+                        if response.status == 200:
+                            data = await response.json()
+                            insights = data.get("data", [])
                     
                     if insights:
                         insight = insights[0]  # Should be only one for this adset
@@ -221,6 +209,9 @@ async def get_adset_stats(adset_id: str):
                         
                 except Exception as e:
                     logging.error(f"Error fetching stats for period {period['value']}: {e}")
+                    # If it's a 403 error, the adset might not be accessible
+                    if "403" in str(e) or "Forbidden" in str(e):
+                        logging.error(f"Access denied for adset {adset_id} in account {target_account_id}")
                     # Don't add empty data - let frontend handle missing periods
         
         return stats_data
