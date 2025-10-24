@@ -2,8 +2,9 @@
 
 import React, { useState } from "react";
 import { Avatar, Flex, Td, Text, Tr, Switch, useColorModeValue, Spinner, Image, Box, useToast, IconButton, Icon } from "@chakra-ui/react";
-import { FaMagic } from "react-icons/fa";
+import { FaMagic, FaChartLine } from "react-icons/fa";
 import AnalysisModal from "components/Tables/AnalysisModal";
+import AdsetStatsModal from "components/Tables/AdsetStatsModal";
 import { CLIENT_AVATARS } from "../../variables/clientAvatars.js";
 
 function resolveAvatar(adset) {
@@ -43,6 +44,7 @@ function TablesTableRow(props) {
   const [isRowAnalyzing, setIsRowAnalyzing] = useState(false);
   const [rowAnalysisResult, setRowAnalysisResult] = useState(null);
   const [isRowModalOpen, setIsRowModalOpen] = useState(false);
+  const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
   
   const avatarSrc = resolveAvatar(adset);
   const ctrLinkClick = adset && adset.impressions > 0 ? (Number(adset.link_clicks || 0) / adset.impressions) * 100 : 0;
@@ -109,7 +111,28 @@ function TablesTableRow(props) {
         </Td>
         <Td>{isUpdating ? <Spinner size="sm" /> : <Switch colorScheme="teal" isChecked={adset.status === "ACTIVE"} onChange={() => onStatusChange(adset.adset_id, adset.status === "ACTIVE" ? "PAUSED" : "ACTIVE")} />}</Td>
         <Td>
-          <IconButton aria-label="Analyze Ad Set" icon={<Icon as={FaMagic} />} size="sm" colorScheme="purple" variant="ghost" onClick={handleRowAnalysis} isLoading={isRowAnalyzing} />
+          <Flex gap={2} align="center">
+            <IconButton 
+              aria-label="Analyze Ad Set" 
+              icon={<Icon as={FaMagic} />} 
+              size="sm" 
+              colorScheme="purple" 
+              variant="solid" 
+              onClick={handleRowAnalysis} 
+              isLoading={isRowAnalyzing} 
+            />
+            <IconButton 
+              aria-label="View Ad Set Statistics" 
+              icon={<Icon as={FaChartLine} />} 
+              size="sm" 
+              colorScheme="blue" 
+              variant="solid" 
+              onClick={() => {
+                console.log("Opening stats modal for adset:", adset.adset_name);
+                setIsStatsModalOpen(true);
+              }} 
+            />
+          </Flex>
         </Td>
         <Td><Text fontSize="xs">{shortObjective(adset.objective)}</Text></Td>
         <Td><Text fontSize="sm">{fmtMoney(adset.spend)}</Text></Td>
@@ -124,6 +147,11 @@ function TablesTableRow(props) {
       </Tr>
       {expanded && (adsLoading ? (<Tr><Td colSpan={13}><Flex py={3} justify="center" align="center"><Spinner size="sm" mr={2} />Loading ads…</Flex></Td></Tr>) : ads.length === 0 ? (<Tr><Td colSpan={13}><Text color="gray.300" fontSize="sm" py={3} pl="68px">No ads found for this ad set.</Text></Td></Tr>) : (ads.map((ad) => (<Tr key={ad.ad_id} bg={AD_ROW_BG}><Td position="sticky" left="0" zIndex="1" py={2}><Flex align="center" gap={3} pl="48px">{ad.thumbnail_url ? <Image src={ad.thumbnail_url} alt="" boxSize="32px" borderRadius="md" objectFit="cover" /> : <Avatar size="sm" name={ad.ad_name} />}<Text noOfLines={1}>{ad.ad_name}</Text></Flex></Td><Td>{updatingAdId === ad.ad_id ? <Spinner size="xs" /> : <Switch size="sm" colorScheme="teal" isChecked={ad.status === "ACTIVE"} onChange={() => updateAdStatus(ad.ad_id, ad.status)} />}</Td><Td></Td><Td><Text fontSize="xs">—</Text></Td><Td>{fmtMoney(ad.spend)}</Td><Td>{fmtNum(ad.impressions)}</Td><Td>{ad.frequency?.toFixed(3)}</Td><Td>{fmtNum(ad.leads)}</Td><Td>{fmtMoney(ad.cpa)}</Td><Td>{fmtMoney(ad.cpm)}</Td><Td>{fmtPct(ad.ctr)}</Td><Td>{fmtPct(ad.ctr_link)}</Td><Td>{fmtNum(ad.link_clicks)}</Td></Tr>))))}
       {rowAnalysisResult && <AnalysisModal isOpen={isRowModalOpen} onClose={() => setIsRowModalOpen(false)} data={rowAnalysisResult} />}
+      <AdsetStatsModal 
+        isOpen={isStatsModalOpen} 
+        onClose={() => setIsStatsModalOpen(false)} 
+        adset={adset} 
+      />
     </>
   );
 }
