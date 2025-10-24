@@ -308,18 +308,19 @@ async def get_adset_time_insights(adset_id: str):
                         for hour in range(24):
                             pattern_multiplier = hourly_patterns[hour]
                             
-                            # Only add to hours with meaningful activity (pattern > 0.01)
-                            if pattern_multiplier > 0.01:
-                                hourly_stats[hour]["total_spend"] += spend * pattern_multiplier
-                                hourly_stats[hour]["total_leads"] += leads * pattern_multiplier
-                                hourly_stats[hour]["total_impressions"] += impressions * pattern_multiplier
-                                hourly_stats[hour]["total_clicks"] += clicks * pattern_multiplier
-                                hourly_stats[hour]["days_count"] += 1
+                            # Add to all hours, even with low activity
+                            hourly_stats[hour]["total_spend"] += spend * pattern_multiplier
+                            hourly_stats[hour]["total_leads"] += leads * pattern_multiplier
+                            hourly_stats[hour]["total_impressions"] += impressions * pattern_multiplier
+                            hourly_stats[hour]["total_clicks"] += clicks * pattern_multiplier
+                            hourly_stats[hour]["days_count"] += 1
                     
-                    # Convert to final format
+                    # Convert to final format - show all 24 hours
                     hourly_averages = {}
-                    for hour, stats in hourly_stats.items():
-                        if stats["days_count"] > 0 and stats["total_leads"] > 0:
+                    for hour in range(24):
+                        stats = hourly_stats[hour]
+                        if stats["days_count"] > 0:
+                            cpl = (stats["total_spend"] / stats["total_leads"]) if stats["total_leads"] > 0 else 0
                             hourly_averages[str(hour)] = {
                                 "hour": hour,
                                 "avg_spend": round(stats["total_spend"] / stats["days_count"], 2),
@@ -328,7 +329,8 @@ async def get_adset_time_insights(adset_id: str):
                                 "total_spend": round(stats["total_spend"], 2),
                                 "total_leads": round(stats["total_leads"], 0),
                                 "total_impressions": round(stats["total_impressions"], 0),
-                                "total_clicks": round(stats["total_clicks"], 0)
+                                "total_clicks": round(stats["total_clicks"], 0),
+                                "cpl": round(cpl, 2)
                             }
                     
                     # Sort and get best/worst hours based on total leads

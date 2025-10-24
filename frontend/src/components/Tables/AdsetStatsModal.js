@@ -904,7 +904,7 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
                                     {formatMoney(hour.total_spend)} потрачено
                                   </Text>
                                   <Text fontSize="xs" color="gray.600">
-                                    {formatNumber(hour.total_impressions)} показов
+                                    CPL: {formatMoney(hour.cpl || 0)}
                                   </Text>
                                 </Flex>
                               </Box>
@@ -936,7 +936,7 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
                                     {formatMoney(hour.total_spend)} потрачено
                                   </Text>
                                   <Text fontSize="xs" color="gray.600">
-                                    {formatNumber(hour.total_impressions)} показов
+                                    CPL: {formatMoney(hour.cpl || 0)}
                                   </Text>
                                 </Flex>
                               </Box>
@@ -979,7 +979,14 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
                               .map((hour) => {
                                 const maxLeads = Math.max(...Object.values(timeInsights.hourly_averages).map(h => h.total_leads));
                                 const intensity = maxLeads > 0 ? (hour.total_leads / maxLeads) : 0;
-                                const bgColor = intensity > 0.7 ? "green.400" : intensity > 0.4 ? "yellow.400" : "gray.300";
+                                let bgColor = "gray.200"; // Default for very low activity
+                                
+                                if (hour.total_leads > 0) {
+                                  if (intensity > 0.7) bgColor = "green.400";
+                                  else if (intensity > 0.4) bgColor = "yellow.400";
+                                  else if (intensity > 0.1) bgColor = "blue.300";
+                                  else bgColor = "gray.300";
+                                }
                                 
                                 return (
                                   <Box
@@ -1000,7 +1007,7 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
                                       {formatNumber(hour.total_leads)}
                                     </Text>
                                     <Text fontSize="xs" color="gray.600">
-                                      leads
+                                      CPL: {formatMoney(hour.cpl || 0)}
                                     </Text>
                                   </Box>
                                 );
