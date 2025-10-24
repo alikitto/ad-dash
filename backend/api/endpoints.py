@@ -182,41 +182,54 @@ async def get_adset_stats(adset_id: str):
                         if response.status == 200:
                             data = await response.json()
                             insights = data.get("data", [])
-                    
-                    if insights:
-                        insight = insights[0]  # Should be only one for this adset
-                        logging.info(f"Found insights for {period['value']}: {insight}")
-                        
-                        # Use the same logic as main dashboard
-                        spend = safe_float(insight.get("spend", 0))
-                        leads = sum(int(safe_float(a.get("value", 0))) for a in insight.get("actions", []) or [] if LEAD_ACTION_TYPE in a.get("action_type", ""))
-                        impressions = int(safe_float(insight.get("impressions", 0)))
-                        
-                        # Always add data if insights exist
-                        stats_data.append({
-                            "period": period["value"],
-                            "label": period["label"],
-                            "leads": leads,
-                            "cpl": (spend / leads) if leads > 0 else 0.0,
-                            "cpm": safe_float(insight.get("cpm", 0)),
-                            "ctr": safe_float(insight.get("ctr", 0)),
-                            "frequency": safe_float(insight.get("frequency", 0)),
-                            "spent": spend,
-                            "impressions": impressions
-                        })
-                    else:
-                        # No insights for this period - add empty data
-                        stats_data.append({
-                            "period": period["value"],
-                            "label": period["label"],
-                            "leads": 0,
-                            "cpl": 0,
-                            "cpm": 0,
-                            "ctr": 0,
-                            "frequency": 0,
-                            "spent": 0,
-                            "impressions": 0
-                        })
+                            
+                            if insights:
+                                insight = insights[0]  # Should be only one for this adset
+                                logging.info(f"Found insights for {period['value']}: {insight}")
+                                
+                                # Use the same logic as main dashboard
+                                spend = safe_float(insight.get("spend", 0))
+                                leads = sum(int(safe_float(a.get("value", 0))) for a in insight.get("actions", []) or [] if LEAD_ACTION_TYPE in a.get("action_type", ""))
+                                impressions = int(safe_float(insight.get("impressions", 0)))
+                                
+                                # Always add data if insights exist
+                                stats_data.append({
+                                    "period": period["value"],
+                                    "label": period["label"],
+                                    "leads": leads,
+                                    "cpl": (spend / leads) if leads > 0 else 0.0,
+                                    "cpm": safe_float(insight.get("cpm", 0)),
+                                    "ctr": safe_float(insight.get("ctr", 0)),
+                                    "frequency": safe_float(insight.get("frequency", 0)),
+                                    "spent": spend,
+                                    "impressions": impressions
+                                })
+                            else:
+                                # No insights for this period - add empty data
+                                stats_data.append({
+                                    "period": period["value"],
+                                    "label": period["label"],
+                                    "leads": 0,
+                                    "cpl": 0,
+                                    "cpm": 0,
+                                    "ctr": 0,
+                                    "frequency": 0,
+                                    "spent": 0,
+                                    "impressions": 0
+                                })
+                        else:
+                            # Response not 200 - add empty data
+                            stats_data.append({
+                                "period": period["value"],
+                                "label": period["label"],
+                                "leads": 0,
+                                "cpl": 0,
+                                "cpm": 0,
+                                "ctr": 0,
+                                "frequency": 0,
+                                "spent": 0,
+                                "impressions": 0
+                            })
                         
                 except Exception as e:
                     logging.error(f"Error fetching stats for period {period['value']}: {e}")
