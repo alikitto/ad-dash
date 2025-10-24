@@ -44,60 +44,66 @@ def get_db():
 # --- Endpoints ---
 @router.post("/signup", status_code=status.HTTP_201_CREATED)
 def create_user(user: UserCreate, db = Depends(get_db)):
-    # Проверяем, не занят ли email
-    if database_url.startswith("postgres"):
-        # PostgreSQL syntax
+    try:
+        # Проверяем, не занят ли email
         query = text("SELECT email FROM users WHERE email = :email")
-    else:
-        # SQLite syntax
-        query = text("SELECT email FROM users WHERE email = :email")
-    
-    existing_user = db.execute(query, {"email": user.email}).scalar_one_or_none()
-    if existing_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
+        existing_user = db.execute(query, {"email": user.email}).scalar_one_or_none()
+        if existing_user:
+            raise HTTPException(status_code=400, detail="Email already registered")
 
-    hashed_password = get_password_hash(user.password)
-    
-    # Insert user with proper SQL syntax
-    if database_url.startswith("postgres"):
-        # PostgreSQL syntax
+        # Хешируем пароль
+        hashed_password = get_password_hash(user.password)
+        
+        # Insert user with proper SQL syntax for PostgreSQL
         insert_query = text(
-            "INSERT INTO users (name, email, hashed_password) VALUES (:name, :email, :hashed_password)"
+            "INSERT INTO users (name, email, hashed_password, is_active) VALUES (:name, :email, :hashed_password, :is_active)"
         )
-    else:
-        # SQLite syntax
-        insert_query = text(
-            "INSERT INTO users (name, email, hashed_password) VALUES (:name, :email, :hashed_password)"
-        )
-    
-    db.execute(insert_query, {"name": user.name, "email": user.email, "hashed_password": hashed_password})
-    db.commit()
-    
-    return {"message": "User created successfully. Awaiting admin approval."}
+        
+        db.execute(insert_query, {
+            "name": user.name, 
+            "email": user.email, 
+            "hashed_password": hashed_password,
+            "is_active": True
+        })
+        db.commit()
+        
+        return {"message": "User created successfully. Awaiting admin approval."}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
 
 
 @router.post("/token", response_model=Token)
 def login_for_access_token(form_data: UserLogin, db = Depends(get_db)):
-    # Запрашиваем из базы данных поле 'is_active'
-    query = text("SELECT email, hashed_password, is_active FROM users WHERE email = :email")
-    user = db.execute(query, {"email": form_data.email}).mappings().first()
+    try:
+        # Запрашиваем из базы данных поле 'is_active'
+        query = text("SELECT email, hashed_password, is_active FROM users WHERE email = :email")
+        user = db.execute(query, {"email": form_data.email}).mappings().first()
 
-    if not user or not verify_password(form_data.password, user['hashed_password']):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    # Проверка, активен ли аккаунт пользователя (с безопасной проверкой)
-    if user.get('is_active') is False:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account is not active. Please contact administrator.",
-        )
+        if not user or not verify_password(form_data.password, user['hashed_password']):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect email or password",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
         
-    access_token = create_access_token(subject=user['email'])
-    return {"access_token": access_token, "token_type": "bearer"}
+        # Проверка, активен ли аккаунт пользователя (с безопасной проверкой)
+        if user.get('is_active') is False:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Account is not active. Please contact administrator.",
+            )
+            
+        access_token = create_access_token(subject=user['email'])
+        return {"access_token": access_token, "token_type": "bearer"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Login failed: {str(e)}")
 
 @router.post("/init-db")
 def init_database_endpoint(db = Depends(get_db)):
@@ -180,3 +186,47 @@ def test_signup_simple():
 def test_signup_post(user: UserCreate):
     """Test signup POST without database"""
     return {"message": "Signup POST is working", "user": user.name, "email": user.email}
+
+@router.get("/check-tables")
+def check_tables(db = Depends(get_db)):
+    """Check if tables exist"""
+    try:
+        # Check if users table exists
+        result = db.execute(text("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_schema = 'public' 
+                AND table_name = 'users'
+            );
+        """))
+        users_table_exists = result.scalar()
+        
+        # If table exists, check its structure
+        if users_table_exists:
+            columns_result = db.execute(text("""
+                SELECT column_name, data_type 
+                FROM information_schema.columns 
+                WHERE table_name = 'users'
+                ORDER BY ordinal_position;
+            """))
+            columns = [{"name": row[0], "type": row[1]} for row in columns_result.fetchall()]
+            
+            # Try to count users
+            count_result = db.execute(text("SELECT COUNT(*) FROM users"))
+            user_count = count_result.scalar()
+            
+            return {
+                "status": "success",
+                "users_table_exists": users_table_exists,
+                "columns": columns,
+                "user_count": user_count
+            }
+        else:
+            return {
+                "status": "success",
+                "users_table_exists": False,
+                "message": "Users table does not exist"
+            }
+            
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
