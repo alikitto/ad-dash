@@ -44,24 +44,32 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
 
   useEffect(() => {
     if (isOpen && adset) {
+      console.log("AdsetStatsModal opened with adset:", adset);
+      console.log("Adset ID:", adset.adset_id);
       fetchAdsetStats();
     }
   }, [isOpen, adset, selectedPeriod]);
 
   const fetchAdsetStats = async () => {
-    if (!adset?.adset_id) return;
+    if (!adset?.adset_id) {
+      console.log("No adset_id found in adset:", adset);
+      return;
+    }
     
+    console.log("Fetching stats for adset_id:", adset.adset_id);
     setLoading(true);
     try {
-      const response = await fetch(
-        `https://ad-dash-backend-production.up.railway.app/api/adsets/${adset.adset_id}/stats?date_preset=${selectedPeriod}`
-      );
+      const url = `https://ad-dash-backend-production.up.railway.app/api/adsets/${adset.adset_id}/stats?date_preset=${selectedPeriod}`;
+      console.log("Request URL:", url);
+      
+      const response = await fetch(url);
       
       if (!response.ok) {
         throw new Error("Failed to fetch stats");
       }
       
       const data = await response.json();
+      console.log("Received stats data:", data);
       setStatsData(data);
     } catch (error) {
       console.error("Error fetching adset stats:", error);
