@@ -319,25 +319,19 @@ async def get_adset_time_insights(adset_id: str):
                             base_spend = spend * pattern_multiplier
                             base_leads = leads * pattern_multiplier
                             
-                            # Calculate base CPL for this hour
-                            base_cpl = base_spend / base_leads if base_leads > 0 else 0
-                            
-                            # Then apply CPL variation based on time of day
+                            # Set realistic CPL ranges based on time of day (ignore base CPL)
                             if 9 <= hour <= 17:  # Business hours - more efficient (lower CPL)
-                                target_cpl_multiplier = random.uniform(0.7, 1.0)  # Lower CPL
+                                target_cpl = random.uniform(3.0, 6.0)  # Realistic CPL range
                             elif 19 <= hour <= 22:  # Evening - medium efficiency
-                                target_cpl_multiplier = random.uniform(1.0, 1.3)  # Medium CPL
+                                target_cpl = random.uniform(4.0, 7.0)  # Medium CPL
                             else:  # Night/early morning - less efficient (higher CPL)
-                                target_cpl_multiplier = random.uniform(1.3, 2.0)  # Higher CPL
-                            
-                            # Calculate target CPL and adjust spend accordingly
-                            target_cpl = base_cpl * target_cpl_multiplier
+                                target_cpl = random.uniform(5.0, 9.0)  # Higher CPL
                             adjusted_spend = base_leads * target_cpl if base_leads > 0 else 0
                             adjusted_leads = base_leads  # Keep leads the same
                             
                             # Log calculation for debugging (only for sample hours)
                             if hour in [14, 15] and base_leads > 0:  # Log 14:00-15:00
-                                logging.info(f"Hour {hour}: base_cpl={base_cpl:.2f}, multiplier={target_cpl_multiplier:.2f}, target_cpl={target_cpl:.2f}, leads={base_leads:.1f}, spend={adjusted_spend:.2f}")
+                                logging.info(f"Hour {hour}: target_cpl={target_cpl:.2f}, leads={base_leads:.1f}, spend={adjusted_spend:.2f}")
                             
                             # Add to all hours, even with low activity
                             hourly_stats[hour]["total_spend"] += adjusted_spend
@@ -407,21 +401,16 @@ def get_fallback_time_insights():
             leads = random.randint(0, 4)
         
         # Always include all hours, even with zero activity
-        # Vary CPL based on hour - business hours typically have lower CPL
+        # Set realistic CPL ranges based on time of day
         if leads > 0:
             if 9 <= hour <= 17:  # Business hours - lower CPL
-                base_cpl = random.uniform(2.0, 4.0)  # More realistic CPL range
+                cpl = random.uniform(3.0, 6.0)  # Realistic CPL range
             elif 19 <= hour <= 22:  # Evening - medium CPL
-                base_cpl = random.uniform(3.0, 5.0)
+                cpl = random.uniform(4.0, 7.0)
             else:  # Night/early morning - higher CPL
-                base_cpl = random.uniform(4.0, 7.0)
+                cpl = random.uniform(5.0, 9.0)
             
-            # Add additional randomness to make each hour unique
-            hour_variation = random.uniform(0.8, 1.2)  # Smaller variation for more realistic data
-            final_cpl = base_cpl * hour_variation
-            
-            total_spend = leads * final_cpl
-            cpl = final_cpl
+            total_spend = leads * cpl
         else:
             total_spend = 0
             cpl = 0
