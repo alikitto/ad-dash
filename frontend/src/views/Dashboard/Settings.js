@@ -51,7 +51,7 @@ function Settings() {
 
   const handleDelete = async (id) => {
     try {
-        const response = await fetch(`https://ad-dash-backend-production.up.railway.app/api/settings/avatars/${id}`, { method: 'DELETE' });
+        const response = await fetch(`https://ad-dash-backend-production-023f.up.railway.app/api/settings/avatars/${id}`, { method: 'DELETE' });
         if (!response.ok) throw new Error("Failed to delete");
         toast({ title: "Avatar deleted!", status: "warning", duration: 2000 });
         fetchAvatars(); // Обновляем список
