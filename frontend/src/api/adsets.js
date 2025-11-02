@@ -13,12 +13,12 @@ async function handleResponse(response) {
 }
 
 export async function fetchAdsets(datePreset) {
-  const response = await fetch(`${API_BASE_URL}/adsets?date_preset=${datePreset}`);
+  const response = await fetch(`${API_BASE_URL}/api/adsets?date_preset=${datePreset}`);
   return handleResponse(response);
 }
 
 export async function updateAdsetStatus(adsetId, newStatus) {
-  const response = await fetch(`${API_BASE_URL}/adsets/${adsetId}/update-status`, {
+  const response = await fetch(`${API_BASE_URL}/api/adsets/${adsetId}/update-status`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ status: newStatus }),
@@ -27,7 +27,7 @@ export async function updateAdsetStatus(adsetId, newStatus) {
 }
 
 export async function fetchAiAnalysis(adsets) {
-  const response = await fetch(`${API_BASE_URL}/analyze-adsets`, {
+  const response = await fetch(`${API_BASE_URL}/api/analyze-adsets`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(adsets),
