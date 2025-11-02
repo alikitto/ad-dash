@@ -4,7 +4,7 @@ import { DeleteIcon } from "@chakra-ui/icons";
 import Card from "components/Card/Card.js";
 import CardHeader from "components/Card/CardHeader.js";
 import CardBody from "components/Card/CardBody.js";
-import { API_BASE } from "../../config/api.js";
+import { API_BASE } from "../../config/api";
 
 function Settings() {
   const [avatars, setAvatars] = useState({});

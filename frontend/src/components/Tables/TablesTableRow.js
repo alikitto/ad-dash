@@ -6,7 +6,7 @@ import { FaMagic, FaChartLine } from "react-icons/fa";
 import AnalysisModal from "components/Tables/AnalysisModal";
 import AdsetStatsModal from "components/Tables/AdsetStatsModal";
 import { CLIENT_AVATARS } from "../../variables/clientAvatars.js";
-import { API_BASE } from "../../config/api.js";
+import { API_BASE } from "../../config/api";
 
 function resolveAvatar(adset) {
   if (!adset) return undefined;

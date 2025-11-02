@@ -1,6 +1,6 @@
 // src/api/adsets.js
 
-import { API_BASE } from "../config/api.js";
+import { API_BASE } from "../config/api";
 
 const API_BASE_URL = API_BASE;
 

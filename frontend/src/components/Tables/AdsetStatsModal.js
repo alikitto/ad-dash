@@ -25,7 +25,7 @@ import {
   Avatar,
 } from "@chakra-ui/react";
 import { FaChartLine } from "react-icons/fa";
-import { API_BASE } from "../../config/api.js";
+import { API_BASE } from "../../config/api";
 
 const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
   const [statsData, setStatsData] = useState(null);

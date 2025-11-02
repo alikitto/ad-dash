@@ -39,7 +39,7 @@ import GradientBorder from "components/GradientBorder/GradientBorder";
 
 // Assets
 import signUpImage from "assets/img/signUpImage.png";
-import { API_BASE } from "../../config/api.js";
+import { API_BASE } from "../../config/api";
 
 function SignUp() {
   const titleColor = "white";

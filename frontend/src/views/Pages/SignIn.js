@@ -24,7 +24,7 @@ import {
 import signInImage from "assets/img/signInImage.png";
 import AuthFooter from "components/Footer/AuthFooter";
 import GradientBorder from "components/GradientBorder/GradientBorder";
-import { API_BASE } from "../../config/api.js";
+import { API_BASE } from "../../config/api";
 
 // ИЗМЕНЕНИЕ: Объединили два импорта в один
 import { useHistory, Link as RouterLink } from "react-router-dom";
