@@ -1,46 +1,38 @@
 # backend/main.py
 
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import Response
-from core.config import FRONTEND_ORIGINS, ALLOWED_PAGES_REGEX
 
-# Импортируем роутер из нашего нового модуля api
-from api.endpoints import router as api_router
+# Импортируй остальное ТОЛЬКО после FastAPI, чтобы исключить ошибки импорта
 from core.config import FRONTEND_ORIGINS
+from api.endpoints import router as api_router
 from api.auth_endpoints import router as auth_router
 from api.user_endpoints import router as user_router
 
+app = FastAPI(title="Ad-Dash Backend API", version="1.0.0")
 
-app = FastAPI(
-    title="Ad-Dash Backend API",
-    description="API for Meta Ads analysis and automation.",
-    version="1.0.0"
-)
-
-# --- Middleware ---
-
+# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
+    allow_origins=FRONTEND_ORIGINS,   # см. шаг 2
+    allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],  # можно и конкретно: ["content-type", "authorization"]
+    allow_headers=["*"],
 )
 
-# Явно отвечаем на preflight (OPTIONS) для /auth/token
-@app.options("/auth/token")
-def _preflight_auth_token():
-    return Response(status_code=204)
+# Healthcheck — для быстрой проверки, что сервис жив
+@app.get("/healthz")
+def healthz():
+    return {"ok": True}
 
-# опционально для /auth/signup (если тоже падает preflight)
-@app.options("/auth/signup")
-def _preflight_auth_signup():
-    return Response(status_code=204)
+# Роутеры
+app.include_router(api_router, prefix="/api")
+app.include_router(auth_router, prefix="/auth")
+app.include_router(user_router, prefix="/users")
 
-@app.get("/__whoami")
-def whoami():
-    return {"ok": True, "version": "cors-wide-v2"}
-
+@app.get("/")
+def root():
+    return {"status": "ok"}
 # --- Routers ---
 # Подключаем все эндпоинты из api/endpoints.py с префиксом /api
 app.include_router(api_router, prefix="/api")
