@@ -16,7 +16,7 @@ function Settings() {
     try {
       // ВАЖНО: Укажите здесь URL вашего *основного* бэкенда.
       // Railway направит запрос на правильный сервис.
-      const response = await fetch("https://ad-dash-backend-production.up.railway.app/api/settings/avatars");
+      const response = await fetch("https://ad-dash-backend-production-023f.up.railway.app/api/settings/avatars");
       if (!response.ok) throw new Error("Failed to fetch settings");
       const data = await response.json();
       setAvatars(data);
@@ -34,7 +34,7 @@ function Settings() {
   const handleSave = async () => {
     if (!accountId || !imageUrl) return;
     try {
-      const response = await fetch("https://ad-dash-backend-production.up.railway.app/api/settings/avatars", {
+      const response = await fetch("https://ad-dash-backend-production-023f.up.railway.app/api/settings/avatars", {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ accountId, imageUrl })
