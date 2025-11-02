@@ -19,13 +19,15 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 API_VERSION = "v19.0"
 LEAD_ACTION_TYPE = "onsite_conversion.messaging_conversation_started_7d"
 
-# --- Application Settings ---
 FRONTEND_ORIGINS = [
-    "https://ad-dash-frontend-production.up.railway.app",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-    "http://localhost:3001"
+    "http://localhost:3001",
+    # если появится свой прод-домен фронта — добавишь сюда
 ]
+
+# Разрешаем ВСЕ деплойные поддомены Cloudflare Pages проекта
+ALLOWED_PAGES_REGEX = r"^https://[a-z0-9-]+\.ad-dash\.pages\.dev$"
 
 # --- Client Specific Data ---
 CLIENT_AVATARS = {
