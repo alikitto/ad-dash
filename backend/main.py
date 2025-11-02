@@ -20,8 +20,8 @@ app = FastAPI(
 # --- Middleware ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=FRONTEND_ORIGINS,          # явные домены (локалка и т.п.)
-    allow_origin_regex=ALLOWED_PAGES_REGEX,  # любой поддомен *.ad-dash.pages.dev
+    allow_origins=FRONTEND_ORIGINS,
+    allow_origin_regex=ALLOWED_PAGES_REGEX,
     allow_credentials=True,
     allow_methods=["GET","POST","PUT","PATCH","DELETE","OPTIONS"],
     allow_headers=["Content-Type","Authorization"],
