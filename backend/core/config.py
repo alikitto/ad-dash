@@ -32,6 +32,12 @@ CLIENT_AVATARS = {
     "act_284902192299330": "https://video.karal.az/avatars/ahadnazim.jpg"
 }
 
+# core/config.py
+FRONTEND_ORIGINS = [
+    "https://bd237748.ad-dash.pages.dev",
+    "http://localhost:3000",
+]
+
 # Try multiple possible database URL variables for Railway
 DATABASE_URL = (
     os.getenv("DATABASE_URL") or 
