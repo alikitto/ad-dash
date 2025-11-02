@@ -19,11 +19,17 @@ app = FastAPI(
 
 # --- Middleware ---
 
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=FRONTEND_ORIGINS,      # точные origins, включая prod
-    allow_origin_regex=ALLOWED_PAGES_REGEX,  # все *.ad-dash.pages.dev превью
-    allow_credentials=True,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "https://ad-dash.pages.dev",
+        "https://ads-dash.pages.dev",  # НОВЫЙ фронт
+    ],
+    allow_origin_regex=r"^https://[a-z0-9-]+\.((ad|ads)-dash)\.pages\.dev$",
+    allow_credentials=False,   # <— ВАЖНО: выключаем, чтобы можно было ставить * / несколько доменов
     allow_methods=["*"],
     allow_headers=["*"],
 )
