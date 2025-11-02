@@ -1,6 +1,6 @@
 // src/api/adsets.js
 
-const API_BASE_URL = "https://ad-dash-backend-production.up.railway.app/api";
+const API_BASE_URL = "https://ad-dash-backend-production-023f.up.railway.app";
 
 async function handleResponse(response) {
   if (!response.ok) {
