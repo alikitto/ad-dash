@@ -21,7 +21,7 @@ export const AuthProvider = ({ children }) => {
       }
 
       try {
-        const response = await fetch("https://ad-dash-backend-production.up.railway.app/users/me", {
+        const response = await fetch("https://ad-dash-backend-production-023f.up.railway.app/users/me", {
           headers: {
             "Authorization": `Bearer ${token}`,
           },
