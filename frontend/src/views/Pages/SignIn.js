@@ -41,7 +41,7 @@ function SignIn() {
     event.preventDefault();
     setIsLoading(true);
     try {
-      const response = await fetch("https://ad-dash-backend-production.up.railway.app/auth/token", {
+      const response = await fetch("https://ad-dash-backend-production-023f.up.railway.app/auth/token", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, password }),
