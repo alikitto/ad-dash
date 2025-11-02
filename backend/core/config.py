@@ -23,11 +23,10 @@ FRONTEND_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "http://localhost:3001",
-    # если появится свой прод-домен фронта — добавишь сюда
 ]
 
-# Разрешаем ВСЕ деплойные поддомены Cloudflare Pages проекта
-ALLOWED_PAGES_REGEX = r"^https://[a-z0-9-]+\.ad-dash\.pages\.dev$"
+# теперь матчится и голый домен, и любые поддомены
+ALLOWED_PAGES_REGEX = r"^https://([a-z0-9-]+\.)?ad-dash\.pages\.dev$"
 
 # --- Client Specific Data ---
 CLIENT_AVATARS = {
