@@ -24,6 +24,7 @@ import {
 import signInImage from "assets/img/signInImage.png";
 import AuthFooter from "components/Footer/AuthFooter";
 import GradientBorder from "components/GradientBorder/GradientBorder";
+import { API_BASE } from "../../config/api.js";
 
 // ИЗМЕНЕНИЕ: Объединили два импорта в один
 import { useHistory, Link as RouterLink } from "react-router-dom";
@@ -41,7 +42,7 @@ function SignIn() {
     event.preventDefault();
     setIsLoading(true);
     try {
-      const response = await fetch("https://ad-dash-backend-production-023f.up.railway.app/auth/token", {
+      const response = await fetch(`${API_BASE}/auth/token`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, password }),

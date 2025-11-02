@@ -4,6 +4,7 @@ import { DeleteIcon } from "@chakra-ui/icons";
 import Card from "components/Card/Card.js";
 import CardHeader from "components/Card/CardHeader.js";
 import CardBody from "components/Card/CardBody.js";
+import { API_BASE } from "../../config/api.js";
 
 function Settings() {
   const [avatars, setAvatars] = useState({});
@@ -16,7 +17,7 @@ function Settings() {
     try {
       // ВАЖНО: Укажите здесь URL вашего *основного* бэкенда.
       // Railway направит запрос на правильный сервис.
-      const response = await fetch("https://ad-dash-backend-production-023f.up.railway.app/api/settings/avatars");
+      const response = await fetch(`${API_BASE}/api/settings/avatars`);
       if (!response.ok) throw new Error("Failed to fetch settings");
       const data = await response.json();
       setAvatars(data);
@@ -34,7 +35,7 @@ function Settings() {
   const handleSave = async () => {
     if (!accountId || !imageUrl) return;
     try {
-      const response = await fetch("https://ad-dash-backend-production-023f.up.railway.app/api/settings/avatars", {
+      const response = await fetch(`${API_BASE}/api/settings/avatars`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ accountId, imageUrl })
@@ -51,7 +52,7 @@ function Settings() {
 
   const handleDelete = async (id) => {
     try {
-        const response = await fetch(`https://ad-dash-backend-production-023f.up.railway.app/api/settings/avatars/${id}`, { method: 'DELETE' });
+        const response = await fetch(`${API_BASE}/api/settings/avatars/${id}`, { method: 'DELETE' });
         if (!response.ok) throw new Error("Failed to delete");
         toast({ title: "Avatar deleted!", status: "warning", duration: 2000 });
         fetchAvatars(); // Обновляем список

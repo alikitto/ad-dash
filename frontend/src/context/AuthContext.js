@@ -1,5 +1,6 @@
 // src/context/AuthContext.js
 import React, { createContext, useState, useEffect, useContext } from "react";
+import { API_BASE } from "../config/api.js";
 
 const AuthContext = createContext();
 
@@ -21,7 +22,7 @@ export const AuthProvider = ({ children }) => {
       }
 
       try {
-        const response = await fetch("https://ad-dash-backend-production-023f.up.railway.app/users/me", {
+        const response = await fetch(`${API_BASE}/users/me`, {
           headers: {
             "Authorization": `Bearer ${token}`,
           },

@@ -6,6 +6,7 @@ import { FaMagic, FaChartLine } from "react-icons/fa";
 import AnalysisModal from "components/Tables/AnalysisModal";
 import AdsetStatsModal from "components/Tables/AdsetStatsModal";
 import { CLIENT_AVATARS } from "../../variables/clientAvatars.js";
+import { API_BASE } from "../../config/api.js";
 
 function resolveAvatar(adset) {
   if (!adset) return undefined;
@@ -53,7 +54,7 @@ function TablesTableRow(props) {
     if (!expanded && ads.length === 0) {
         setAdsLoading(true);
         try {
-            const res = await fetch(`https://ad-dash-backend-production-023f.up.railway.app/api/adsets/${adset.adset_id}/ads?date_preset=${datePreset || "last_7d"}`);
+            const res = await fetch(`${API_BASE}/api/adsets/${adset.adset_id}/ads?date_preset=${datePreset || "last_7d"}`);
             const data = await res.json();
             setAds(Array.isArray(data) ? data : []);
         } catch (e) { console.error("ads fetch error", e); } 
@@ -69,7 +70,7 @@ function TablesTableRow(props) {
     try {
       // Теперь мы отправляем весь объект adset
       const payload = { adset: adset }; 
-      const response = await fetch(`https://ad-dash-backend-production-023f.up.railway.app/api/analyze-adset-details`, {
+      const response = await fetch(`${API_BASE}/api/analyze-adset-details`, {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
       });
       if (!response.ok) throw new Error((await response.json().catch(() => ({}))).detail || "Analysis failed");
@@ -84,7 +85,7 @@ function TablesTableRow(props) {
   const updateAdStatus = async (ad_id, curr) => {
     setUpdatingAdId(ad_id);
     try {
-      const res = await fetch(`https://ad-dash-backend-production-023f.up.railway.app/api/ads/${ad_id}/update-status`, {
+      const res = await fetch(`${API_BASE}/api/ads/${ad_id}/update-status`, {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: curr === "ACTIVE" ? "PAUSED" : "ACTIVE" }),
       });
       if (!res.ok) throw new Error("Update failed");
