@@ -19,20 +19,18 @@ app = FastAPI(
 
 # --- Middleware ---
 
-
+# ⛳️ временно максимально широкие CORS, без credentials
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "https://ad-dash.pages.dev",
-        "https://ads-dash.pages.dev",  # НОВЫЙ фронт
-    ],
-    allow_origin_regex=r"^https://[a-z0-9-]+\.((ad|ads)-dash)\.pages\.dev$",
-    allow_credentials=False,   # <— ВАЖНО: выключаем, чтобы можно было ставить * / несколько доменов
+    allow_origins=["*"],          # временно — пустим всех
+    allow_credentials=False,      # ВАЖНО: выключено
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.get("/__whoami")
+def whoami():
+    return {"ok": True, "version": "cors-wide-v1"}
 
 # --- Routers ---
 # Подключаем все эндпоинты из api/endpoints.py с префиксом /api
