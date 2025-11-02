@@ -1,8 +1,8 @@
 # backend/main.py
 
-from fastapi import FastAPI
-from core.config import FRONTEND_ORIGINS, ALLOWED_PAGES_REGEX
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import Response
+from core.config import FRONTEND_ORIGINS, ALLOWED_PAGES_REGEX
 
 # Импортируем роутер из нашего нового модуля api
 from api.endpoints import router as api_router
@@ -19,18 +19,27 @@ app = FastAPI(
 
 # --- Middleware ---
 
-# ⛳️ временно максимально широкие CORS, без credentials
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],          # временно — пустим всех
-    allow_credentials=False,      # ВАЖНО: выключено
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["*"],  # можно и конкретно: ["content-type", "authorization"]
 )
+
+# Явно отвечаем на preflight (OPTIONS) для /auth/token
+@app.options("/auth/token")
+def _preflight_auth_token():
+    return Response(status_code=204)
+
+# опционально для /auth/signup (если тоже падает preflight)
+@app.options("/auth/signup")
+def _preflight_auth_signup():
+    return Response(status_code=204)
 
 @app.get("/__whoami")
 def whoami():
-    return {"ok": True, "version": "cors-wide-v1"}
+    return {"ok": True, "version": "cors-wide-v2"}
 
 # --- Routers ---
 # Подключаем все эндпоинты из api/endpoints.py с префиксом /api
