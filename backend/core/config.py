@@ -20,14 +20,15 @@ API_VERSION = "v19.0"
 LEAD_ACTION_TYPE = "onsite_conversion.messaging_conversation_started_7d"
 
 FRONTEND_ORIGINS = [
+    "https://ad-dash.pages.dev",      # прод Cloudflare Pages
+    "https://ads-dash.pages.dev",     # если используешь этот тоже
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-    "http://localhost:3001",
-    "https://ads-dash.pages.dev",  # <-- добавь прод Pages
 ]
 
-# Разрешаем все превью-деплои Pages
-ALLOWED_PAGES_REGEX = r"https://.*\.ad-dash\.pages\.dev"
+# Разрешить ПРЕВЬЮ-домены Cloudflare (ветки/хэши):
+# например: https://68596ca2.ad-dash.pages.dev
+ALLOWED_PAGES_REGEX = r"^https://([a-z0-9-]+\.)?ad-dash\.pages\.dev$"
 
 # --- Client Specific Data ---
 CLIENT_AVATARS = {
