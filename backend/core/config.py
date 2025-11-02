@@ -23,10 +23,11 @@ FRONTEND_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "http://localhost:3001",
+    "https://ad-dash.pages.dev",  # <-- добавь прод Pages
 ]
 
-# теперь матчится и голый домен, и любые поддомены
-ALLOWED_PAGES_REGEX = r"^https://([a-z0-9-]+\.)?ad-dash\.pages\.dev$"
+# Разрешаем все превью-деплои Pages
+ALLOWED_PAGES_REGEX = r"https://.*\.ad-dash\.pages\.dev"
 
 # --- Client Specific Data ---
 CLIENT_AVATARS = {
