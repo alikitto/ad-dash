@@ -91,7 +91,7 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
     console.log("Fetching creatives for adset_id:", adset.adset_id);
     setCreativesLoading(true);
     try {
-      const url = `https://ad-dash-backend-production.up.railway.app/api/adsets/${adset.adset_id}/ads?date_preset=maximum`;
+      const url = `https://ad-dash-backend-production-023f.up.railway.app/api/adsets/${adset.adset_id}/ads?date_preset=maximum`;
       console.log("Creatives URL:", url);
       
       const response = await fetch(url);
@@ -120,7 +120,7 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
     console.log("Fetching time insights for adset_id:", adset.adset_id);
     setTimeInsightsLoading(true);
     try {
-      const url = `https://ad-dash-backend-production.up.railway.app/api/adsets/${adset.adset_id}/time-insights`;
+      const url = `https://ad-dash-backend-production-023f.up.railway.app/api/adsets/${adset.adset_id}/time-insights`;
       console.log("Time insights URL:", url);
       
       const response = await fetch(url);
