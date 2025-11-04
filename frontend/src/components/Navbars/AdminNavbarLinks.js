@@ -59,7 +59,7 @@ export default function HeaderLinks(props) {
         try {
           // Динамический импорт для избежания циклических зависимостей
           const authStorage = await import("../../utils/authStorage");
-          const token = authStorage.getAuthToken();
+          const token = authStorage.getAuthToken(); // getAuthToken не асинхронная
           if (!token) return;
           
           const response = await fetch(`${API_BASE}/users/me`, {
