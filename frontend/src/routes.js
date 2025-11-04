@@ -26,6 +26,7 @@ import SignIn from "views/Pages/SignIn.js";
 import SignUp from "views/Pages/SignUp.js";
 import { SettingsIcon } from "@chakra-ui/icons";
 import Settings from "views/Dashboard/Settings.js";
+import MetaAdsStatus from "views/Dashboard/MetaAdsStatus.js";
 
 import {
   HomeIcon,
@@ -35,6 +36,7 @@ import {
   DocumentIcon,
   RocketIcon,
   SupportIcon,
+  GraphIcon,
 } from "components/Icons/Icons";
 
 var dashRoutes = [
@@ -52,6 +54,14 @@ var dashRoutes = [
     rtlName: "لوحة القيادة",
     icon: <StatsIcon color='inherit' />,
     component: Tables,
+    layout: "/admin", // Этот роут будет защищен
+  },
+  {
+    path: "/meta-ads-status",
+    name: "Meta ads Status",
+    rtlName: "حالة إعلانات Meta",
+    icon: <GraphIcon color='inherit' />,
+    component: MetaAdsStatus,
     layout: "/admin", // Этот роут будет защищен
   },
   {
