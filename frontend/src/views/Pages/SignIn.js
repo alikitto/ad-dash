@@ -16,7 +16,7 @@
 
 */
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box, Flex, Button, FormControl, FormLabel, Heading, Input,
   Link, Switch, Text, DarkMode, useToast
@@ -43,7 +43,28 @@ function SignIn() {
   const [isLoading, setIsLoading] = useState(false);
   const toast = useToast();
   const history = useHistory();
-  const { login } = useAuth();
+  const { login, isAuthenticated, isLoading: authLoading } = useAuth();
+
+  // Редирект если уже авторизован
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      history.replace("/admin/stats");
+    }
+  }, [isAuthenticated, authLoading, history]);
+
+  // Показываем загрузку пока проверяем авторизацию
+  if (authLoading) {
+    return (
+      <Flex justify="center" align="center" minH="100vh">
+        <Text color="white">Загрузка...</Text>
+      </Flex>
+    );
+  }
+
+  // Если уже авторизован, не показываем форму (будет редирект)
+  if (isAuthenticated) {
+    return null;
+  }
 
   const handleSubmit = async (event) => {
     event.preventDefault();

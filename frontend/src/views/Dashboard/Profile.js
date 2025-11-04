@@ -51,8 +51,11 @@ import LineChart from 'components/Charts/LineChart';
 import IconBox from 'components/Icons/IconBox';
 import { CarIcon, FulgerIcon, FulgerWhiteIcon } from 'components/Icons/Icons';
 import { Separator } from 'components/Separator/Separator';
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { BsArrowRight } from 'react-icons/bs';
+import { API_BASE } from 'config/api';
+import { getAuthToken } from 'utils/authStorage';
+import { Spinner } from '@chakra-ui/react';
 import { FaCube, FaFacebook, FaInstagram, FaPencilAlt, FaPenFancy, FaTwitter } from 'react-icons/fa';
 // Icons
 import { IoDocumentsSharp } from 'react-icons/io5';
@@ -65,8 +68,56 @@ import {
 } from 'variables/charts';
 
 function Profile() {
+	const [userInfo, setUserInfo] = useState(null);
+	const [loading, setLoading] = useState(true);
+
+	useEffect(() => {
+		const fetchUserInfo = async () => {
+			try {
+				const token = getAuthToken();
+				if (!token) {
+					setLoading(false);
+					return;
+				}
+
+				const response = await fetch(`${API_BASE}/users/me`, {
+					headers: {
+						Authorization: `Bearer ${token}`,
+					},
+				});
+
+				if (response.ok) {
+					const data = await response.json();
+					setUserInfo(data);
+				}
+			} catch (error) {
+				console.error("Error fetching user info:", error);
+			} finally {
+				setLoading(false);
+			}
+		};
+
+		fetchUserInfo();
+	}, []);
+
+	if (loading) {
+		return (
+			<Flex justify="center" align="center" minH="400px">
+				<Spinner size="xl" color="purple.500" />
+			</Flex>
+		);
+	}
+
+	if (!userInfo) {
+		return (
+			<Flex justify="center" align="center" minH="400px">
+				<Text color="white">Не удалось загрузить информацию о пользователе</Text>
+			</Flex>
+		);
+	}
+
 	return (
-		<Flex direction='column' mt={{ sm: '25px', md: '0px' }}>
+		<Flex direction='column' pt={{ base: "120px", md: "75px" }}>
 			<Box
 				mb={{ sm: '24px', md: '50px', xl: '20px' }}
 				borderRadius='15px'
@@ -85,7 +136,7 @@ function Profile() {
 					align='center'
 					p='24px'
 					borderRadius='20px'
-					mt='100px'>
+					mt='20px'>
 					<Flex align='center' direction={{ sm: 'column', md: 'row' }}>
 						<Flex
 							align='center'
@@ -110,11 +161,16 @@ function Profile() {
 									color='#fff'
 									fontWeight='bold'
 									ms={{ sm: '8px', md: '0px' }}>
-									Mark Johnson
+									{userInfo.name || 'Пользователь'}
 								</Text>
 								<Text fontSize={{ sm: 'sm', md: 'md' }} color='gray.400'>
-									mark@simmmple.com
+									{userInfo.email}
 								</Text>
+								{userInfo.role && (
+									<Text fontSize={{ sm: 'xs', md: 'sm' }} color='gray.500' mt={1}>
+										Роль: {userInfo.role}
+									</Text>
+								)}
 							</Flex>
 						</Flex>
 						<Flex direction={{ sm: 'column', lg: 'row' }} w={{ sm: '100%', md: '50%', lg: 'auto' }}>
@@ -182,7 +238,7 @@ function Profile() {
 							Welcome back!
 						</Text>
 						<Text color='#fff' fontSize='sm' mb='auto'>
-							Nice to see you, Mark Johnson!
+							Nice to see you, {userInfo.name || 'User'}!
 						</Text>
 						<Button alignSelf='flex-start' variant='no-hover' bg='transparent' p='0px'>
 							<Text
