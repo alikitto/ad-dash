@@ -274,7 +274,7 @@ function Profile() {
 								Car Informations
 							</Text>
 							<Text fontSize='sm' color='gray.400'>
-								Hello, Mark Johnson! Your Car is ready.
+								Hello, {userInfo.name || 'User'}! Your Car is ready.
 							</Text>
 						</Flex>
 					</CardHeader>
@@ -293,7 +293,7 @@ function Profile() {
 									variant='vision'>
 									<CircularProgressLabel>
 										<Flex direction='column' justify='center' align='center'>
-											<LightningIcon w='14px' h='22px' mb='8px' />
+											<FulgerIcon w='14px' h='22px' mb='8px' />
 											<Text color='#fff' fontSize='36px' fontWeight='bold' mb='6px'>
 												68%
 											</Text>
@@ -426,23 +426,25 @@ function Profile() {
 									Full Name:{' '}
 								</Text>
 								<Text fontSize='sm' color='#fff' fontWeight='400'>
-									Mark Johnson
+									{userInfo.name || 'N/A'}
 								</Text>
 							</Flex>
-							<Flex align='center' mb='18px'>
-								<Text fontSize='sm' color={'gray.400'} me='10px'>
-									Mobile:{' '}
-								</Text>
-								<Text fontSize='sm' color='#fff' fontWeight='400'>
-									(44) 123 1234 123
-								</Text>
-							</Flex>
+							{userInfo.role && (
+								<Flex align='center' mb='18px'>
+									<Text fontSize='sm' color={'gray.400'} me='10px'>
+										Role:{' '}
+									</Text>
+									<Text fontSize='sm' color='#fff' fontWeight='400'>
+										{userInfo.role}
+									</Text>
+								</Flex>
+							)}
 							<Flex align='center' mb='18px'>
 								<Text fontSize='sm' color={'gray.400'} me='10px'>
 									Email:{' '}
 								</Text>
 								<Text fontSize='sm' color='#fff' fontWeight='400'>
-									mark@simmmple.com
+									{userInfo.email || 'N/A'}
 								</Text>
 							</Flex>
 							<Flex align='center' mb='18px'>
