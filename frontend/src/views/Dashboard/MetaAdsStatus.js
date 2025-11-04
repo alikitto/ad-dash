@@ -89,7 +89,7 @@ function ClientCard({ clientData, datePreset }) {
         </Flex>
       </CardHeader>
       <CardBody>
-        <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+        <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4}>
           {/* Бюджет */}
           <Box>
             <Text fontSize="sm" color="gray.400" mb={1}>
@@ -112,31 +112,31 @@ function ClientCard({ clientData, datePreset }) {
             </Text>
           </Box>
 
-          {/* Статистика */}
+          {/* Активность */}
           <Box>
             <Text fontSize="sm" color="gray.400" mb={2}>
               Активность
             </Text>
             <HStack spacing={4} mb={2}>
               <Box>
-                <Text fontSize="xs" color="gray.500">
+                <Text fontSize="xs" color="gray.500" mb={1}>
                   Группы
                 </Text>
-                <Badge colorScheme="green" fontSize="md">
+                <Badge colorScheme="green" fontSize="md" p={2}>
                   {active_adsets}
                 </Badge>
               </Box>
               <Box>
-                <Text fontSize="xs" color="gray.500">
+                <Text fontSize="xs" color="gray.500" mb={1}>
                   Объявления
                 </Text>
-                <Badge colorScheme="blue" fontSize="md">
+                <Badge colorScheme="blue" fontSize="md" p={2}>
                   {active_ads}
                 </Badge>
               </Box>
             </HStack>
             <Text fontSize="xs" color="gray.500" mt={2}>
-              Последнее обновление: {formatDate(last_updated)}
+              Обновлено: {formatDate(last_updated)}
             </Text>
           </Box>
 
