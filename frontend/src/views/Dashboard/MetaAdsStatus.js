@@ -322,7 +322,8 @@ function MetaAdsStatus() {
         })
       );
 
-      setClients(clientsList);
+      const finalClientsList = Object.values(clientsMap);
+      setClients(finalClientsList);
       setLastUpdated(new Date());
     } catch (error) {
       toast({
