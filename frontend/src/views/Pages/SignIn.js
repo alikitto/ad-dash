@@ -25,6 +25,7 @@ import signInImage from "assets/img/signInImage.png";
 import AuthFooter from "components/Footer/AuthFooter";
 import GradientBorder from "components/GradientBorder/GradientBorder";
 import { API_BASE } from "../../config/api";
+import { useAuth } from "../../context/AuthContext";
 
 // ИЗМЕНЕНИЕ: Объединили два импорта в один
 import { useHistory, Link as RouterLink } from "react-router-dom";
@@ -37,6 +38,7 @@ function SignIn() {
   const [isLoading, setIsLoading] = useState(false);
   const toast = useToast();
   const history = useHistory();
+  const { verifyToken } = useAuth();
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -55,6 +57,7 @@ function SignIn() {
 
       const data = await response.json();
       localStorage.setItem("authToken", data.access_token); // Сохраняем токен
+      await verifyToken(); // Проверяем токен и обновляем состояние аутентификации
       toast({ title: "Successfully signed in!", status: "success", duration: 2000, isClosable: true, position: "top" });
       history.push("/admin/stats"); // Редирект на главную страницу
       
