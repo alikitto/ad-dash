@@ -27,6 +27,7 @@ import SignUp from "views/Pages/SignUp.js";
 import { SettingsIcon } from "@chakra-ui/icons";
 import Settings from "views/Dashboard/Settings.js";
 import MetaAdsStatus from "views/Dashboard/MetaAdsStatus.js";
+import ClientsList from "views/Dashboard/ClientsList.js";
 
 import {
   HomeIcon,
@@ -85,6 +86,14 @@ var dashRoutes = [
     name: "Settings",
     icon: <SettingsIcon color="inherit" />,
     component: Settings,
+    layout: "/admin", // Этот роут будет защищен
+  },
+  {
+    path: "/clients-list",
+    name: "Clients List",
+    rtlName: "قائمة العملاء",
+    icon: <PersonIcon color='inherit' />,
+    component: ClientsList,
     layout: "/admin", // Этот роут будет защищен
   },
   {

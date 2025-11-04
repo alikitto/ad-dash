@@ -72,16 +72,16 @@ function ClientCard({ clientData, datePreset }) {
   };
 
   return (
-    <Card mb={4}>
-      <CardHeader>
+    <Card mb={4} bg="white" boxShadow="md">
+      <CardHeader bg="gray.50">
         <Flex justify="space-between" align="center">
           <HStack spacing={3}>
             <Avatar size="md" name={account_name} src={avatarSrc} />
             <Box>
-              <Text fontSize="lg" fontWeight="bold" color="white">
+              <Text fontSize="lg" fontWeight="bold" color="gray.800">
                 {account_name || "Unknown Client"}
               </Text>
-              <Text fontSize="xs" color="gray.400">
+              <Text fontSize="xs" color="gray.600">
                 ID: {account_id || "N/A"}
               </Text>
             </Box>
@@ -95,10 +95,10 @@ function ClientCard({ clientData, datePreset }) {
             <Text fontSize="sm" color="gray.400" mb={1}>
               Месячный бюджет
             </Text>
-            <Text fontSize="xl" fontWeight="bold" color="white" mb={2}>
+            <Text fontSize="xl" fontWeight="bold" color="gray.800" mb={2}>
               {formatMoney(monthly_budget)}
             </Text>
-            <Text fontSize="sm" color="gray.400" mb={2}>
+            <Text fontSize="sm" color="gray.600" mb={2}>
               Осталось: {formatMoney(remaining_budget)}
             </Text>
             <Progress
@@ -114,7 +114,7 @@ function ClientCard({ clientData, datePreset }) {
 
           {/* Активность */}
           <Box>
-            <Text fontSize="sm" color="gray.400" mb={2}>
+            <Text fontSize="sm" color="gray.600" mb={2}>
               Активность
             </Text>
             <HStack spacing={4} mb={2}>
@@ -142,30 +142,30 @@ function ClientCard({ clientData, datePreset }) {
 
           {/* Метрики */}
           <Box>
-            <Text fontSize="sm" color="gray.400" mb={2}>
+            <Text fontSize="sm" color="gray.600" mb={2}>
               Метрики
             </Text>
             <Box mb={2}>
-              <Text fontSize="xs" color="gray.500">
+              <Text fontSize="xs" color="gray.600">
                 Цена за результат (CPL)
               </Text>
-              <Text fontSize="lg" fontWeight="bold" color="white">
+              <Text fontSize="lg" fontWeight="bold" color="gray.800">
                 {formatMoney(cpl)}
               </Text>
             </Box>
             <Box mb={2}>
-              <Text fontSize="xs" color="gray.500">
+              <Text fontSize="xs" color="gray.600">
                 Показы
               </Text>
-              <Text fontSize="lg" fontWeight="bold" color="white">
+              <Text fontSize="lg" fontWeight="bold" color="gray.800">
                 {formatNumber(impressions)}
               </Text>
             </Box>
             <Box>
-              <Text fontSize="xs" color="gray.500">
+              <Text fontSize="xs" color="gray.600">
                 Потрачено
               </Text>
-              <Text fontSize="lg" fontWeight="bold" color="white">
+              <Text fontSize="lg" fontWeight="bold" color="gray.800">
                 {formatMoney(spent)}
               </Text>
             </Box>
@@ -250,25 +250,31 @@ function MetaAdsStatus() {
         client.cpl = client.leads > 0 ? client.spent / client.leads : 0;
       });
 
-      // Получаем бюджеты клиентов (если есть API)
-      // Пока используем заглушку - потом можно будет добавить отдельный API
+      // Получаем бюджеты клиентов из БД
       try {
-        const budgetsResponse = await fetch(`${API_BASE}/api/settings/clients`);
+        const budgetsResponse = await fetch(`${API_BASE}/api/clients`);
         if (budgetsResponse.ok) {
-          const budgets = await budgetsResponse.json();
+          const clientsFromDb = await budgetsResponse.json();
+          const budgetsMap = {};
+          clientsFromDb.forEach((client) => {
+            budgetsMap[client.account_id] = client;
+            // Также создаем маппинг по имени на случай если ID не совпадает
+            budgetsMap[client.account_name] = client;
+          });
+          
           Object.values(clientsMap).forEach((client) => {
-            const budget = budgets[client.account_id] || budgets[client.account_name];
-            if (budget) {
-              client.monthly_budget = budget.monthly_budget || 0;
+            const dbClient = budgetsMap[client.account_id] || budgetsMap[client.account_name];
+            if (dbClient) {
+              client.monthly_budget = dbClient.monthly_budget || 0;
               client.remaining_budget = Math.max(0, client.monthly_budget - client.spent);
             } else {
-              // Если бюджета нет, вычисляем как spent * коэффициент
-              client.monthly_budget = client.spent * 1.5; // Примерная оценка
-              client.remaining_budget = client.monthly_budget - client.spent;
+              // Если клиента нет в БД, используем оценку
+              client.monthly_budget = client.spent * 1.5;
+              client.remaining_budget = Math.max(0, client.monthly_budget - client.spent);
             }
           });
         } else {
-          // Если API нет, используем оценку
+          // Если API недоступен, используем оценку
           Object.values(clientsMap).forEach((client) => {
             client.monthly_budget = client.spent * 1.5;
             client.remaining_budget = Math.max(0, client.monthly_budget - client.spent);
