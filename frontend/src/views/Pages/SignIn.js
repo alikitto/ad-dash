@@ -35,10 +35,15 @@ function SignIn() {
   const textColor = "gray.400";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  // Восстанавливаем состояние rememberMe из localStorage если есть сохраненное значение
+  const [rememberMe, setRememberMe] = useState(() => {
+    const saved = localStorage.getItem("authRememberMe");
+    return saved === "true";
+  });
   const [isLoading, setIsLoading] = useState(false);
   const toast = useToast();
   const history = useHistory();
-  const { verifyToken } = useAuth();
+  const { login } = useAuth();
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -56,9 +61,15 @@ function SignIn() {
       }
 
       const data = await response.json();
-      localStorage.setItem("authToken", data.access_token); // Сохраняем токен
-      await verifyToken(); // Проверяем токен и обновляем состояние аутентификации
-      toast({ title: "Successfully signed in!", status: "success", duration: 2000, isClosable: true, position: "top" });
+      login(data.access_token, rememberMe); // Сохраняем токен с учетом rememberMe
+      toast({ 
+        title: "Successfully signed in!", 
+        description: rememberMe ? "Вы будете авторизованы на 30 дней" : "Вы будете авторизованы до конца сессии",
+        status: "success", 
+        duration: 3000, 
+        isClosable: true, 
+        position: "top" 
+      });
       history.push("/admin/stats"); // Редирект на главную страницу
       
     } catch (error) {
@@ -122,10 +133,16 @@ function SignIn() {
             </FormControl>
             <FormControl display='flex' alignItems='center'>
               <DarkMode>
-                <Switch id='remember-login' colorScheme='brand' me='10px' />
+                <Switch 
+                  id='remember-login' 
+                  colorScheme='brand' 
+                  me='10px'
+                  isChecked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                />
               </DarkMode>
               <FormLabel htmlFor='remember-login' mb='0' ms='1' fontWeight='normal' color='white'>
-                Remember me
+                Remember me (30 дней)
               </FormLabel>
             </FormControl>
             <Button

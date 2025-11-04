@@ -1,6 +1,7 @@
 // src/context/AuthContext.js
 import React, { createContext, useState, useEffect, useContext } from "react";
 import { API_BASE } from "../config/api";
+import { getAuthToken, clearAuthToken, saveAuthToken } from "../utils/authStorage";
 
 const AuthContext = createContext();
 
@@ -13,7 +14,7 @@ export const AuthProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   const verifyToken = async () => {
-    const token = localStorage.getItem("authToken");
+    const token = getAuthToken(); // Используем функцию с проверкой срока действия
     if (!token) {
       setIsAuthenticated(false);
       setIsLoading(false);
@@ -30,11 +31,13 @@ export const AuthProvider = ({ children }) => {
       if (response.ok) {
         setIsAuthenticated(true);
       } else {
-        localStorage.removeItem("authToken");
+        // Если токен невалиден на сервере, очищаем локальное хранилище
+        clearAuthToken();
         setIsAuthenticated(false);
       }
     } catch (error) {
-      localStorage.removeItem("authToken");
+      // При ошибке сети или сервера очищаем токен
+      clearAuthToken();
       setIsAuthenticated(false);
     } finally {
       setIsLoading(false);
@@ -45,13 +48,15 @@ export const AuthProvider = ({ children }) => {
     verifyToken();
   }, []);
 
-  const login = () => {
+  const login = (token, rememberMe = false) => {
+    // Сохраняем токен с учетом rememberMe
+    saveAuthToken(token, rememberMe);
     setIsAuthenticated(true);
     setIsLoading(false);
   };
 
   const logout = () => {
-    localStorage.removeItem("authToken");
+    clearAuthToken();
     setIsAuthenticated(false);
   };
 
