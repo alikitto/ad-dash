@@ -50,9 +50,9 @@ function TablesTableRow(props) {
   const avatarSrc = resolveAvatar(adset);
   const ctrLinkClick = adset && adset.impressions > 0 ? (Number(adset.link_clicks || 0) / adset.impressions) * 100 : 0;
   const accountId = adset?.account_id ? String(adset.account_id) : "";
-  const actParam = accountId ? (accountId.startsWith("act_") ? accountId : `act_${accountId}`) : "";
-  const adsManagerUrl = actParam && adset?.adset_id
-    ? `https://business.facebook.com/adsmanager/manage/campaigns?act=${actParam}&selected_adsets=${adset.adset_id}&nav_entry_point=adsets_overview`
+  const accountNumericId = accountId.replace(/^act_/, "");
+  const adsManagerUrl = accountNumericId && adset?.adset_id
+    ? `https://business.facebook.com/adsmanager/manage/campaigns?act=${accountNumericId}&selected_adsets=${adset.adset_id}&nav_entry_point=adsets_overview`
     : null;
 
   const toggleExpanded = async () => {
