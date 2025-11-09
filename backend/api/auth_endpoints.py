@@ -1,9 +1,12 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from services.auth_service import get_password_hash, verify_password, create_access_token
 from core.config import DATABASE_URL
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -72,6 +75,7 @@ def create_user(user: UserCreate, db = Depends(get_db)):
     except HTTPException:
         raise
     except Exception as e:
+        logger.exception("Registration failed for %s", user.email)
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
 
@@ -103,6 +107,7 @@ def login_for_access_token(form_data: UserLogin, db = Depends(get_db)):
     except HTTPException:
         raise
     except Exception as e:
+        logger.exception("Login failed for %s", form_data.email)
         raise HTTPException(status_code=500, detail=f"Login failed: {str(e)}")
 
 @router.post("/init-db")
