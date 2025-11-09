@@ -1,8 +1,8 @@
 // frontend/src/components/Tables/TablesTableRow.js
 
 import React, { useState } from "react";
-import { Avatar, Flex, Td, Text, Tr, Switch, useColorModeValue, Spinner, Image, Box, useToast, IconButton, Icon, Button } from "@chakra-ui/react";
-import { FaMagic, FaChartLine, FaExternalLinkAlt } from "react-icons/fa";
+import { Avatar, Flex, Td, Text, Tr, Switch, useColorModeValue, Spinner, Image, Box, useToast, IconButton, Icon } from "@chakra-ui/react";
+import { FaMagic, FaChartLine } from "react-icons/fa";
 import AnalysisModal from "components/Tables/AnalysisModal";
 import AdsetStatsModal from "components/Tables/AdsetStatsModal";
 import { CLIENT_AVATARS } from "../../variables/clientAvatars.js";
@@ -49,11 +49,6 @@ function TablesTableRow(props) {
   
   const avatarSrc = resolveAvatar(adset);
   const ctrLinkClick = adset && adset.impressions > 0 ? (Number(adset.link_clicks || 0) / adset.impressions) * 100 : 0;
-  const accountId = adset?.account_id ? String(adset.account_id) : "";
-  const actParam = accountId ? (accountId.startsWith("act_") ? accountId : `act_${accountId}`) : "";
-  const adsManagerUrl = actParam && adset?.adset_id
-    ? `https://business.facebook.com/adsmanager/manage/campaigns?act=${actParam}&selected_adsets=${adset.adset_id}&nav_entry_point=adsets_overview`
-    : null;
 
   const toggleExpanded = async () => {
     if (!expanded && ads.length === 0) {
@@ -138,20 +133,6 @@ function TablesTableRow(props) {
                 setIsStatsModalOpen(true);
               }} 
             />
-            {adsManagerUrl && (
-              <Button
-                as="a"
-                href={adsManagerUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                size="sm"
-                colorScheme="teal"
-                variant="solid"
-                leftIcon={<Icon as={FaExternalLinkAlt} />}
-              >
-                Кабинет
-              </Button>
-            )}
           </Flex>
         </Td>
         <Td><Text fontSize="xs">{shortObjective(adset.objective)}</Text></Td>
