@@ -59,11 +59,11 @@ function Dashboard() {
 
   return (
     <Flex direction="column" pt={{ base: "120px", md: "75px" }}>
-      <Card>
+      <Card bg="white">
         {/* 👇 И ВОТ ЗДЕСЬ ОН ИСПОЛЬЗУЕТСЯ 👇 */}
         <CardHeader mb="4">
           <Flex direction="column">
-            <Text fontSize="xl" color="white" fontWeight="bold" mb="4">
+            <Text fontSize="xl" color="gray.800" fontWeight="bold" mb="4">
               Active Ad Sets
             </Text>
             <AdsetFilters
