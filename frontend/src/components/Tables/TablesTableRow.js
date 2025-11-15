@@ -1,7 +1,7 @@
 // frontend/src/components/Tables/TablesTableRow.js
 
 import React, { useState } from "react";
-import { Avatar, Flex, Td, Text, Tr, Switch, useColorModeValue, Spinner, Image, Box, useToast, IconButton, Icon, Button } from "@chakra-ui/react";
+import { Avatar, Flex, Td, Text, Tr, Switch, useColorModeValue, Spinner, Image, Box, useToast, IconButton, Icon } from "@chakra-ui/react";
 import { FaMagic, FaChartLine, FaExternalLinkAlt } from "react-icons/fa";
 import AnalysisModal from "components/Tables/AnalysisModal";
 import AdsetStatsModal from "components/Tables/AdsetStatsModal";
@@ -139,18 +139,17 @@ function TablesTableRow(props) {
               }} 
             />
             {adsManagerUrl && (
-              <Button
+              <IconButton
                 as="a"
                 href={adsManagerUrl}
                 target="_blank"
                 rel="noopener noreferrer"
+                aria-label="Открыть в кабинете"
+                icon={<Icon as={FaExternalLinkAlt} />}
                 size="sm"
                 colorScheme="teal"
                 variant="solid"
-                leftIcon={<Icon as={FaExternalLinkAlt} />}
-              >
-                Кабинет
-              </Button>
+              />
             )}
           </Flex>
         </Td>

@@ -3,7 +3,7 @@
 import React from "react";
 import { Select, HStack, Button, Spacer, IconButton, Text, Icon } from "@chakra-ui/react";
 import { RepeatIcon } from "@chakra-ui/icons";
-import { FaMagic } from "react-icons/fa";
+import { FaMagic, FaUndo } from "react-icons/fa";
 
 function AdsetFilters({
   filters,
@@ -15,10 +15,16 @@ function AdsetFilters({
   isRefreshing,
   isAnalyzing,
   lastUpdatedLabel,
+  onResetColumns,
 }) {
   const selectStyles = {
-    color: "white",
-    sx: { "> option": { background: "#0F1535" } },
+    color: "gray.800",
+    bg: "white",
+    borderColor: "gray.300",
+    sx: { 
+      "> option": { background: "white", color: "gray.800" },
+      "&:hover": { borderColor: "gray.400" }
+    },
     size: "sm",
     borderRadius: "md",
   };
@@ -42,7 +48,18 @@ function AdsetFilters({
       <HStack spacing={2}>
         <Button leftIcon={<Icon as={FaMagic} />} colorScheme="purple" size="sm" onClick={onAnalyze} isLoading={isAnalyzing} loadingText="Analyzing">AI Analysis</Button>
         <IconButton aria-label="Refresh" icon={<RepeatIcon />} size="sm" onClick={onRefresh} isLoading={isRefreshing} />
-        <Text fontSize="xs" color="gray.400" whiteSpace="nowrap">Updated: {lastUpdatedLabel}</Text>
+        {onResetColumns && (
+          <IconButton 
+            aria-label="Reset Column Sizes" 
+            icon={<Icon as={FaUndo} />} 
+            size="sm" 
+            onClick={onResetColumns}
+            title="Сбросить размеры столбцов"
+            colorScheme="gray"
+            variant="outline"
+          />
+        )}
+        <Text fontSize="xs" color="gray.600" whiteSpace="nowrap">Updated: {lastUpdatedLabel}</Text>
       </HStack>
     </HStack>
   );

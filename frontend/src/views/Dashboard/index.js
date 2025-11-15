@@ -1,6 +1,6 @@
 // src/views/Dashboard/index.js (Финальная версия)
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Flex, Text, useToast } from "@chakra-ui/react";
 import { useAdsets } from "hooks/useAdsets";
 import * as api from "api/adsets";
@@ -32,11 +32,33 @@ function Dashboard() {
   const toast = useToast();
 
   const [tick, setTick] = useState(0);
+  const resetColumnsRef = useRef(null);
+  
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 60_000);
     return () => clearInterval(id);
   }, []);
   const lastUpdatedLabel = useMemo(() => formatLastUpdated(lastUpdated), [lastUpdated, tick]);
+  
+  const handleResetColumns = () => {
+    if (resetColumnsRef.current) {
+      resetColumnsRef.current();
+      toast({
+        title: "Размеры столбцов сброшены",
+        status: "success",
+        duration: 2000,
+        position: "top",
+      });
+    } else {
+      console.warn("Reset function not available");
+      toast({
+        title: "Ошибка: функция сброса недоступна",
+        status: "error",
+        duration: 2000,
+        position: "top",
+      });
+    }
+  };
 
   const handleAnalysisClick = async () => {
     if (!processedAdsets || processedAdsets.length === 0) {
@@ -76,6 +98,7 @@ function Dashboard() {
               isRefreshing={loading}
               isAnalyzing={isAnalyzing}
               lastUpdatedLabel={lastUpdatedLabel}
+              onResetColumns={handleResetColumns}
             />
           </Flex>
         </CardHeader>
@@ -90,6 +113,10 @@ function Dashboard() {
             onStatusChange={handleStatusChange}
             updatingId={updatingId}
             datePreset={filters.datePreset}
+            onResetColumns={(fn) => { 
+              resetColumnsRef.current = fn;
+              console.log("Reset function registered:", !!fn);
+            }}
           />
         </CardBody>
       </Card>

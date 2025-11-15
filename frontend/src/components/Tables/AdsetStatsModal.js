@@ -32,8 +32,10 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
   const [loading, setLoading] = useState(false);
   const [creativesData, setCreativesData] = useState(null);
   const [creativesLoading, setCreativesLoading] = useState(false);
-  const [timeInsights, setTimeInsights] = useState(null);
-  const [timeInsightsLoading, setTimeInsightsLoading] = useState(false);
+  const [placementBreakdown, setPlacementBreakdown] = useState(null);
+  const [placementLoading, setPlacementLoading] = useState(false);
+  const [ageBreakdown, setAgeBreakdown] = useState(null);
+  const [ageLoading, setAgeLoading] = useState(false);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   
   const bgColor = useColorModeValue("white", "gray.800");
@@ -47,7 +49,8 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
       console.log("Adset ID:", adset.adset_id);
       fetchAdsetStats();
       fetchCreatives();
-      fetchTimeInsights();
+      fetchPlacementBreakdown();
+      fetchAgeBreakdown();
     }
   }, [isOpen, adset]);
 
@@ -112,39 +115,45 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
     }
   };
 
-  const fetchTimeInsights = async () => {
-    if (!adset?.adset_id) {
-      console.log("No adset_id found for time insights:", adset);
-      return;
-    }
+  const fetchPlacementBreakdown = async () => {
+    if (!adset?.adset_id) return;
     
-    console.log("Fetching time insights for adset_id:", adset.adset_id);
-    setTimeInsightsLoading(true);
+    setPlacementLoading(true);
     try {
-      const url = `${API_BASE}/api/adsets/${adset.adset_id}/time-insights`;
-      console.log("Time insights URL:", url);
-      
+      const url = `${API_BASE}/api/adsets/${adset.adset_id}/breakdown?type=placement`;
       const response = await fetch(url);
       
-      if (!response.ok) {
-        throw new Error("Failed to fetch time insights");
-      }
+      if (!response.ok) throw new Error("Failed to fetch placement breakdown");
       
       const data = await response.json();
-      console.log("Received time insights data:", data);
-      
-      // Check if data is valid
-      if (data && (data.hourly_averages || data.best_hours || data.worst_hours)) {
-        setTimeInsights(data);
-      } else {
-        console.warn("Invalid time insights data received:", data);
-        setTimeInsights({ error: "Получены некорректные данные" });
-      }
+      console.log("✅ Received placement breakdown:", data);
+      setPlacementBreakdown(data);
     } catch (error) {
-      console.error("Error fetching time insights:", error);
-      setTimeInsights({ error: error.message || "Ошибка загрузки данных" });
+      console.error("❌ Error fetching placement breakdown:", error);
+      setPlacementBreakdown({ error: error.message });
     } finally {
-      setTimeInsightsLoading(false);
+      setPlacementLoading(false);
+    }
+  };
+
+  const fetchAgeBreakdown = async () => {
+    if (!adset?.adset_id) return;
+    
+    setAgeLoading(true);
+    try {
+      const url = `${API_BASE}/api/adsets/${adset.adset_id}/breakdown?type=age`;
+      const response = await fetch(url);
+      
+      if (!response.ok) throw new Error("Failed to fetch age breakdown");
+      
+      const data = await response.json();
+      console.log("✅ Received age breakdown:", data);
+      setAgeBreakdown(data);
+    } catch (error) {
+      console.error("❌ Error fetching age breakdown:", error);
+      setAgeBreakdown({ error: error.message });
+    } finally {
+      setAgeLoading(false);
     }
   };
 
@@ -348,23 +357,24 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="6xl" isCentered>
+    <Modal isOpen={isOpen} onClose={onClose} size="6xl" isCentered scrollBehavior="inside">
       <ModalOverlay />
-      <ModalContent bg={bgColor} maxW="1200px">
-        <ModalHeader>
-          <Flex align="center" justify="space-between" w="full">
-            <Flex align="center" gap={2}>
+      <ModalContent bg={bgColor} maxW="1200px" maxH="90vh">
+        <ModalHeader pb={3}>
+          <Flex align="center" justify="space-between" w="full" flexWrap="wrap" gap={2}>
+            <Flex align="center" gap={2} minW="200px">
               <Icon as={FaChartLine} color="purple.500" />
-              <Text>Детальная статистика</Text>
-              <Badge colorScheme="purple" ml={2}>
-                {adset?.adset_name || "Adset"}
-              </Badge>
+              <Text fontSize="md">Детальная статистика</Text>
             </Flex>
             
+            <Badge colorScheme="purple" fontSize="xs" px={2} py={1}>
+              {adset?.adset_name || "Adset"}
+            </Badge>
+            
             {/* Quick Actions */}
-            <Flex gap={2}>
+            <Flex gap={1}>
               <Button
-                size="sm"
+                size="xs"
                 colorScheme={adset?.status === "ACTIVE" ? "red" : "green"}
                 variant="outline"
                 onClick={() => {
@@ -372,10 +382,10 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
                   console.log("Toggle status for", adset?.adset_id);
                 }}
               >
-                {adset?.status === "ACTIVE" ? "Пауза" : "Запуск"}
+                {adset?.status === "ACTIVE" ? "Пауза" : "Старт"}
               </Button>
               <Button
-                size="sm"
+                size="xs"
                 colorScheme="blue"
                 variant="outline"
                 onClick={() => {
@@ -383,10 +393,10 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
                   console.log("Increase budget for", adset?.adset_id);
                 }}
               >
-                + Бюджет
+                + $
               </Button>
               <Button
-                size="sm"
+                size="xs"
                 colorScheme="purple"
                 variant="outline"
                 onClick={() => {
@@ -394,26 +404,26 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
                   console.log("Duplicate", adset?.adset_id);
                 }}
               >
-                Дублировать
+                Дубль
               </Button>
             </Flex>
           </Flex>
         </ModalHeader>
         <ModalCloseButton />
         
-        <ModalBody pb={6}>
+        <ModalBody pb={6} overflowY="auto">
           {/* AI Recommendations */}
-          {statsData && statsData.length > 0 && (
-            <Box mb={6}>
-              <Text fontSize="lg" fontWeight="bold" mb={3} color={textColor}>
+          {statsData && statsData.length > 0 && generateAIRecommendations().length > 0 && (
+            <Box mb={4}>
+              <Text fontSize="md" fontWeight="bold" mb={2} color={textColor}>
                 🤖 AI-рекомендации
               </Text>
               
-              <Flex wrap="wrap" gap={3}>
+              <Flex wrap="wrap" gap={2}>
                 {generateAIRecommendations().map((rec, index) => (
                   <Box
                     key={index}
-                    p={4}
+                    p={3}
                     bg={useColorModeValue(
                       rec.type === "error" ? "red.50" : 
                       rec.type === "warning" ? "yellow.50" : 
@@ -423,26 +433,27 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
                       rec.type === "success" ? "green.900" : "blue.900"
                     )}
                     borderRadius="md"
-                    borderLeft="4px solid"
+                    borderLeft="3px solid"
                     borderLeftColor={
                       rec.type === "error" ? "red.500" : 
                       rec.type === "warning" ? "yellow.500" : 
                       rec.type === "success" ? "green.500" : "blue.500"
                     }
                     flex="1"
-                    minW="300px"
+                    minW="250px"
+                    maxW="350px"
                   >
-                    <Flex align="start" gap={3}>
-                      <Text fontSize="lg">{rec.icon}</Text>
+                    <Flex align="start" gap={2}>
+                      <Text fontSize="md">{rec.icon}</Text>
                       <Box flex={1}>
-                        <Text fontSize="sm" fontWeight="bold" color={
+                        <Text fontSize="xs" fontWeight="bold" color={
                           rec.type === "error" ? "red.600" : 
                           rec.type === "warning" ? "yellow.600" : 
                           rec.type === "success" ? "green.600" : "blue.600"
                         }>
                           {rec.title}
                         </Text>
-                        <Text fontSize="xs" color="gray.600" mt={1} mb={2}>
+                        <Text fontSize="xs" color="gray.600" mt={1} mb={1} noOfLines={2}>
                           {rec.description}
                         </Text>
                         <Button
@@ -869,173 +880,116 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
                 )}
               </Box>
               
-              {/* Time Efficiency Section */}
+              {/* Placement Breakdown Section */}
               <Box mt={6}>
                 <Text fontSize="lg" fontWeight="bold" mb={3} color={textColor}>
-                  Эффективность по времени
+                  📍 Breakdown по плейсментам
                 </Text>
                 
-                {timeInsightsLoading ? (
+                {placementLoading ? (
                   <Flex justify="center" align="center" py={4}>
                     <Spinner size="md" color="purple.500" />
-                    <Text ml={3}>Загрузка данных по времени...</Text>
+                    <Text ml={3}>Загрузка breakdown по плейсментам...</Text>
                   </Flex>
-                ) : timeInsights && !timeInsights.error && (timeInsights.hourly_averages && Object.keys(timeInsights.hourly_averages).length > 0) ? (
-                  <Box>
-                    {/* Best and Worst Hours */}
-                    <Flex gap={6} mb={6}>
-                      <Box flex={1} p={4} bg={useColorModeValue("green.50", "green.900")} borderRadius="md">
-                        <Text fontSize="md" fontWeight="bold" color="green.600" mb={2}>
-                          🏆 Лучшие часы
-                        </Text>
-                        {timeInsights.best_hours && timeInsights.best_hours.length > 0 ? (
-                          <Box>
-                            {timeInsights.best_hours.slice(0, 3).map((hour, index) => (
-                              <Box key={index} py={2} borderBottom={index < 2 ? "1px solid" : "none"} borderColor="green.200">
-                                <Flex justify="space-between" align="center" mb={1}>
-                                  <Text fontSize="sm" fontWeight="semibold">
-                                    {hour.hour}:00 - {hour.hour + 1}:00
-                                  </Text>
-                                  <Text fontSize="sm" fontWeight="bold" color="green.600">
-                                    {formatNumber(hour.total_leads)} leads
-                                  </Text>
-                                </Flex>
-                                <Flex justify="space-between" align="center">
-                                  <Text fontSize="xs" color="gray.600">
-                                    {formatMoney(hour.total_spend)} потрачено
-                                  </Text>
-                                  <Text fontSize="xs" color="gray.600">
-                                    CPL: {formatMoney(hour.cpl || 0)}
-                                  </Text>
-                                </Flex>
-                              </Box>
-                            ))}
-                          </Box>
-                        ) : (
-                          <Text fontSize="sm" color="gray.500">Нет данных</Text>
-                        )}
-                      </Box>
-                      
-                      <Box flex={1} p={4} bg={useColorModeValue("red.50", "red.900")} borderRadius="md">
-                        <Text fontSize="md" fontWeight="bold" color="red.600" mb={2}>
-                          ⚠️ Худшие часы
-                        </Text>
-                        {timeInsights.worst_hours && timeInsights.worst_hours.length > 0 ? (
-                          <Box>
-                            {timeInsights.worst_hours.slice(0, 3).map((hour, index) => (
-                              <Box key={index} py={2} borderBottom={index < 2 ? "1px solid" : "none"} borderColor="red.200">
-                                <Flex justify="space-between" align="center" mb={1}>
-                                  <Text fontSize="sm" fontWeight="semibold">
-                                    {hour.hour}:00 - {hour.hour + 1}:00
-                                  </Text>
-                                  <Text fontSize="sm" fontWeight="bold" color="red.600">
-                                    {formatNumber(hour.total_leads)} leads
-                                  </Text>
-                                </Flex>
-                                <Flex justify="space-between" align="center">
-                                  <Text fontSize="xs" color="gray.600">
-                                    {formatMoney(hour.total_spend)} потрачено
-                                  </Text>
-                                  <Text fontSize="xs" color="gray.600">
-                                    CPL: {formatMoney(hour.cpl || 0)}
-                                  </Text>
-                                </Flex>
-                              </Box>
-                            ))}
-                          </Box>
-                        ) : (
-                          <Text fontSize="sm" color="gray.500">Нет данных</Text>
-                        )}
-                      </Box>
-                    </Flex>
-                    
-                    {/* Hourly Performance Chart */}
-                    <Box>
-                      <Flex justify="space-between" align="center" mb={3}>
-                        <Text fontSize="md" fontWeight="bold" color={textColor}>
-                          Производительность по часам (за все время)
-                        </Text>
-                        {timeInsights.total_days > 0 && (
-                          <Text fontSize="sm" color="gray.500">
-                            Проанализировано {timeInsights.total_days} дней
-                            {timeInsights.date_range?.start && timeInsights.date_range?.end && (
-                              <span> ({timeInsights.date_range.start} - {timeInsights.date_range.end})</span>
-                            )}
-                          </Text>
-                        )}
-                      </Flex>
-                      <Box p={4} bg={useColorModeValue("gray.50", "gray.700")} borderRadius="md">
-                        {timeInsights.hourly_averages && Object.keys(timeInsights.hourly_averages).length > 0 ? (
-                          <Box
-                            display="grid"
-                            gridTemplateColumns={{
-                              base: "repeat(4, 1fr)", // 4 columns on mobile
-                              md: "repeat(6, 1fr)",    // 6 columns on tablet
-                              lg: "repeat(12, 1fr)"    // 12 columns on desktop
-                            }}
-                            gap={2}
-                          >
-                            {Object.values(timeInsights.hourly_averages)
-                              .sort((a, b) => a.hour - b.hour)
-                              .map((hour) => {
-                                const maxLeads = Math.max(...Object.values(timeInsights.hourly_averages).map(h => h.total_leads));
-                                const intensity = maxLeads > 0 ? (hour.total_leads / maxLeads) : 0;
-                                let bgColor = "gray.200"; // Default for very low activity
-                                
-                                if (hour.total_leads > 0) {
-                                  if (intensity > 0.7) bgColor = "green.400";
-                                  else if (intensity > 0.4) bgColor = "yellow.400";
-                                  else if (intensity > 0.1) bgColor = "blue.300";
-                                  else bgColor = "gray.300";
-                                }
-                                
-                                return (
-                                  <Box
-                                    key={hour.hour}
-                                    p={2}
-                                    bg={bgColor}
-                                    borderRadius="md"
-                                    textAlign="center"
-                                    minH="80px"
-                                    display="flex"
-                                    flexDirection="column"
-                                    justifyContent="center"
-                                  >
-                                    <Text fontSize="xs" fontWeight="bold" mb={1}>
-                                      {hour.hour}:00
-                                    </Text>
-                                    <Text fontSize="xs" fontWeight="semibold" mb={1}>
-                                      {formatNumber(hour.total_leads)}
-                                    </Text>
-                                    <Text fontSize="xs" color="gray.600">
-                                      CPL: {formatMoney(hour.cpl || 0)}
-                                    </Text>
-                                  </Box>
-                                );
-                              })}
-                          </Box>
-                        ) : (
-                          <Text fontSize="sm" color="gray.500">Нет данных по часам</Text>
-                        )}
-                      </Box>
-                    </Box>
+                ) : placementBreakdown && placementBreakdown.data && placementBreakdown.data.length > 0 ? (
+                  <TableContainer>
+                    <Table size="sm" variant="simple">
+                      <Thead>
+                        <Tr>
+                          <Th>Placement</Th>
+                          <Th isNumeric>Spend</Th>
+                          <Th isNumeric>Leads</Th>
+                          <Th isNumeric>CPL</Th>
+                          <Th isNumeric>Impressions</Th>
+                          <Th isNumeric>CPM</Th>
+                          <Th isNumeric>CTR</Th>
+                        </Tr>
+                      </Thead>
+                      <Tbody>
+                        {placementBreakdown.data.map((item, idx) => (
+                          <Tr key={idx}>
+                            <Td>{item.key}</Td>
+                            <Td isNumeric fontWeight="semibold">{formatMoney(item.spend)}</Td>
+                            <Td isNumeric>{item.leads}</Td>
+                            <Td isNumeric color={item.leads > 0 ? "green.600" : "gray.500"}>
+                              {formatMoney(item.cpl)}
+                            </Td>
+                            <Td isNumeric>{formatNumber(item.impressions)}</Td>
+                            <Td isNumeric>{formatMoney(item.cpm)}</Td>
+                            <Td isNumeric>{item.ctr.toFixed(2)}%</Td>
+                          </Tr>
+                        ))}
+                      </Tbody>
+                    </Table>
+                  </TableContainer>
+                ) : placementBreakdown && placementBreakdown.error ? (
+                  <Box textAlign="center" py={4} bg="red.50" borderRadius="md">
+                    <Text color="red.600" fontSize="sm">
+                      Ошибка загрузки: {placementBreakdown.error}
+                    </Text>
                   </Box>
                 ) : (
                   <Box textAlign="center" py={4}>
-                    <Text color="gray.500" fontSize="sm" mb={2}>
-                      {timeInsights && timeInsights.error 
-                        ? `Ошибка загрузки данных: ${timeInsights.error}` 
-                        : "Нет данных по эффективности времени"
-                      }
+                    <Text color="gray.500" fontSize="sm">
+                      Нет данных по плейсментам
                     </Text>
-                    <Button
-                      size="sm"
-                      colorScheme="purple"
-                      variant="outline"
-                      onClick={fetchTimeInsights}
-                    >
-                      Попробовать снова
-                    </Button>
+                  </Box>
+                )}
+              </Box>
+
+              {/* Age Breakdown Section */}
+              <Box mt={6}>
+                <Text fontSize="lg" fontWeight="bold" mb={3} color={textColor}>
+                  👥 Breakdown по возрасту
+                </Text>
+                
+                {ageLoading ? (
+                  <Flex justify="center" align="center" py={4}>
+                    <Spinner size="md" color="purple.500" />
+                    <Text ml={3}>Загрузка breakdown по возрасту...</Text>
+                  </Flex>
+                ) : ageBreakdown && ageBreakdown.data && ageBreakdown.data.length > 0 ? (
+                  <TableContainer>
+                    <Table size="sm" variant="simple">
+                      <Thead>
+                        <Tr>
+                          <Th>Возраст</Th>
+                          <Th isNumeric>Spend</Th>
+                          <Th isNumeric>Leads</Th>
+                          <Th isNumeric>CPL</Th>
+                          <Th isNumeric>Impressions</Th>
+                          <Th isNumeric>CPM</Th>
+                          <Th isNumeric>CTR</Th>
+                        </Tr>
+                      </Thead>
+                      <Tbody>
+                        {ageBreakdown.data.map((item, idx) => (
+                          <Tr key={idx}>
+                            <Td fontWeight="semibold">{item.key}</Td>
+                            <Td isNumeric fontWeight="semibold">{formatMoney(item.spend)}</Td>
+                            <Td isNumeric>{item.leads}</Td>
+                            <Td isNumeric color={item.leads > 0 ? "green.600" : "gray.500"}>
+                              {formatMoney(item.cpl)}
+                            </Td>
+                            <Td isNumeric>{formatNumber(item.impressions)}</Td>
+                            <Td isNumeric>{formatMoney(item.cpm)}</Td>
+                            <Td isNumeric>{item.ctr.toFixed(2)}%</Td>
+                          </Tr>
+                        ))}
+                      </Tbody>
+                    </Table>
+                  </TableContainer>
+                ) : ageBreakdown && ageBreakdown.error ? (
+                  <Box textAlign="center" py={4} bg="red.50" borderRadius="md">
+                    <Text color="red.600" fontSize="sm">
+                      Ошибка загрузки: {ageBreakdown.error}
+                    </Text>
+                  </Box>
+                ) : (
+                  <Box textAlign="center" py={4}>
+                    <Text color="gray.500" fontSize="sm">
+                      Нет данных по возрасту
+                    </Text>
                   </Box>
                 )}
               </Box>
