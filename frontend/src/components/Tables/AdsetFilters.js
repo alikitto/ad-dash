@@ -21,9 +21,17 @@ function AdsetFilters({
     color: "gray.800",
     bg: "white",
     borderColor: "gray.300",
+    _hover: { borderColor: "gray.400" },
     sx: { 
-      "> option": { background: "white", color: "gray.800" },
-      "&:hover": { borderColor: "gray.400" }
+      "> option": { 
+        background: "white !important", 
+        color: "gray.800 !important" 
+      },
+      "&:hover": { borderColor: "gray.400" },
+      "&:focus": { 
+        borderColor: "blue.500",
+        boxShadow: "0 0 0 1px var(--chakra-colors-blue-500)"
+      }
     },
     size: "sm",
     borderRadius: "md",

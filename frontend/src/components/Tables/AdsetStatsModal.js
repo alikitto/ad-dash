@@ -359,8 +359,8 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="6xl" isCentered scrollBehavior="inside">
       <ModalOverlay />
-      <ModalContent bg={bgColor} maxW="1200px" maxH="90vh">
-        <ModalHeader pb={3}>
+      <ModalContent bg={bgColor} maxW="1400px" maxH="95vh" display="flex" flexDirection="column">
+        <ModalHeader pb={3} flexShrink={0}>
           <Flex align="center" justify="space-between" w="full" flexWrap="wrap" gap={2}>
             <Flex align="center" gap={2} minW="200px">
               <Icon as={FaChartLine} color="purple.500" />
@@ -411,7 +411,7 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
         </ModalHeader>
         <ModalCloseButton />
         
-        <ModalBody pb={6} overflowY="auto">
+        <ModalBody pb={6} overflowY="auto" flex="1" minH="0">
           {/* AI Recommendations */}
           {statsData && statsData.length > 0 && generateAIRecommendations().length > 0 && (
             <Box mb={4}>
