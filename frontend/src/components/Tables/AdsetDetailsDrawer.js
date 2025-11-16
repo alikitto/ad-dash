@@ -14,13 +14,22 @@ import {
   Button,
   HStack,
   VStack,
-  Image,
   useToast,
   Divider,
   Icon,
 } from "@chakra-ui/react";
+import {
+  AlertDialog,
+  AlertDialogOverlay,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogBody,
+  AlertDialogFooter,
+} from "@chakra-ui/react";
 import { FaExternalLinkAlt, FaCopy, FaStickyNote } from "react-icons/fa";
-import { fmtMoney, fmtPct, fmtNum } from "utils/formatters";
+import { fmtMoney, fmtPct, fmtNum, fmtDateDMYIntl } from "utils/formatters";
+import { API_BASE } from "../../config/api";
+import { updateAdsetBudgetDates } from "../../api/adsets";
 
 export default function AdsetDetailsDrawer({
   isOpen,
@@ -44,6 +53,9 @@ export default function AdsetDetailsDrawer({
   const adsetId = adset?.adset_id ? String(adset.adset_id) : "";
   const [schedule, setSchedule] = useState(null);
   const [timeInsights, setTimeInsights] = useState(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const cancelRef = React.useRef();
+  const [pendingChange, setPendingChange] = useState(null); // { summary, payload, toastSuccess }
 
   const parseBudgetNumber = (v) => {
     if (v == null) return 0;
@@ -112,10 +124,14 @@ export default function AdsetDetailsDrawer({
   };
   const formatDMY = (date) => {
     if (!date) return null;
-    const d = date.getDate();
-    const m = date.getMonth() + 1;
-    const y = date.getFullYear();
-    return `${d}/${m}/${y}`;
+    try {
+      return fmtDateDMYIntl(date);
+    } catch {
+      const d = date.getDate();
+      const m = date.getMonth() + 1;
+      const y = date.getFullYear();
+      return `${d}/${m}/${y}`;
+    }
   };
   const startRaw =
     adset?.start_time ||
@@ -395,6 +411,10 @@ export default function AdsetDetailsDrawer({
                 const dailyValue = dailyBudget > 0 ? dailyBudget : (details?.daily_budget ? parseBudgetNumber(details.daily_budget) : 0);
                 const lifeValue = lifetimeBudget > 0 ? lifetimeBudget : (details?.lifetime_budget ? parseBudgetNumber(details.lifetime_budget) : 0);
 
+                const openConfirm = (change) => {
+                  setPendingChange(change);
+                  setConfirmOpen(true);
+                };
                 return (
                   <VStack align="stretch" spacing={2}>
                     <Text fontSize="xs" color="gray.600">
@@ -403,81 +423,60 @@ export default function AdsetDetailsDrawer({
                     <HStack spacing={2} flexWrap="wrap">
                       {isLifetime ? (
                         <>
-                          <Button size="xs" variant="outline" colorScheme="green" onClick={async () => {
-                            try {
-                              // lifetime budgets are in minor units; here avgDaily is in major, backend expects minor
-                              const addDays = 1;
-                              const newLifetime = Math.round((lifeValue + avgDaily * addDays) * 100);
-                              const currentEnd = endDate || toDate(details?.end_time);
-                              const newEnd = new Date((currentEnd || new Date()).getTime());
-                              newEnd.setDate(newEnd.getDate() + addDays);
-                              await fetch(`${API_BASE}/api/adsets/${encodeURIComponent(adsetId)}/update-budget-dates`, {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({
-                                  lifetime_budget: newLifetime,
-                                  end_time: newEnd.toISOString(),
-                                }),
-                              });
-                              toast({ title: "Обновлено", description: "Продлено на +1 день", status: "success", duration: 2000, position: "top" });
-                            } catch (e) {
-                              toast({ title: "Ошибка", description: "Не удалось обновить бюджет/дату", status: "error", duration: 2500, position: "top" });
-                            }
+                          <Button size="xs" variant="outline" colorScheme="green" isDisabled={avgDaily <= 0} onClick={() => {
+                            const addDays = 1;
+                            const newLifetimeMajor = lifeValue + avgDaily * addDays;
+                            const currentEnd = endDate || toDate(details?.end_time);
+                            const newEnd = new Date((currentEnd || new Date()).getTime());
+                            newEnd.setDate(newEnd.getDate() + addDays);
+                            openConfirm({
+                              summary: `Продлить на +1 день: бюджет ${fmtMoney(lifeValue)} → ${fmtMoney(newLifetimeMajor)}, дата ${formatDMY(currentEnd || new Date())} → ${formatDMY(newEnd)}`,
+                              payload: {
+                                lifetime_budget: Math.round(newLifetimeMajor * 100),
+                                end_time: newEnd.toISOString(),
+                              },
+                              toastSuccess: "Продлено на +1 день",
+                            });
                           }}>
                             +1 день ({fmtMoney(avgDaily)})
                           </Button>
-                          <Button size="xs" variant="outline" colorScheme="green" onClick={async () => {
-                            try {
-                              const addDays = 3;
-                              const newLifetime = Math.round((lifeValue + avgDaily * addDays) * 100);
-                              const currentEnd = endDate || toDate(details?.end_time);
-                              const newEnd = new Date((currentEnd || new Date()).getTime());
-                              newEnd.setDate(newEnd.getDate() + addDays);
-                              await fetch(`${API_BASE}/api/adsets/${encodeURIComponent(adsetId)}/update-budget-dates`, {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({
-                                  lifetime_budget: newLifetime,
-                                  end_time: newEnd.toISOString(),
-                                }),
-                              });
-                              toast({ title: "Обновлено", description: "Продлено на +3 дня", status: "success", duration: 2000, position: "top" });
-                            } catch (e) {
-                              toast({ title: "Ошибка", description: "Не удалось обновить бюджет/дату", status: "error", duration: 2500, position: "top" });
-                            }
+                          <Button size="xs" variant="outline" colorScheme="green" isDisabled={avgDaily <= 0} onClick={() => {
+                            const addDays = 3;
+                            const newLifetimeMajor = lifeValue + avgDaily * addDays;
+                            const currentEnd = endDate || toDate(details?.end_time);
+                            const newEnd = new Date((currentEnd || new Date()).getTime());
+                            newEnd.setDate(newEnd.getDate() + addDays);
+                            openConfirm({
+                              summary: `Продлить на +3 дня: бюджет ${fmtMoney(lifeValue)} → ${fmtMoney(newLifetimeMajor)}, дата ${formatDMY(currentEnd || new Date())} → ${formatDMY(newEnd)}`,
+                              payload: {
+                                lifetime_budget: Math.round(newLifetimeMajor * 100),
+                                end_time: newEnd.toISOString(),
+                              },
+                              toastSuccess: "Продлено на +3 дня",
+                            });
                           }}>
                             +3 дня ({fmtMoney(avgDaily * 3)})
                           </Button>
                         </>
                       ) : (
                         <>
-                          <Button size="xs" variant="outline" colorScheme="blue" onClick={async () => {
-                            try {
-                              const newDaily = Math.round(dailyValue * 1.1 * 100);
-                              await fetch(`${API_BASE}/api/adsets/${encodeURIComponent(adsetId)}/update-budget-dates`, {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ daily_budget: newDaily }),
-                              });
-                              toast({ title: "Обновлено", description: "Дневной бюджет +10%", status: "success", duration: 2000, position: "top" });
-                            } catch (e) {
-                              toast({ title: "Ошибка", description: "Не удалось обновить дневной бюджет", status: "error", duration: 2500, position: "top" });
-                            }
+                          <Button size="xs" variant="outline" colorScheme="blue" isDisabled={!(dailyValue > 0)} onClick={() => {
+                            const newDailyMajor = dailyValue * 1.1;
+                            openConfirm({
+                              summary: `Увеличить daily на +10%: ${fmtMoney(dailyValue)} → ${fmtMoney(newDailyMajor)}`,
+                              payload: { daily_budget: Math.round(newDailyMajor * 100) },
+                              toastSuccess: "Дневной бюджет +10%",
+                            });
                           }}>
                             +10% {dailyValue > 0 ? `(${fmtMoney(dailyValue * 1.1)})` : ""}
                           </Button>
-                          <Button size="xs" variant="outline" colorScheme="blue" onClick={async () => {
-                            try {
-                              const newDaily = Math.round(dailyValue * 1.2 * 100);
-                              await fetch(`${API_BASE}/api/adsets/${encodeURIComponent(adsetId)}/update-budget-dates`, {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ daily_budget: newDaily }),
-                              });
-                              toast({ title: "Обновлено", description: "Дневной бюджет +20%", status: "success", duration: 2000, position: "top" });
-                            } catch (e) {
-                              toast({ title: "Ошибка", description: "Не удалось обновить дневной бюджет", status: "error", duration: 2500, position: "top" });
-                            }
+                          <Button size="xs" variant="outline" colorScheme="blue" isDisabled={!(dailyValue > 0)} onClick={() => {
+                            const newDailyMajor = dailyValue * 1.2;
+                            openConfirm({
+                              summary: `Увеличить daily на +20%: ${fmtMoney(dailyValue)} → ${fmtMoney(newDailyMajor)}`,
+                              payload: { daily_budget: Math.round(newDailyMajor * 100) },
+                              toastSuccess: "Дневной бюджет +20%",
+                            });
                           }}>
                             +20% {dailyValue > 0 ? `(${fmtMoney(dailyValue * 1.2)})` : ""}
                           </Button>
@@ -525,6 +524,61 @@ export default function AdsetDetailsDrawer({
             {/* Creatives moved to Detailed Stats modal */}
           </VStack>
         </DrawerBody>
+        {/* Confirm Dialog */}
+        <AlertDialog isOpen={confirmOpen} leastDestructiveRef={cancelRef} onClose={() => setConfirmOpen(false)}>
+          <AlertDialogOverlay>
+            <AlertDialogContent>
+              <AlertDialogHeader fontSize="lg" fontWeight="bold">
+                Подтверждение изменений
+              </AlertDialogHeader>
+              <AlertDialogBody>
+                {pendingChange?.summary || "Применить изменения?"}
+              </AlertDialogBody>
+              <AlertDialogFooter>
+                <Button ref={cancelRef} onClick={() => setConfirmOpen(false)}>
+                  Отменить
+                </Button>
+                <Button colorScheme="blue" ml={3} onClick={async () => {
+                  try {
+                    await updateAdsetBudgetDates(adsetId, pendingChange?.payload || {});
+                    if (fetchAdsetDetails) {
+                      const d = await fetchAdsetDetails(adsetId);
+                      setDetails(d);
+                      const s = toDate(d?.start_time);
+                      const e = toDate(d?.end_time);
+                      if (s) setSchedule(`${formatDMY(s)}${e ? ` → ${formatDMY(e)}` : " → Ongoing"}`);
+                    }
+                    // append to local history
+                    try {
+                      const when = new Date();
+                      const entry = {
+                        timestamp: when.toISOString(),
+                        user: "you",
+                        action: "update",
+                        details: pendingChange?.summary || "Budget/dates updated",
+                      };
+                      setHistory((h) => Array.isArray(h) ? [entry, ...h] : [entry]);
+                    } catch {}
+                    try {
+                      if (typeof window !== "undefined") {
+                        window.dispatchEvent(new CustomEvent("adsetUpdated", { detail: { adsetId } }));
+                      }
+                    } catch {}
+                    toast({ title: "Обновлено", description: pendingChange?.toastSuccess || "Изменения применены", status: "success", duration: 2000, position: "top" });
+                  } catch (e) {
+                    const msg = (e && e.message) ? e.message : "Не удалось применить изменения";
+                    toast({ title: "Ошибка", description: msg, status: "error", duration: 3000, position: "top" });
+                  } finally {
+                    setConfirmOpen(false);
+                    setPendingChange(null);
+                  }
+                }}>
+                  Подтвердить
+                </Button>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialogOverlay>
+        </AlertDialog>
       </DrawerContent>
     </Drawer>
   );

@@ -172,6 +172,62 @@ async def update_adset_budget_dates(adset_id: str, daily_budget: Optional[float]
                 raise HTTPException(status_code=response.status, detail=resp_json)
             return {"updated": True, "response": resp_json}
 
+async def get_adset_activity(session: aiohttp.ClientSession, adset_id: str, after: Optional[str] = None, limit: int = 25) -> Dict:
+    """
+    Fetch adset activity (change history) from Meta Graph API.
+    Returns normalized structure with items and paging cursors.
+    """
+    if not META_TOKEN:
+        raise HTTPException(status_code=500, detail="Token not configured")
+    url = f"https://graph.facebook.com/{API_VERSION}/{adset_id}/adactivity"
+    params: Dict[str, str] = {
+        "access_token": META_TOKEN,
+        "limit": str(max(1, min(limit, 100))),
+        # event_type could be filtered if needed; we keep all for now
+        # "event_type": "adset_updated,adset_created",
+    }
+    if after:
+        params["after"] = after
+    data = await fb_request(session, "get", url, params=params)
+    raw_items = data.get("data", []) or []
+    items = []
+    for it in raw_items:
+        # it contains event_time, event_type, actor_id, actor_name, extra_data
+        event_time = it.get("event_time")
+        event_type = it.get("event_type")
+        actor = it.get("actor_name") or it.get("actor_id") or "system"
+        extra = it.get("extra_data") or {}
+        # Try to build a concise details string
+        try:
+            if isinstance(extra, dict):
+                # highlight common fields
+                changed_fields = []
+                for key in ["budget", "daily_budget", "lifetime_budget", "start_time", "end_time", "status", "effective_status", "name"]:
+                    if key in extra:
+                        changed_fields.append(f"{key}: {extra.get(key)}")
+                details = ", ".join(changed_fields) if changed_fields else str(extra)
+            else:
+                details = str(extra)
+        except Exception:
+            details = ""
+        items.append({
+            "timestamp": event_time,
+            "user": actor,
+            "action": event_type,
+            "details": details,
+        })
+    paging = (data.get("paging") or {})
+    cursors = (paging.get("cursors") or {})
+    return {
+        "items": items,
+        "paging": {
+            "after": cursors.get("after"),
+            "before": cursors.get("before"),
+            "next": paging.get("next"),
+            "previous": paging.get("previous"),
+        }
+    }
+
 async def get_adset_details(session: aiohttp.ClientSession, adset_id: str) -> Dict:
     """
     Fetch ad set details that include budgets and scheduling.

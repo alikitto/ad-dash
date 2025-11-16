@@ -34,6 +34,7 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
   const [loading, setLoading] = useState(false);
   const [creativesData, setCreativesData] = useState(null);
   const [creativesLoading, setCreativesLoading] = useState(false);
+  const [creativesSort, setCreativesSort] = useState({ key: "leads", direction: "desc" });
   const [placementBreakdown, setPlacementBreakdown] = useState(null);
   const [placementLoading, setPlacementLoading] = useState(false);
   const [ageBreakdown, setAgeBreakdown] = useState(null);
@@ -190,6 +191,26 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
       ctr: 0, // CTR нужно вычислять по-другому
       frequency: statsData.reduce((acc, day) => acc + (day.frequency || 0), 0) / statsData.length
     };
+  };
+
+  const getSortedCreatives = () => {
+    if (!Array.isArray(creativesData)) return [];
+    const { key, direction } = creativesSort || {};
+    const dir = direction === "asc" ? 1 : -1;
+    return [...creativesData].sort((a, b) => {
+      const aVal = Number(a?.[key] ?? 0);
+      const bVal = Number(b?.[key] ?? 0);
+      if (aVal < bVal) return -1 * dir;
+      if (aVal > bVal) return 1 * dir;
+      return 0;
+    });
+  };
+
+  const handleCreativesSort = (key) => {
+    setCreativesSort((prev) => {
+      if (!prev || prev.key !== key) return { key, direction: "desc" };
+      return { key, direction: prev.direction === "desc" ? "asc" : "desc" };
+    });
   };
 
   // Функции для определения трендов и цветов
@@ -681,16 +702,26 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
                         <Tr>
                           <Th borderColor={borderColor} color={textColor}>Креатив</Th>
                           <Th borderColor={borderColor} color={textColor}>Статус</Th>
-                          <Th borderColor={borderColor} color={textColor} isNumeric>Leads</Th>
-                          <Th borderColor={borderColor} color={textColor} isNumeric>CPA</Th>
-                          <Th borderColor={borderColor} color={textColor} isNumeric>CPM</Th>
-                          <Th borderColor={borderColor} color={textColor} isNumeric>CTR</Th>
+                          <Th borderColor={borderColor} color={textColor} isNumeric cursor="pointer" onClick={() => handleCreativesSort("leads")}>
+                            Leads {creativesSort.key === "leads" ? (creativesSort.direction === "desc" ? "↓" : "↑") : ""}
+                          </Th>
+                          <Th borderColor={borderColor} color={textColor} isNumeric cursor="pointer" onClick={() => handleCreativesSort("cpa")}>
+                            CPA {creativesSort.key === "cpa" ? (creativesSort.direction === "desc" ? "↓" : "↑") : ""}
+                          </Th>
+                          <Th borderColor={borderColor} color={textColor} isNumeric cursor="pointer" onClick={() => handleCreativesSort("cpm")}>
+                            CPM {creativesSort.key === "cpm" ? (creativesSort.direction === "desc" ? "↓" : "↑") : ""}
+                          </Th>
+                          <Th borderColor={borderColor} color={textColor} isNumeric cursor="pointer" onClick={() => handleCreativesSort("ctr")}>
+                            CTR {creativesSort.key === "ctr" ? (creativesSort.direction === "desc" ? "↓" : "↑") : ""}
+                          </Th>
                           <Th borderColor={borderColor} color={textColor} isNumeric>Частота</Th>
-                          <Th borderColor={borderColor} color={textColor} isNumeric>Spent</Th>
+                          <Th borderColor={borderColor} color={textColor} isNumeric cursor="pointer" onClick={() => handleCreativesSort("spend")}>
+                            Spent {creativesSort.key === "spend" ? (creativesSort.direction === "desc" ? "↓" : "↑") : ""}
+                          </Th>
                         </Tr>
                       </Thead>
                       <Tbody>
-                        {creativesData.map((creative, index) => (
+                        {getSortedCreatives().map((creative, index) => (
                           <Tr key={index}>
                             <Td borderColor={borderColor} color={textColor}>
                               <Flex align="center" gap={3}>
@@ -887,6 +918,22 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
                 <Text fontSize="lg" fontWeight="bold" mb={3} color={textColor}>
                   📍 Breakdown по плейсментам
                 </Text>
+                {/* Small insights */}
+                {placementBreakdown && placementBreakdown.data && placementBreakdown.data.length > 0 && (
+                  <Box mb={3} fontSize="sm" color="gray.600">
+                    {(() => {
+                      const data = placementBreakdown.data;
+                      const topByLeads = [...data].sort((a,b) => (b.leads||0)-(a.leads||0))[0];
+                      const topBySpend = [...data].sort((a,b) => (b.spend||0)-(a.spend||0))[0];
+                      return (
+                        <Flex gap={4} wrap="wrap">
+                          <Text>Топ по лидам: <b>{topByLeads?.key || "—"}</b> ({formatNumber(topByLeads?.leads || 0)} л.)</Text>
+                          <Text>Топ по тратам: <b>{topBySpend?.key || "—"}</b> ({formatMoney(topBySpend?.spend || 0)})</Text>
+                        </Flex>
+                      );
+                    })()}
+                  </Box>
+                )}
                 
                 {placementLoading ? (
                   <Flex justify="center" align="center" py={4}>
@@ -944,6 +991,22 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
                 <Text fontSize="lg" fontWeight="bold" mb={3} color={textColor}>
                   👥 Breakdown по возрасту
                 </Text>
+                {/* Small insights */}
+                {ageBreakdown && ageBreakdown.data && ageBreakdown.data.length > 0 && (
+                  <Box mb={3} fontSize="sm" color="gray.600">
+                    {(() => {
+                      const data = ageBreakdown.data;
+                      const topByLeads = [...data].sort((a,b) => (b.leads||0)-(a.leads||0))[0];
+                      const bestCpl = [...data].filter(d => (d.leads||0)>0).sort((a,b) => (a.cpl||Infinity)-(b.cpl||Infinity))[0];
+                      return (
+                        <Flex gap={4} wrap="wrap">
+                          <Text>Больше всего лидов: <b>{topByLeads?.key || "—"}</b> ({formatNumber(topByLeads?.leads || 0)} л.)</Text>
+                          <Text>Лучший CPL: <b>{bestCpl?.key || "—"}</b> ({formatMoney(bestCpl?.cpl || 0)})</Text>
+                        </Flex>
+                      );
+                    })()}
+                  </Box>
+                )}
                 
                 {ageLoading ? (
                   <Flex justify="center" align="center" py={4}>

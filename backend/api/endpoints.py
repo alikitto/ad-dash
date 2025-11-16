@@ -450,6 +450,25 @@ async def get_ads_for_adset(
         logging.error(f"!!! ADS API ERROR: {e} !!!", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/adsets/{adset_id}/history")
+async def get_adset_history(
+    adset_id: str,
+    after: Optional[str] = Query(None),
+    limit: int = Query(25, ge=1, le=100),
+):
+    """Return adset change history from Meta 'adactivity' edge."""
+    if not META_TOKEN:
+        raise HTTPException(status_code=500, detail="Token not configured")
+    try:
+        import aiohttp
+        async with aiohttp.ClientSession() as session:
+            data = await facebook_service.get_adset_activity(session, adset_id, after=after, limit=limit)
+            # Frontend expects an array or .items; return items directly for backward-compat
+            return data.get("items", [])
+    except Exception as e:
+        logging.error(f"get_adset_history error: {e}", exc_info=True)
+        # Fall back to empty list so UI doesn't break
+        return []
 # ------- write-ручки оставляем POST --------
 
 @router.post("/adsets/{adset_id}/update-status")
