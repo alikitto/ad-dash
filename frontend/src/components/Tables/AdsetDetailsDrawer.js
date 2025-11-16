@@ -264,12 +264,48 @@ export default function AdsetDetailsDrawer({
     return items.filter((evt) => {
       const action = String(evt?.action || "").toLowerCase();
       const detailsText = String(evt?.details || "");
-      const isCreated = /create/.test(action) || /created/.test(action);
-      const isBudget = /budget|daily_budget|lifetime_budget/i.test(detailsText);
-      const isDate = /start_time|end_time/i.test(detailsText);
+      const isCreated = /(^|_)create(_|$)|created/.test(action);
+      // учитываем и название действия, и текст деталей
+      const isBudget =
+        /budget|daily_budget|lifetime_budget/i.test(detailsText) ||
+        /budget/.test(action);
+      const isDate =
+        /start_time|end_time/i.test(detailsText) ||
+        /(duration|schedule|scheduling|start|end)/.test(action);
       return isCreated || isBudget || isDate;
     });
   }, [history]);
+
+  // управление раскрытием подробностей
+  const [openItems, setOpenItems] = useState({});
+  const toggleOpen = (idx) => setOpenItems((s) => ({ ...s, [idx]: !s[idx] }));
+
+  const actionToTitle = (actionLower) => {
+    if (/create_ad_set|(^|_)create(_|$)/.test(actionLower)) return "Группа объявлений создана";
+    if (/update_ad_set_budget|budget/.test(actionLower)) return "Бюджет группы объявлений обновлён";
+    if (/update_ad_set_duration|scheduling|schedule|(start|end)/.test(actionLower)) return "График группы объявлений обновлён";
+    if (/update_ad_set_name|rename|name/.test(actionLower)) return "Название группы объявлений обновлено";
+    return "Изменение";
+  };
+
+  const renderPrettyDetails = (detailsText) => {
+    if (!detailsText || detailsText === "{}") {
+      return <Text fontSize="xs" color="gray.600">Подробности недоступны.</Text>;
+    }
+    // если строка похожа на JSON — красиво отформатируем
+    try {
+      const obj = typeof detailsText === "string" ? JSON.parse(detailsText) : detailsText;
+      const pretty = JSON.stringify(obj, null, 2);
+      return (
+        <Box as="pre" fontSize="xs" color="gray.700" bg="gray.50" p={2} borderRadius="md" overflowX="auto">
+{pretty}
+        </Box>
+      );
+    } catch {
+      // иначе покажем как есть
+      return <Text fontSize="xs" color="gray.700">{String(detailsText)}</Text>;
+    }
+  };
 
   const adsManagerUrl = useMemo(() => {
     if (!accountId || !adsetId) return undefined;
@@ -542,33 +578,35 @@ export default function AdsetDetailsDrawer({
                   const when = toDate(evt.timestamp || evt.time || evt.date);
                   const who = evt.user || evt.actor || "system";
                   const action = evt.action || evt.change || evt.event || "updated";
-                  const detailsText = evt.details || evt.note || "";
-                  const isBudget = /budget|daily_budget|lifetime_budget/i.test(detailsText);
-                  const isDate = /start_time|end_time/i.test(detailsText);
-                  const isCreated = /create|created/i.test(String(action));
-                  const actionLabel = isCreated
-                    ? "Создано"
-                    : isBudget
-                      ? "Изменён бюджет"
-                      : isDate
-                        ? "Изменён график"
-                        : action;
+                  const actionLower = String(action).toLowerCase();
+                  const detailsTextRaw = evt.details || evt.note || "";
+                  const detailsText = (detailsTextRaw === "{}" ? "" : detailsTextRaw);
+                  const isBudget =
+                    /budget|daily_budget|lifetime_budget/i.test(detailsText) ||
+                    /budget/.test(actionLower);
+                  const isDate =
+                    /start_time|end_time/i.test(detailsText) ||
+                    /(duration|schedule|scheduling|start|end)/.test(actionLower);
+                  const isCreated = /(^|_)create(_|$)|created/.test(actionLower);
+                  const actionLabel = actionToTitle(actionLower);
                   return (
-                    <Flex key={idx} align="start" gap={3} p={2} borderWidth="1px" borderRadius="md" bg="white">
-                      <Box flex="0 0 auto" minW="120px" color="gray.600" fontSize="xs">
-                        {when ? when.toLocaleString("ru-RU") : "—"}
-                      </Box>
-                      <Box flex="1 1 auto">
-                        <Text fontSize="sm">
-                          <b>{who}</b>: {actionLabel}
-                          {evt._scope === "campaign" ? " (кампания)" : ""}
-                        </Text>
-                        {detailsText && (
-                          <Text fontSize="xs" color={isBudget ? "green.700" : isDate ? "blue.700" : "gray.700"}>
-                            {detailsText}
+                    <Flex key={idx} direction="column" p={2} borderWidth="1px" borderRadius="md" bg="white">
+                      <Flex align="start" gap={3} cursor="pointer" onClick={() => toggleOpen(idx)}>
+                        <Box flex="0 0 auto" minW="120px" color="gray.600" fontSize="xs">
+                          {when ? when.toLocaleString("ru-RU") : "—"}
+                        </Box>
+                        <Box flex="1 1 auto">
+                          <Text fontSize="sm">
+                            <b>{who}</b>: {actionLabel}
+                            {evt._scope === "campaign" ? " (кампания)" : ""}
                           </Text>
-                        )}
-                      </Box>
+                        </Box>
+                      </Flex>
+                      {openItems[idx] && (
+                        <Box mt={2} ml={0} pl={0}>
+                          {renderPrettyDetails(detailsText)}
+                        </Box>
+                      )}
                     </Flex>
                   );
                 })}
