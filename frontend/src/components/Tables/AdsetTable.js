@@ -7,6 +7,7 @@ import { FaHourglassHalf } from "react-icons/fa";
 import TablesTableRow from "./TablesTableRow";
 import { useColumnSizes } from "hooks/useColumnSizes";
 import AdsetDetailsDrawer from "./AdsetDetailsDrawer";
+import * as api from "api/adsets";
 
 const SEPARATOR = "rgba(0,0,0,0.10)";
 
@@ -158,35 +159,10 @@ function AdsetTable({ adsets, loading, error, sortConfig, onSort, onStatusChange
     onStatusChange(row.adset_id, row.status);
   };
 
-  const fetchAdsForAdset = async (adsetId) => {
-    try {
-      const res = await fetch(`/api/adsets/${encodeURIComponent(adsetId)}/ads`);
-      if (!res.ok) return [];
-      const data = await res.json();
-      return Array.isArray(data) ? data : (data.items || []);
-    } catch {
-      return [];
-    }
-  };
-  const fetchAdsetDetails = async (adsetId) => {
-    try {
-      const res = await fetch(`/api/adsets/${encodeURIComponent(adsetId)}`);
-      if (!res.ok) return null;
-      return await res.json();
-    } catch {
-      return null;
-    }
-  };
-  const fetchAdsetHistory = async (adsetId) => {
-    try {
-      const res = await fetch(`/api/adsets/${encodeURIComponent(adsetId)}/history`);
-      if (!res.ok) return [];
-      const data = await res.json();
-      return Array.isArray(data) ? data : (data.items || []);
-    } catch {
-      return [];
-    }
-  };
+  const fetchAdsForAdset = (adsetId) => api.fetchAdsetAds(adsetId);
+  const fetchAdsetDetails = (adsetId) => api.fetchAdsetDetails(adsetId);
+  const fetchAdsetHistory = (adsetId) => api.fetchAdsetHistory(adsetId);
+  const fetchAdsetTimeInsights = (adsetId) => api.fetchAdsetTimeInsights(adsetId);
 
   return (
     <Box {...tableStyles}>
@@ -223,6 +199,7 @@ function AdsetTable({ adsets, loading, error, sortConfig, onSort, onStatusChange
         fetchAdsForAdset={fetchAdsForAdset}
         fetchAdsetDetails={fetchAdsetDetails}
         fetchAdsetHistory={fetchAdsetHistory}
+        fetchAdsetTimeInsights={fetchAdsetTimeInsights}
       />
     </Box>
   );

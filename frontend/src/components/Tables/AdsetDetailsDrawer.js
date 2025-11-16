@@ -31,6 +31,7 @@ export default function AdsetDetailsDrawer({
   fetchAdsForAdset,
   fetchAdsetDetails,
   fetchAdsetHistory,
+  fetchAdsetTimeInsights,
 }) {
   const toast = useToast();
   const [ads, setAds] = useState([]);
@@ -41,22 +42,61 @@ export default function AdsetDetailsDrawer({
   const [historyLoading, setHistoryLoading] = useState(false);
   const accountId = adset?.account_id ? String(adset.account_id) : "";
   const adsetId = adset?.adset_id ? String(adset.adset_id) : "";
+  const [schedule, setSchedule] = useState(null);
 
   const parseBudgetNumber = (v) => {
     if (v == null) return 0;
     const num = typeof v === "string" ? parseFloat(v) : Number(v);
     if (!isFinite(num)) return 0;
-    // many APIs return budget in minor units (cents)
-    if (num >= 10000 && Number.isFinite(num / 100)) {
-      // heuristic: if looks too big, treat as cents
+    // Heuristics: some APIs return minor units (cents) or micros
+    if (num >= 1_000_000 && Number.isFinite(num / 1_000_000)) {
+      // micros to major (e.g. Google-style)
+      return Math.round((num / 1_000_000) * 100) / 100;
+    }
+    if (num >= 10_000 && Number.isFinite(num / 100)) {
+      // cents to major
       return Math.round((num / 100) * 100) / 100;
     }
     return num;
   };
-  const dailyBudget = parseBudgetNumber(adset?.daily_budget ?? adset?.dailyBudget ?? adset?.budget_daily ?? adset?.budget);
-  const lifetimeBudget = parseBudgetNumber(adset?.lifetime_budget ?? adset?.lifetimeBudget ?? adset?.budget_lifetime);
+  const dailyBudget = parseBudgetNumber(
+    adset?.daily_budget ??
+      adset?.dailyBudget ??
+      adset?.budget_daily ??
+      adset?.budget ??
+      adset?.daily_budget_amount ??
+      adset?.dailyBudgetAmount ??
+      adset?.daily_budget_micro ??
+      adset?.dailyBudgetMicros
+  );
+  const lifetimeBudget = parseBudgetNumber(
+    adset?.lifetime_budget ??
+      adset?.lifetimeBudget ??
+      adset?.budget_lifetime ??
+      adset?.lifetime_budget_amount ??
+      adset?.lifetimeBudgetAmount ??
+      adset?.lifetime_budget_micro ??
+      adset?.lifetimeBudgetMicros
+  );
   const budgetType = dailyBudget > 0 ? "Daily" : lifetimeBudget > 0 ? "Lifetime" : null;
   const budgetValue = dailyBudget > 0 ? dailyBudget : lifetimeBudget > 0 ? lifetimeBudget : 0;
+
+  // Try to extract daily budget from adset name like "$10/day", "10$ per day", "Budget 15 daily"
+  const parseBudgetFromName = (name) => {
+    if (!name || typeof name !== "string") return null;
+    const text = name.toLowerCase();
+    // common patterns: $10/day, 10$/day, 10 $ / day, 10 per day, daily 10, 10 daily
+    const dollarPattern = /(?:\$?\s?)(\d+(?:[.,]\d{1,2})?)(?:\s?\$)?\s*(?:\/\s*day|per\s*day|daily)/i;
+    const reversedPattern = /(?:daily|per\s*day)\s*(\$?\s?\d+(?:[.,]\d{1,2})?(?:\s?\$)?)/i;
+    let m = text.match(dollarPattern);
+    if (!m) m = text.match(reversedPattern);
+    if (m && m[1]) {
+      const raw = m[1].replace(/[^0-9.,]/g, "").replace(",", ".");
+      const num = parseFloat(raw);
+      if (isFinite(num) && num > 0) return { type: "Daily", value: Math.round(num * 100) / 100 };
+    }
+    return null;
+  };
 
   const toDate = (v) => {
     if (!v) return null;
@@ -68,13 +108,23 @@ export default function AdsetDetailsDrawer({
     const d = new Date(v);
     return isNaN(d.getTime()) ? null : d;
   };
-  const startRaw = adset?.start_time || adset?.time_start || adset?.start || adset?.created_time || adset?.createdTime;
-  const endRaw = adset?.end_time || adset?.time_end || adset?.end || adset?.stop_time || adset?.stopTime;
+  const startRaw =
+    adset?.start_time ||
+    adset?.time_start ||
+    adset?.start ||
+    adset?.created_time ||
+    adset?.createdTime ||
+    (typeof adset?.adset_name === "string" && (adset.adset_name.match(/(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})/) || [])[0]);
+  const endRaw =
+    adset?.end_time ||
+    adset?.time_end ||
+    adset?.end ||
+    adset?.stop_time ||
+    adset?.stopTime;
   const startDate = toDate(startRaw);
   const endDate = toDate(endRaw);
-  const scheduleLabel = startDate
-    ? `${startDate.toLocaleDateString()}${endDate ? ` → ${endDate.toLocaleDateString()}` : " → Ongoing"}`
-    : "—";
+  const initialScheduleLabel =
+    startDate ? `${startDate.toLocaleDateString()}${endDate ? ` → ${endDate.toLocaleDateString()}` : " → Ongoing"}` : "—";
 
   // Load details and history if providers exist to improve budget/schedule and add change history
   useEffect(() => {
@@ -86,6 +136,14 @@ export default function AdsetDetailsDrawer({
         setDetailsLoading(true);
         const d = await fetchAdsetDetails(adsetId);
         if (!cancelled) setDetails(d);
+        // derive schedule from details if present
+        if (!cancelled && d) {
+          const s = toDate(d?.start_time ?? d?.time_start ?? d?.start ?? d?.created_time);
+          const e = toDate(d?.end_time ?? d?.time_end ?? d?.end ?? d?.stop_time);
+          if (s) {
+            setSchedule(`${s.toLocaleDateString()}${e ? ` → ${e.toLocaleDateString()}` : " → Ongoing"}`);
+          }
+        }
       } catch {
         if (!cancelled) setDetails(null);
       } finally {
@@ -104,12 +162,25 @@ export default function AdsetDetailsDrawer({
         if (!cancelled) setHistoryLoading(false);
       }
     };
+    const loadTimeInsights = async () => {
+      if (!fetchAdsetTimeInsights) return;
+      try {
+        const ti = await fetchAdsetTimeInsights(adsetId);
+        const dr = ti?.date_range || {};
+        if (dr.start || dr.end) {
+          const s = toDate(dr.start);
+          const e = toDate(dr.end);
+          if (s) setSchedule(`${s.toLocaleDateString()}${e ? ` → ${e.toLocaleDateString()}` : " → Ongoing"}`);
+        }
+      } catch {}
+    };
     loadDetails();
     loadHistory();
+    loadTimeInsights();
     return () => {
       cancelled = true;
     };
-  }, [isOpen, adsetId, fetchAdsetDetails, fetchAdsetHistory]);
+  }, [isOpen, adsetId, fetchAdsetDetails, fetchAdsetHistory, fetchAdsetTimeInsights]);
 
   useEffect(() => {
     if (!isOpen || !adsetId) return;
@@ -189,12 +260,19 @@ export default function AdsetDetailsDrawer({
               </Badge>
               <Badge colorScheme="green">
                 {(() => {
-                  // Prefer details if present
-                  const dDaily = parseBudgetNumber(details?.daily_budget ?? details?.dailyBudget ?? details?.budget_daily);
-                  const dLife = parseBudgetNumber(details?.lifetime_budget ?? details?.lifetimeBudget ?? details?.budget_lifetime);
-                  const type = dDaily > 0 ? "Daily" : dLife > 0 ? "Lifetime" : budgetType;
-                  const value = dDaily > 0 ? dDaily : dLife > 0 ? dLife : budgetValue;
-                  return `Budget: ${type ? `${type} ${fmtMoney(value)}` : "—"}`;
+                  // Prefer details if present, otherwise from name, otherwise from row fallback
+                  const dDaily = parseBudgetNumber(details?.daily_budget ?? details?.dailyBudget ?? details?.budget_daily ?? details?.daily_budget_amount ?? details?.daily_budget_micro);
+                  const dLife = parseBudgetNumber(details?.lifetime_budget ?? details?.lifetimeBudget ?? details?.budget_lifetime ?? details?.lifetime_budget_amount ?? details?.lifetime_budget_micro);
+                  let type = dDaily > 0 ? "Daily" : dLife > 0 ? "Lifetime" : budgetType;
+                  let value = dDaily > 0 ? dDaily : dLife > 0 ? dLife : budgetValue;
+                  if (!type || !(value > 0)) {
+                    const fromName = parseBudgetFromName(adset?.adset_name);
+                    if (fromName) {
+                      type = fromName.type;
+                      value = fromName.value;
+                    }
+                  }
+                  return `Budget: ${type && value > 0 ? `${type} ${fmtMoney(value)}` : "—"}`;
                 })()}
               </Badge>
             </HStack>
@@ -223,12 +301,12 @@ export default function AdsetDetailsDrawer({
               </Text>
             </HStack>
             <Text fontSize="xs" color="gray.600" pt={1}>
-              {(() => {
-                // Prefer details dates if present
+              Schedule: {(() => {
+                if (schedule) return schedule;
                 const s = toDate(details?.start_time ?? details?.time_start ?? details?.start ?? details?.created_time);
                 const e = toDate(details?.end_time ?? details?.time_end ?? details?.end ?? details?.stop_time);
-                const label = s ? `${s.toLocaleDateString()}${e ? ` → ${e.toLocaleDateString()}` : " → Ongoing"}` : scheduleLabel;
-                return `Schedule: ${label}`;
+                if (s) return `${s.toLocaleDateString()}${e ? ` → ${e.toLocaleDateString()}` : " → Ongoing"}`;
+                return initialScheduleLabel;
               })()}
             </Text>
           </VStack>

@@ -32,6 +32,19 @@ async def get_all_adsets_data(
             return []
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/adsets/{adset_id}")
+async def get_adset_details(adset_id: str):
+    """Return minimal adset details (budget and schedule)"""
+    if not META_TOKEN:
+        raise HTTPException(status_code=500, detail="Token not configured")
+    try:
+        import aiohttp
+        async with aiohttp.ClientSession() as session:
+            return await facebook_service.get_adset_details(session, adset_id)
+    except Exception as e:
+        logging.error(f"get_adset_details error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.get("/token-status")
 async def check_token_status():
     """Check if Meta API token is valid"""

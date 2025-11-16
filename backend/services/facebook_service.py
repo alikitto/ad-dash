@@ -141,3 +141,32 @@ async def update_entity_status(entity_id: str, new_status: str) -> dict:
     data = {"status": new_status}
     async with aiohttp.ClientSession() as session:
         return await fb_request(session, "post", url, data=data)
+
+async def get_adset_details(session: aiohttp.ClientSession, adset_id: str) -> Dict:
+    """
+    Fetch ad set details that include budgets and scheduling.
+    Returns a minimal normalized dict with common keys used by the frontend.
+    """
+    # Request both daily and lifetime budgets and schedule-related fields
+    fields = ",".join([
+        "id",
+        "name",
+        "status",
+        "effective_status",
+        "daily_budget",
+        "lifetime_budget",
+        "start_time",
+        "end_time"
+    ])
+    url = f"https://graph.facebook.com/{API_VERSION}/{adset_id}"
+    params = {"fields": fields}
+    data = await fb_request(session, "get", url, params=params)
+    return {
+        "id": data.get("id"),
+        "name": data.get("name"),
+        "status": data.get("status") or data.get("effective_status"),
+        "daily_budget": data.get("daily_budget"),
+        "lifetime_budget": data.get("lifetime_budget"),
+        "start_time": data.get("start_time"),
+        "end_time": data.get("end_time"),
+    }

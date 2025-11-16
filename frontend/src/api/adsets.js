@@ -17,6 +17,40 @@ export async function fetchAdsets(datePreset) {
   return handleResponse(response);
 }
 
+export async function fetchAdsetDetails(adsetId) {
+  const response = await fetch(`${API_BASE_URL}/api/adsets/${encodeURIComponent(adsetId)}`);
+  if (!response.ok) {
+    // Many backends may not have this endpoint yet; degrade gracefully
+    return null;
+  }
+  return response.json();
+}
+
+export async function fetchAdsetHistory(adsetId) {
+  const response = await fetch(`${API_BASE_URL}/api/adsets/${encodeURIComponent(adsetId)}/history`);
+  if (!response.ok) {
+    return [];
+  }
+  const data = await response.json();
+  return Array.isArray(data) ? data : (data.items || []);
+}
+
+export async function fetchAdsetAds(adsetId) {
+  const response = await fetch(`${API_BASE_URL}/api/adsets/${encodeURIComponent(adsetId)}/ads`);
+  if (!response.ok) {
+    return [];
+  }
+  const data = await response.json();
+  return Array.isArray(data) ? data : (data.items || []);
+}
+
+export async function fetchAdsetTimeInsights(adsetId) {
+  const response = await fetch(`${API_BASE_URL}/api/adsets/${encodeURIComponent(adsetId)}/time-insights`);
+  if (!response.ok) {
+    return null;
+  }
+  return response.json();
+}
 export async function updateAdsetStatus(adsetId, newStatus) {
   const response = await fetch(`${API_BASE_URL}/api/adsets/${adsetId}/update-status`, {
     method: "POST",
