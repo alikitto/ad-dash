@@ -175,16 +175,30 @@ async def update_adset_budget_dates(adset_id: str, daily_budget: Optional[float]
 async def _get_entity_activity(session: aiohttp.ClientSession, entity_id: str, after: Optional[str], limit: int) -> Dict:
     if not META_TOKEN:
         raise HTTPException(status_code=500, detail="Token not configured")
-    url = f"https://graph.facebook.com/{API_VERSION}/{entity_id}/adactivity"
+    # Some objects expose "adactivity", others "activities". Try adactivity first, then fallback.
     params: Dict[str, str] = {
         "access_token": META_TOKEN,
         "limit": str(max(1, min(limit, 100))),
-        # event_type could be filtered if needed; we keep all for now
-        # "event_type": "adset_updated,adset_created",
     }
     if after:
         params["after"] = after
-    data = await fb_request(session, "get", url, params=params)
+    data = None
+    last_error: Optional[Exception] = None
+    for edge in ("adactivity", "activities"):
+        try:
+            url = f"https://graph.facebook.com/{API_VERSION}/{entity_id}/{edge}"
+            data = await fb_request(session, "get", url, params=params)
+            if data is not None:
+                break
+        except Exception as e:
+            last_error = e
+            # try next edge
+            continue
+    if data is None:
+        # Re-raise the last error if both edges failed
+        if last_error:
+            raise last_error
+        return {"items": [], "paging": {}}
     raw_items = data.get("data", []) or []
     items = []
     for it in raw_items:

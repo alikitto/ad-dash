@@ -27,7 +27,7 @@ export async function fetchAdsetDetails(adsetId) {
 }
 
 export async function fetchAdsetHistory(adsetId) {
-  const response = await fetch(`${API_BASE_URL}/api/adsets/${encodeURIComponent(adsetId)}/history`);
+  const response = await fetch(`${API_BASE_URL}/api/adsets/${encodeURIComponent(adsetId)}/history?limit=50`);
   if (!response.ok) {
     return [];
   }

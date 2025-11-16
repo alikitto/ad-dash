@@ -258,6 +258,19 @@ export default function AdsetDetailsDrawer({
     };
   }, [isOpen, adsetId, fetchAdsForAdset, toast]);
 
+  // Оставляем только релевантные события: создание, бюджет, график
+  const relevantHistory = useMemo(() => {
+    const items = Array.isArray(history) ? history : [];
+    return items.filter((evt) => {
+      const action = String(evt?.action || "").toLowerCase();
+      const detailsText = String(evt?.details || "");
+      const isCreated = /create/.test(action) || /created/.test(action);
+      const isBudget = /budget|daily_budget|lifetime_budget/i.test(detailsText);
+      const isDate = /start_time|end_time/i.test(detailsText);
+      return isCreated || isBudget || isDate;
+    });
+  }, [history]);
+
   const adsManagerUrl = useMemo(() => {
     if (!accountId || !adsetId) return undefined;
     const actId = accountId.startsWith("act_") ? accountId : `act_${accountId}`;
@@ -518,29 +531,37 @@ export default function AdsetDetailsDrawer({
 
             <Box>
               <Text fontSize="sm" fontWeight="bold" mb={3}>
-                Change history
+                История изменений
               </Text>
               <VStack align="stretch" spacing={2}>
-                {historyLoading && <Text fontSize="sm" color="gray.600">Loading history...</Text>}
-                {!historyLoading && history.length === 0 && (
-                  <Text fontSize="sm" color="gray.600">No recent changes.</Text>
+                {historyLoading && <Text fontSize="sm" color="gray.600">Загрузка истории...</Text>}
+                {!historyLoading && relevantHistory.length === 0 && (
+                  <Text fontSize="sm" color="gray.600">Нет данных по созданию, бюджету или графику.</Text>
                 )}
-                {history.map((evt, idx) => {
+                {!historyLoading && relevantHistory.length > 0 && relevantHistory.map((evt, idx) => {
                   const when = toDate(evt.timestamp || evt.time || evt.date);
                   const who = evt.user || evt.actor || "system";
                   const action = evt.action || evt.change || evt.event || "updated";
                   const detailsText = evt.details || evt.note || "";
                   const isBudget = /budget|daily_budget|lifetime_budget/i.test(detailsText);
                   const isDate = /start_time|end_time/i.test(detailsText);
+                  const isCreated = /create|created/i.test(String(action));
+                  const actionLabel = isCreated
+                    ? "Создано"
+                    : isBudget
+                      ? "Изменён бюджет"
+                      : isDate
+                        ? "Изменён график"
+                        : action;
                   return (
                     <Flex key={idx} align="start" gap={3} p={2} borderWidth="1px" borderRadius="md" bg="white">
                       <Box flex="0 0 auto" minW="120px" color="gray.600" fontSize="xs">
-                        {when ? when.toLocaleString() : "—"}
+                        {when ? when.toLocaleString("ru-RU") : "—"}
                       </Box>
                       <Box flex="1 1 auto">
                         <Text fontSize="sm">
-                          <b>{who}</b>: {action}
-                          {evt._scope === "campaign" ? " (campaign)" : ""}
+                          <b>{who}</b>: {actionLabel}
+                          {evt._scope === "campaign" ? " (кампания)" : ""}
                         </Text>
                         {detailsText && (
                           <Text fontSize="xs" color={isBudget ? "green.700" : isDate ? "blue.700" : "gray.700"}>
