@@ -4,6 +4,7 @@ import logging
 from typing import List, Optional
 
 from fastapi import APIRouter, Query, HTTPException, Body
+from pydantic import BaseModel
 # важное: эти импорты работают при запуске uvicorn из папки backend
 from services import facebook_service, ai_service
 from models.payloads import AdSetPayload, StatusUpdatePayload
@@ -469,4 +470,27 @@ async def update_ad_status(ad_id: str, payload: StatusUpdatePayload):
         return await facebook_service.update_entity_status(ad_id, payload.status)
     except Exception as e:
         logging.error(f"update_ad_status error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+class BudgetDatesPayload(BaseModel):
+    daily_budget: Optional[float] = None  # minor units (e.g., cents)
+    lifetime_budget: Optional[float] = None  # minor units (e.g., cents)
+    end_time: Optional[str] = None  # ISO8601
+    start_time: Optional[str] = None  # ISO8601
+
+@router.post("/adsets/{adset_id}/update-budget-dates")
+async def update_adset_budget_dates_endpoint(adset_id: str, payload: BudgetDatesPayload):
+    """Update adset budget and/or dates using Meta API."""
+    try:
+        return await facebook_service.update_adset_budget_dates(
+            adset_id=adset_id,
+            daily_budget=payload.daily_budget,
+            lifetime_budget=payload.lifetime_budget,
+            end_time=payload.end_time,
+            start_time=payload.start_time,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"update_adset_budget_dates error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))

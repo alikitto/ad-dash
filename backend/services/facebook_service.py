@@ -142,6 +142,36 @@ async def update_entity_status(entity_id: str, new_status: str) -> dict:
     async with aiohttp.ClientSession() as session:
         return await fb_request(session, "post", url, data=data)
 
+async def update_adset_budget_dates(adset_id: str, daily_budget: Optional[float] = None, lifetime_budget: Optional[float] = None, end_time: Optional[str] = None, start_time: Optional[str] = None) -> Dict:
+    """
+    Update adset budget (daily or lifetime) and optionally dates via Facebook Graph API.
+    Budgets must be provided in the smallest currency unit (e.g., cents).
+    Dates should be ISO8601 strings if provided.
+    """
+    if not META_TOKEN:
+        raise HTTPException(status_code=500, detail="Token not configured")
+    import aiohttp
+    url = f"https://graph.facebook.com/{API_VERSION}/{adset_id}"
+    data: Dict[str, str] = {}
+    # Meta expects integers in minor units
+    if daily_budget is not None:
+        data["daily_budget"] = str(int(round(daily_budget)))
+    if lifetime_budget is not None:
+        data["lifetime_budget"] = str(int(round(lifetime_budget)))
+    if end_time is not None:
+        data["end_time"] = end_time
+    if start_time is not None:
+        data["start_time"] = start_time
+    if not data:
+        return {"updated": False, "message": "No fields to update"}
+    params = {"access_token": META_TOKEN}
+    async with aiohttp.ClientSession() as session:
+        async with session.post(url, params=params, data=data) as response:
+            resp_json = await response.json()
+            if response.status != 200:
+                raise HTTPException(status_code=response.status, detail=resp_json)
+            return {"updated": True, "response": resp_json}
+
 async def get_adset_details(session: aiohttp.ClientSession, adset_id: str) -> Dict:
     """
     Fetch ad set details that include budgets and scheduling.

@@ -43,6 +43,7 @@ export default function AdsetDetailsDrawer({
   const accountId = adset?.account_id ? String(adset.account_id) : "";
   const adsetId = adset?.adset_id ? String(adset.adset_id) : "";
   const [schedule, setSchedule] = useState(null);
+  const [timeInsights, setTimeInsights] = useState(null);
 
   const parseBudgetNumber = (v) => {
     if (v == null) return 0;
@@ -53,8 +54,10 @@ export default function AdsetDetailsDrawer({
       // micros to major (e.g. Google-style)
       return Math.round((num / 1_000_000) * 100) / 100;
     }
-    if (num >= 10_000 && Number.isFinite(num / 100)) {
-      // cents to major
+    // Facebook returns budgets in the smallest currency unit (cents for USD/EUR, etc.)
+    // Convert any reasonably-sized integer >= 100 to major units.
+    if (num >= 100 && Number.isFinite(num / 100)) {
+      // cents to major (Meta-style)
       return Math.round((num / 100) * 100) / 100;
     }
     return num;
@@ -63,7 +66,6 @@ export default function AdsetDetailsDrawer({
     adset?.daily_budget ??
       adset?.dailyBudget ??
       adset?.budget_daily ??
-      adset?.budget ??
       adset?.daily_budget_amount ??
       adset?.dailyBudgetAmount ??
       adset?.daily_budget_micro ??
@@ -108,6 +110,13 @@ export default function AdsetDetailsDrawer({
     const d = new Date(v);
     return isNaN(d.getTime()) ? null : d;
   };
+  const formatDMY = (date) => {
+    if (!date) return null;
+    const d = date.getDate();
+    const m = date.getMonth() + 1;
+    const y = date.getFullYear();
+    return `${d}/${m}/${y}`;
+  };
   const startRaw =
     adset?.start_time ||
     adset?.time_start ||
@@ -124,7 +133,7 @@ export default function AdsetDetailsDrawer({
   const startDate = toDate(startRaw);
   const endDate = toDate(endRaw);
   const initialScheduleLabel =
-    startDate ? `${startDate.toLocaleDateString()}${endDate ? ` → ${endDate.toLocaleDateString()}` : " → Ongoing"}` : "—";
+    startDate ? `${formatDMY(startDate)}${endDate ? ` → ${formatDMY(endDate)}` : " → Ongoing"}` : "—";
 
   // Load details and history if providers exist to improve budget/schedule and add change history
   useEffect(() => {
@@ -141,7 +150,7 @@ export default function AdsetDetailsDrawer({
           const s = toDate(d?.start_time ?? d?.time_start ?? d?.start ?? d?.created_time);
           const e = toDate(d?.end_time ?? d?.time_end ?? d?.end ?? d?.stop_time);
           if (s) {
-            setSchedule(`${s.toLocaleDateString()}${e ? ` → ${e.toLocaleDateString()}` : " → Ongoing"}`);
+            setSchedule(`${formatDMY(s)}${e ? ` → ${formatDMY(e)}` : " → Ongoing"}`);
           }
         }
       } catch {
@@ -166,11 +175,15 @@ export default function AdsetDetailsDrawer({
       if (!fetchAdsetTimeInsights) return;
       try {
         const ti = await fetchAdsetTimeInsights(adsetId);
+        if (!cancelled) setTimeInsights(ti || null);
         const dr = ti?.date_range || {};
-        if (dr.start || dr.end) {
+        // Do not override explicit schedule from details
+        const hasExplicitStart = !!(details?.start_time ?? details?.time_start ?? details?.start ?? details?.created_time);
+        const hasExplicitEnd = !!(details?.end_time ?? details?.time_end ?? details?.end ?? details?.stop_time);
+        if (!hasExplicitStart && (dr.start || dr.end)) {
           const s = toDate(dr.start);
           const e = toDate(dr.end);
-          if (s) setSchedule(`${s.toLocaleDateString()}${e ? ` → ${e.toLocaleDateString()}` : " → Ongoing"}`);
+          if (s) setSchedule(`${formatDMY(s)}${e ? ` → ${formatDMY(e)}` : " → Ongoing"}`);
         }
       } catch {}
     };
@@ -263,8 +276,31 @@ export default function AdsetDetailsDrawer({
                   // Prefer details if present, otherwise from name, otherwise from row fallback
                   const dDaily = parseBudgetNumber(details?.daily_budget ?? details?.dailyBudget ?? details?.budget_daily ?? details?.daily_budget_amount ?? details?.daily_budget_micro);
                   const dLife = parseBudgetNumber(details?.lifetime_budget ?? details?.lifetimeBudget ?? details?.budget_lifetime ?? details?.lifetime_budget_amount ?? details?.lifetime_budget_micro);
-                  let type = dDaily > 0 ? "Daily" : dLife > 0 ? "Lifetime" : budgetType;
-                  let value = dDaily > 0 ? dDaily : dLife > 0 ? dLife : budgetValue;
+
+                  // If backend provides explicit budget_type, honor it
+                  const explicitType = typeof details?.budget_type === "string" ? details.budget_type.toUpperCase() : null;
+
+                  let type = null;
+                  let value = 0;
+
+                  if (explicitType === "DAILY" && dDaily > 0) {
+                    type = "Daily";
+                    value = dDaily;
+                  } else if (explicitType === "LIFETIME" && dLife > 0) {
+                    type = "Lifetime";
+                    value = dLife;
+                  } else if (dLife > 0 && (details?.end_time || !dDaily)) {
+                    // If lifetime budget is set and we have an end date, prefer lifetime even if daily exists
+                    type = "Lifetime";
+                    value = dLife;
+                  } else if (dDaily > 0) {
+                    type = "Daily";
+                    value = dDaily;
+                  } else {
+                    // Fallback to what we inferred from the row
+                    type = budgetType;
+                    value = budgetValue;
+                  }
                   if (!type || !(value > 0)) {
                     const fromName = parseBudgetFromName(adset?.adset_name);
                     if (fromName) {
@@ -347,20 +383,110 @@ export default function AdsetDetailsDrawer({
 
             <Box>
               <Text fontSize="sm" fontWeight="bold" mb={2}>
-                Performance (last days)
+                Smart рекомендации
               </Text>
-              <Box
-                height="120px"
-                border="1px dashed #CBD5E0"
-                borderRadius="md"
-                display="flex"
-                alignItems="center"
-                justifyContent="center"
-                color="gray.500"
-                bg="gray.50"
-              >
-                Mini chart placeholder
-              </Box>
+              {(() => {
+                // Рассчитываем среднесуточную трату по daily_data из timeInsights
+                const daily = Array.isArray(timeInsights?.daily_data) ? timeInsights.daily_data : [];
+                const days = daily.length;
+                const totalSpend = daily.reduce((sum, d) => sum + (Number(d?.spend || d?.spent || 0) || 0), 0);
+                const avgDaily = days > 0 ? Math.round((totalSpend / days) * 100) / 100 : 0;
+                const isLifetime = (details?.lifetime_budget || lifetimeBudget > 0) && (!!(details?.end_time || endDate));
+                const dailyValue = dailyBudget > 0 ? dailyBudget : (details?.daily_budget ? parseBudgetNumber(details.daily_budget) : 0);
+                const lifeValue = lifetimeBudget > 0 ? lifetimeBudget : (details?.lifetime_budget ? parseBudgetNumber(details.lifetime_budget) : 0);
+
+                return (
+                  <VStack align="stretch" spacing={2}>
+                    <Text fontSize="xs" color="gray.600">
+                      Средняя дневная трата: <b>{fmtMoney(avgDaily)}</b> за {days} дн.
+                    </Text>
+                    <HStack spacing={2} flexWrap="wrap">
+                      {isLifetime ? (
+                        <>
+                          <Button size="xs" variant="outline" colorScheme="green" onClick={async () => {
+                            try {
+                              // lifetime budgets are in minor units; here avgDaily is in major, backend expects minor
+                              const addDays = 1;
+                              const newLifetime = Math.round((lifeValue + avgDaily * addDays) * 100);
+                              const currentEnd = endDate || toDate(details?.end_time);
+                              const newEnd = new Date((currentEnd || new Date()).getTime());
+                              newEnd.setDate(newEnd.getDate() + addDays);
+                              await fetch(`${API_BASE}/api/adsets/${encodeURIComponent(adsetId)}/update-budget-dates`, {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                  lifetime_budget: newLifetime,
+                                  end_time: newEnd.toISOString(),
+                                }),
+                              });
+                              toast({ title: "Обновлено", description: "Продлено на +1 день", status: "success", duration: 2000, position: "top" });
+                            } catch (e) {
+                              toast({ title: "Ошибка", description: "Не удалось обновить бюджет/дату", status: "error", duration: 2500, position: "top" });
+                            }
+                          }}>
+                            +1 день ({fmtMoney(avgDaily)})
+                          </Button>
+                          <Button size="xs" variant="outline" colorScheme="green" onClick={async () => {
+                            try {
+                              const addDays = 3;
+                              const newLifetime = Math.round((lifeValue + avgDaily * addDays) * 100);
+                              const currentEnd = endDate || toDate(details?.end_time);
+                              const newEnd = new Date((currentEnd || new Date()).getTime());
+                              newEnd.setDate(newEnd.getDate() + addDays);
+                              await fetch(`${API_BASE}/api/adsets/${encodeURIComponent(adsetId)}/update-budget-dates`, {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                  lifetime_budget: newLifetime,
+                                  end_time: newEnd.toISOString(),
+                                }),
+                              });
+                              toast({ title: "Обновлено", description: "Продлено на +3 дня", status: "success", duration: 2000, position: "top" });
+                            } catch (e) {
+                              toast({ title: "Ошибка", description: "Не удалось обновить бюджет/дату", status: "error", duration: 2500, position: "top" });
+                            }
+                          }}>
+                            +3 дня ({fmtMoney(avgDaily * 3)})
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button size="xs" variant="outline" colorScheme="blue" onClick={async () => {
+                            try {
+                              const newDaily = Math.round(dailyValue * 1.1 * 100);
+                              await fetch(`${API_BASE}/api/adsets/${encodeURIComponent(adsetId)}/update-budget-dates`, {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ daily_budget: newDaily }),
+                              });
+                              toast({ title: "Обновлено", description: "Дневной бюджет +10%", status: "success", duration: 2000, position: "top" });
+                            } catch (e) {
+                              toast({ title: "Ошибка", description: "Не удалось обновить дневной бюджет", status: "error", duration: 2500, position: "top" });
+                            }
+                          }}>
+                            +10% {dailyValue > 0 ? `(${fmtMoney(dailyValue * 1.1)})` : ""}
+                          </Button>
+                          <Button size="xs" variant="outline" colorScheme="blue" onClick={async () => {
+                            try {
+                              const newDaily = Math.round(dailyValue * 1.2 * 100);
+                              await fetch(`${API_BASE}/api/adsets/${encodeURIComponent(adsetId)}/update-budget-dates`, {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ daily_budget: newDaily }),
+                              });
+                              toast({ title: "Обновлено", description: "Дневной бюджет +20%", status: "success", duration: 2000, position: "top" });
+                            } catch (e) {
+                              toast({ title: "Ошибка", description: "Не удалось обновить дневной бюджет", status: "error", duration: 2500, position: "top" });
+                            }
+                          }}>
+                            +20% {dailyValue > 0 ? `(${fmtMoney(dailyValue * 1.2)})` : ""}
+                          </Button>
+                        </>
+                      )}
+                    </HStack>
+                  </VStack>
+                );
+              })()}
             </Box>
 
             <Divider />
@@ -396,48 +522,7 @@ export default function AdsetDetailsDrawer({
 
             <Divider />
 
-            <Box>
-              <Text fontSize="sm" fontWeight="bold" mb={3}>
-                Creatives
-              </Text>
-              <VStack align="stretch" spacing={3}>
-                {adsLoading && (
-                  <Text fontSize="sm" color="gray.600">
-                    Loading creatives...
-                  </Text>
-                )}
-                {!adsLoading && ads.length === 0 && (
-                  <Text fontSize="sm" color="gray.600">
-                    No creatives found.
-                  </Text>
-                )}
-                {ads.map((ad) => (
-                  <Flex key={ad.ad_id} align="center" gap={3} p={2} borderWidth="1px" borderRadius="md" bg="white">
-                    <Box boxSize="64px" borderRadius="md" overflow="hidden" bg="gray.100" flexShrink={0}>
-                      {ad.image_url ? (
-                        <Image src={ad.image_url} alt={ad.ad_name} objectFit="cover" w="64px" h="64px" />
-                      ) : (
-                        <Box w="64px" h="64px" display="flex" alignItems="center" justifyContent="center" color="gray.400">
-                          No Preview
-                        </Box>
-                      )}
-                    </Box>
-                    <Box flex="1 1 auto" minW={0}>
-                      <Text fontSize="sm" fontWeight="medium" noOfLines={1}>
-                        {ad.ad_name || "—"}
-                      </Text>
-                      <HStack spacing={4} mt={1} color="gray.700" fontSize="xs">
-                        <Text>Leads: {fmtNum(ad.leads)}</Text>
-                        <Text>CPA: {fmtMoney(ad.cpa)}</Text>
-                        <Text>Spent: {fmtMoney(ad.spend)}</Text>
-                        <Text>CTR: {fmtPct(ad.ctr)}</Text>
-                        <Text>CTR (link): {fmtPct(ad.ctr_link)}</Text>
-                      </HStack>
-                    </Box>
-                  </Flex>
-                ))}
-              </VStack>
-            </Box>
+            {/* Creatives moved to Detailed Stats modal */}
           </VStack>
         </DrawerBody>
       </DrawerContent>

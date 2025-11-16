@@ -19,6 +19,8 @@ import {
   useColorModeValue,
   Badge,
   Flex,
+  HStack,
+  VStack,
   Icon,
   Button,
   Image,
@@ -661,7 +663,7 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
                 </Box>
               )}
               
-              {/* Creatives Table */}
+              {/* Creatives Table (original look) */}
               <Box mt={6}>
                 <Text fontSize="lg" fontWeight="bold" mb={3} color={textColor}>
                   Креативы

@@ -68,3 +68,12 @@ export async function fetchAiAnalysis(adsets) {
   });
   return handleResponse(response);
 }
+
+export async function updateAdsetBudgetDates(adsetId, payload) {
+  const response = await fetch(`${API_BASE_URL}/api/adsets/${encodeURIComponent(adsetId)}/update-budget-dates`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse(response);
+}
