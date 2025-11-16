@@ -172,14 +172,10 @@ async def update_adset_budget_dates(adset_id: str, daily_budget: Optional[float]
                 raise HTTPException(status_code=response.status, detail=resp_json)
             return {"updated": True, "response": resp_json}
 
-async def get_adset_activity(session: aiohttp.ClientSession, adset_id: str, after: Optional[str] = None, limit: int = 25) -> Dict:
-    """
-    Fetch adset activity (change history) from Meta Graph API.
-    Returns normalized structure with items and paging cursors.
-    """
+async def _get_entity_activity(session: aiohttp.ClientSession, entity_id: str, after: Optional[str], limit: int) -> Dict:
     if not META_TOKEN:
         raise HTTPException(status_code=500, detail="Token not configured")
-    url = f"https://graph.facebook.com/{API_VERSION}/{adset_id}/adactivity"
+    url = f"https://graph.facebook.com/{API_VERSION}/{entity_id}/adactivity"
     params: Dict[str, str] = {
         "access_token": META_TOKEN,
         "limit": str(max(1, min(limit, 100))),
@@ -201,7 +197,7 @@ async def get_adset_activity(session: aiohttp.ClientSession, adset_id: str, afte
         try:
             if isinstance(extra, dict):
                 # highlight common fields
-                changed_fields = []
+                changed_fields: List[str] = []
                 for key in ["budget", "daily_budget", "lifetime_budget", "start_time", "end_time", "status", "effective_status", "name"]:
                     if key in extra:
                         changed_fields.append(f"{key}: {extra.get(key)}")
@@ -228,6 +224,18 @@ async def get_adset_activity(session: aiohttp.ClientSession, adset_id: str, afte
         }
     }
 
+async def get_adset_activity(session: aiohttp.ClientSession, adset_id: str, after: Optional[str] = None, limit: int = 25) -> Dict:
+    """
+    Fetch adset activity (change history) from Meta Graph API.
+    """
+    return await _get_entity_activity(session, adset_id, after, limit)
+
+async def get_campaign_activity(session: aiohttp.ClientSession, campaign_id: str, after: Optional[str] = None, limit: int = 25) -> Dict:
+    """
+    Fetch campaign activity (change history) from Meta Graph API.
+    """
+    return await _get_entity_activity(session, campaign_id, after, limit)
+
 async def get_adset_details(session: aiohttp.ClientSession, adset_id: str) -> Dict:
     """
     Fetch ad set details that include budgets and scheduling.
@@ -237,12 +245,14 @@ async def get_adset_details(session: aiohttp.ClientSession, adset_id: str) -> Di
     fields = ",".join([
         "id",
         "name",
+        "campaign{id,name}",
         "status",
         "effective_status",
         "daily_budget",
         "lifetime_budget",
         "start_time",
-        "end_time"
+        "end_time",
+        "updated_time"
     ])
     url = f"https://graph.facebook.com/{API_VERSION}/{adset_id}"
     params = {"fields": fields}
@@ -250,9 +260,12 @@ async def get_adset_details(session: aiohttp.ClientSession, adset_id: str) -> Di
     return {
         "id": data.get("id"),
         "name": data.get("name"),
+        "campaign_id": ((data.get("campaign") or {}).get("id")),
+        "campaign_name": ((data.get("campaign") or {}).get("name")),
         "status": data.get("status") or data.get("effective_status"),
         "daily_budget": data.get("daily_budget"),
         "lifetime_budget": data.get("lifetime_budget"),
         "start_time": data.get("start_time"),
         "end_time": data.get("end_time"),
+        "updated_time": data.get("updated_time"),
     }

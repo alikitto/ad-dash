@@ -180,7 +180,26 @@ export default function AdsetDetailsDrawer({
       try {
         setHistoryLoading(true);
         const h = await fetchAdsetHistory(adsetId);
-        if (!cancelled) setHistory(Array.isArray(h) ? h : []);
+        let items = Array.isArray(h) ? h : [];
+        // Fallback: if no adset activity and we know campaign_id, fetch campaign activity
+        try {
+          if (items.length === 0) {
+            // ensure details are loaded to get campaign_id
+            const d = details || (fetchAdsetDetails ? await fetchAdsetDetails(adsetId) : null);
+            const campaignId = d?.campaign_id;
+            if (campaignId) {
+              const resp = await fetch(`${API_BASE}/api/campaigns/${encodeURIComponent(campaignId)}/history?limit=50`);
+              if (resp.ok) {
+                const cam = await resp.json();
+                if (Array.isArray(cam) && cam.length > 0) {
+                  // mark items as campaign-level
+                  items = cam.map((it) => ({ ...it, _scope: "campaign" }));
+                }
+              }
+            }
+          }
+        } catch {}
+        if (!cancelled) setHistory(items);
       } catch {
         if (!cancelled) setHistory([]);
       } finally {
@@ -357,9 +376,16 @@ export default function AdsetDetailsDrawer({
                 if (schedule) return schedule;
                 const s = toDate(details?.start_time ?? details?.time_start ?? details?.start ?? details?.created_time);
                 const e = toDate(details?.end_time ?? details?.time_end ?? details?.end ?? details?.stop_time);
-                if (s) return `${s.toLocaleDateString()}${e ? ` → ${e.toLocaleDateString()}` : " → Ongoing"}`;
+                if (s) return `${formatDMY(s)}${e ? ` → ${formatDMY(e)}` : " → Ongoing"}`;
                 return initialScheduleLabel;
               })()}
+            </Text>
+            <Text fontSize="xs" color="gray.600">
+              Launched: {(() => {
+                const s = toDate(details?.start_time ?? details?.created_time ?? startRaw);
+                return s ? formatDMY(s) : "—";
+              })()}
+              {details?.updated_time ? ` • Updated: ${formatDMY(toDate(details.updated_time))}` : ""}
             </Text>
           </VStack>
         </DrawerHeader>
@@ -504,14 +530,23 @@ export default function AdsetDetailsDrawer({
                   const who = evt.user || evt.actor || "system";
                   const action = evt.action || evt.change || evt.event || "updated";
                   const detailsText = evt.details || evt.note || "";
+                  const isBudget = /budget|daily_budget|lifetime_budget/i.test(detailsText);
+                  const isDate = /start_time|end_time/i.test(detailsText);
                   return (
                     <Flex key={idx} align="start" gap={3} p={2} borderWidth="1px" borderRadius="md" bg="white">
                       <Box flex="0 0 auto" minW="120px" color="gray.600" fontSize="xs">
                         {when ? when.toLocaleString() : "—"}
                       </Box>
                       <Box flex="1 1 auto">
-                        <Text fontSize="sm"><b>{who}</b>: {action}</Text>
-                        {detailsText && <Text fontSize="xs" color="gray.700">{detailsText}</Text>}
+                        <Text fontSize="sm">
+                          <b>{who}</b>: {action}
+                          {evt._scope === "campaign" ? " (campaign)" : ""}
+                        </Text>
+                        {detailsText && (
+                          <Text fontSize="xs" color={isBudget ? "green.700" : isDate ? "blue.700" : "gray.700"}>
+                            {detailsText}
+                          </Text>
+                        )}
                       </Box>
                     </Flex>
                   );
