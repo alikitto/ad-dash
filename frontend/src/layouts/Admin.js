@@ -34,6 +34,7 @@ import MainPanel from "../components/Layout/MainPanel";
 import PanelContainer from "../components/Layout/PanelContainer";
 import PanelContent from "../components/Layout/PanelContent";
 import ProtectedRoute from "components/ProtectedRoute"; // <-- ИЗМЕНЕНИЕ 1: Импортируем наш защищенный роут
+import ErrorBoundary from "components/ErrorBoundary";
 
 export default function Dashboard(props) {
   const { ...rest } = props;
@@ -113,7 +114,14 @@ export default function Dashboard(props) {
     });
   };
   const { isOpen, onOpen, onClose } = useDisclosure();
-  document.documentElement.dir = "ltr";
+  
+  // Устанавливаем направление текста только в браузере
+  React.useEffect(() => {
+    if (typeof document !== "undefined") {
+      document.documentElement.dir = "ltr";
+    }
+  }, []);
+  
   // Chakra Color Mode
   return (
     <ChakraProvider theme={theme} resetCss={false}>
@@ -128,8 +136,14 @@ export default function Dashboard(props) {
         ref={mainPanel}
         w={{
           base: "100%",
-          xl: "calc(100% - 275px)",
-        }}>
+          xl: "calc(100% - 95px)",
+        }}
+        ml={{
+          base: "0",
+          xl: "95px",
+        }}
+        transition='all 0.3s ease'
+        className='main-panel'>
         <Portal>
           <AdminNavbar
             onOpen={onOpen}
@@ -143,10 +157,12 @@ export default function Dashboard(props) {
         {getRoute() ? (
           <PanelContent>
             <PanelContainer>
-              <Switch>
-                {getRoutes(routes)}
-                <Redirect from='/admin' to='/admin/dashboard' />
-              </Switch>
+              <ErrorBoundary>
+                <Switch>
+                  {getRoutes(routes)}
+                  <Redirect from='/admin' to='/admin/dashboard' />
+                </Switch>
+              </ErrorBoundary>
             </PanelContainer>
           </PanelContent>
         ) : null}

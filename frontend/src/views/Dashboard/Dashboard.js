@@ -52,7 +52,7 @@ import IconBox from 'components/Icons/IconBox';
 import { CartIcon, DocumentIcon, GlobeIcon, RocketIcon, StatsIcon, WalletIcon } from 'components/Icons/Icons.js';
 import DashboardTableRow from 'components/Tables/DashboardTableRow';
 import TimelineRow from 'components/Tables/TimelineRow';
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { AiFillCheckCircle } from 'react-icons/ai';
 import { BiHappy } from 'react-icons/bi';
 import { BsArrowRight } from 'react-icons/bs';
@@ -67,6 +67,21 @@ import {
 import { dashboardTableData, timelineData } from 'variables/general';
 
 export default function Dashboard() {
+	const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024);
+
+	useEffect(() => {
+		if (typeof window === 'undefined') return;
+		const handleResize = () => setWindowWidth(window.innerWidth);
+		window.addEventListener('resize', handleResize);
+		return () => window.removeEventListener('resize', handleResize);
+	}, []);
+
+	const getCircularProgressSize = () => {
+		if (windowWidth >= 1024) return 200;
+		if (windowWidth >= 768) return 170;
+		return 200;
+	};
+
 	return (
 		<Flex flexDirection='column' pt={{ base: '120px', md: '75px' }}>
 			<SimpleGrid columns={{ sm: 1, md: 2, xl: 4 }} spacing='24px'>
@@ -349,7 +364,7 @@ export default function Dashboard() {
 							</Flex>
 							<Box mx={{ sm: 'auto', md: '0px' }}>
 								<CircularProgress
-									size={window.innerWidth >= 1024 ? 200 : window.innerWidth >= 768 ? 170 : 200}
+									size={getCircularProgressSize()}
 									value={70}
 									thickness={6}
 									color='#05CD99'

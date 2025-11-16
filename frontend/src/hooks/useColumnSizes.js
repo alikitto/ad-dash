@@ -6,7 +6,7 @@ const STORAGE_KEY = "adsetTableColumnSizes";
 const DEFAULT_SIZES = {
   account: 250,
   status: 80,
-  actions: 180,
+  actions: 120,
   objective: 120,
   spend: 100,
   impressions: 120,
@@ -21,19 +21,45 @@ const DEFAULT_SIZES = {
 
 export function useColumnSizes() {
   const [sizes, setSizes] = useState(() => {
+    if (typeof window === "undefined" || typeof localStorage === "undefined") {
+      return { ...DEFAULT_SIZES };
+    }
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        return { ...DEFAULT_SIZES, ...parsed };
+        // Валидация: проверяем, что parsed является объектом
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          // Фильтруем только валидные ключи и значения
+          const validSizes = {};
+          for (const key in DEFAULT_SIZES) {
+            if (parsed.hasOwnProperty(key) && typeof parsed[key] === "number" && parsed[key] >= 80 && parsed[key] <= 500) {
+              validSizes[key] = parsed[key];
+            }
+          }
+          return { ...DEFAULT_SIZES, ...validSizes };
+        } else {
+          // Если данные некорректны, очищаем их
+          console.warn("Invalid column sizes data in localStorage, clearing...");
+          localStorage.removeItem(STORAGE_KEY);
+        }
       }
     } catch (e) {
       console.warn("Failed to load column sizes from localStorage", e);
+      // При ошибке парсинга очищаем поврежденные данные
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch (clearError) {
+        console.warn("Failed to clear corrupted localStorage data", clearError);
+      }
     }
     return { ...DEFAULT_SIZES };
   });
 
   useEffect(() => {
+    if (typeof window === "undefined" || typeof localStorage === "undefined") {
+      return;
+    }
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(sizes));
     } catch (e) {
@@ -49,6 +75,9 @@ export function useColumnSizes() {
   }, []);
 
   const resetSizes = useCallback(() => {
+    if (typeof window === "undefined" || typeof localStorage === "undefined") {
+      return;
+    }
     try {
       localStorage.removeItem(STORAGE_KEY);
       console.log("✅ LocalStorage cleared for column sizes");
@@ -60,7 +89,7 @@ export function useColumnSizes() {
       const defaultSizes = {
         account: 250,
         status: 80,
-        actions: 180,
+        actions: 120,
         objective: 120,
         spend: 100,
         impressions: 120,

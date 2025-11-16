@@ -1,13 +1,10 @@
 // Chakra Icons
-import { BellIcon, SearchIcon } from "@chakra-ui/icons";
+import { BellIcon } from "@chakra-ui/icons";
 // Chakra Imports
 import {
   Button,
   Flex,
   IconButton,
-  Input,
-  InputGroup,
-  InputLeftElement,
   Menu,
   MenuButton,
   MenuItem,
@@ -22,7 +19,7 @@ import avatar1 from "assets/img/avatars/avatar1.png";
 import avatar2 from "assets/img/avatars/avatar2.png";
 import avatar3 from "assets/img/avatars/avatar3.png";
 // Custom Icons
-import { ProfileIcon, SettingsIcon } from "components/Icons/Icons";
+import { ProfileIcon } from "components/Icons/Icons";
 // Custom Components
 import { ItemContent } from "components/Menu/ItemContent";
 import { SidebarResponsive } from "components/Sidebar/Sidebar";
@@ -41,16 +38,11 @@ export default function HeaderLinks(props) {
   const [userInfo, setUserInfo] = useState(null);
 
   // Chakra Color Mode
-  let inputBg = "#0F1535";
-  let mainText = "gray.400";
   let navbarIcon = "white";
-  let searchIcon = "white";
 
   if (secondary) {
     navbarIcon = "white";
-    mainText = "white";
   }
-  const settingsRef = React.useRef();
 
   // Загружаем информацию о пользователе
   useEffect(() => {
@@ -95,43 +87,6 @@ export default function HeaderLinks(props) {
       w={{ sm: "100%", md: "auto" }}
       alignItems='center'
       flexDirection='row'>
-      <InputGroup
-        cursor='pointer'
-        bg={inputBg}
-        borderRadius='15px'
-        borderColor='rgba(226, 232, 240, 0.3)'
-        w={{
-          sm: "128px",
-          md: "200px",
-        }}
-        me={{ sm: "auto", md: "20px" }}>
-        <InputLeftElement
-          children={
-            <IconButton
-              bg='inherit'
-              borderRadius='inherit'
-              _hover='none'
-              _active={{
-                bg: "inherit",
-                transform: "none",
-                borderColor: "transparent",
-              }}
-              _focus={{
-                boxShadow: "none",
-              }}
-              icon={
-                <SearchIcon color={searchIcon} w='15px' h='15px' />
-              }></IconButton>
-          }
-        />
-        <Input
-          fontSize='xs'
-          py='11px'
-          color={mainText}
-          placeholder='Type here...'
-          borderRadius='inherit'
-        />
-      </InputGroup>
       {/* User Avatar Menu */}
       {isAuthenticated ? (
         <Menu>
@@ -213,16 +168,6 @@ export default function HeaderLinks(props) {
         routes={routes}
         // logo={logo}
         {...rest}
-      />
-      <SettingsIcon
-        cursor='pointer'
-        ms={{ base: "16px", xl: "0px" }}
-        me='16px'
-        ref={settingsRef}
-        onClick={props.onOpen}
-        color={navbarIcon}
-        w='18px'
-        h='18px'
       />
       <Menu>
         <MenuButton align='center'>

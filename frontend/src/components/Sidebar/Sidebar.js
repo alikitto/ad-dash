@@ -18,7 +18,6 @@ import {
 import IconBox from "components/Icons/IconBox";
 import { SimmmpleLogoWhite } from "components/Icons/Icons";
 import { Separator } from "components/Separator/Separator";
-import { SidebarHelp } from "components/Sidebar/SidebarHelp";
 import PropTypes from "prop-types";
 import React from "react";
 import { NavLink, useLocation } from "react-router-dom";
@@ -62,11 +61,13 @@ function Sidebar(props) {
                 xl: "12px",
               }}
               mx='auto'
-              ps={{
-                sm: "10px",
-                xl: "16px",
-              }}
-              py='12px'>
+          ps={{
+            sm: "10px",
+            xl: "10px",
+          }}
+          justifyContent='flex-start'
+              py='12px'
+              whiteSpace='nowrap'>
               {document.documentElement.dir === "rtl"
                 ? prop.rtlName
                 : prop.name}
@@ -80,7 +81,6 @@ function Sidebar(props) {
           {activeRoute(prop.layout + prop.path) === "active" ? (
             <Button
               boxSize='initial'
-              justifyContent='flex-start'
               alignItems='center'
               boxShadow={sidebarActiveShadow}
               bg={activeBg}
@@ -90,12 +90,13 @@ function Sidebar(props) {
                 xl: "12px",
               }}
               mx={{
-                xl: "auto",
+                xl: "0",
               }}
-              ps={{
-                sm: "10px",
-                xl: "16px",
-              }}
+          ps={{
+            sm: "10px",
+            xl: "10px",
+          }}
+          justifyContent='flex-start'
               py='12px'
               borderRadius='15px'
               _hover='none'
@@ -108,11 +109,12 @@ function Sidebar(props) {
               _focus={{
                 boxShadow: "0px 7px 11px rgba(0, 0, 0, 0.04)",
               }}>
-              <Flex>
+              <Flex className='sidebar-button'>
                 {typeof prop.icon === "string" ? (
-                  <Icon>{prop.icon}</Icon>
+                  <Icon className='sidebar-icon'>{prop.icon}</Icon>
                 ) : (
                   <IconBox
+                    className='sidebar-icon'
                     bg='brand.200'
                     color='white'
                     h='30px'
@@ -122,7 +124,7 @@ function Sidebar(props) {
                     {prop.icon}
                   </IconBox>
                 )}
-                <Text color={activeColor} my='auto' fontSize='sm'>
+                <Text className='sidebar-text' color={activeColor} my='auto' fontSize='sm' whiteSpace='nowrap' flexShrink={0}>
                   {document.documentElement.dir === "rtl"
                     ? prop.rtlName
                     : prop.name}
@@ -139,13 +141,14 @@ function Sidebar(props) {
                 xl: "12px",
               }}
               mx={{
-                xl: "auto",
+                xl: "0",
               }}
               py='12px'
-              ps={{
-                sm: "10px",
-                xl: "16px",
-              }}
+          ps={{
+            sm: "10px",
+            xl: "10px",
+          }}
+          justifyContent='flex-start'
               borderRadius='15px'
               _hover='none'
               w='100%'
@@ -157,11 +160,12 @@ function Sidebar(props) {
               _focus={{
                 boxShadow: "none",
               }}>
-              <Flex>
+              <Flex className='sidebar-button'>
                 {typeof prop.icon === "string" ? (
-                  <Icon>{prop.icon}</Icon>
+                  <Icon className='sidebar-icon'>{prop.icon}</Icon>
                 ) : (
                   <IconBox
+                    className='sidebar-icon'
                     bg={inactiveBg}
                     color='brand.200'
                     h='30px'
@@ -171,7 +175,7 @@ function Sidebar(props) {
                     {prop.icon}
                   </IconBox>
                 )}
-                <Text color={inactiveColor} my='auto' fontSize='sm'>
+                <Text className='sidebar-text' color={inactiveColor} my='auto' fontSize='sm' whiteSpace='nowrap' flexShrink={0}>
                   {document.documentElement.dir === "rtl"
                     ? prop.rtlName
                     : prop.name}
@@ -201,14 +205,15 @@ function Sidebar(props) {
         lineHeight='100%'
         mb='30px'
         fontWeight='bold'
-        justifyContent='center'
+        justifyContent='flex-start'
         alignItems='center'
-        fontSize='11px'>
-        <SimmmpleLogoWhite w='22px' h='22px' me='10px' mt='2px' />
+        fontSize='11px'
+        className='brand-link'>
+        <SimmmpleLogoWhite w='22px' h='22px' me='10px' mt='2px' flexShrink={0} />
         <Box
           bg='linear-gradient(97.89deg, #FFFFFF 70.67%, rgba(117, 122, 140, 0) 108.55%)'
           bgClip='text'>
-          <Text fontSize='sm' letterSpacing='3px' mt='3px' color='transparent'>
+          <Text className='sidebar-brand-text' fontSize='sm' letterSpacing='3px' mt='3px' color='transparent' whiteSpace='nowrap'>
             {logoText}
           </Text>
         </Box>
@@ -220,13 +225,13 @@ function Sidebar(props) {
   // SIDEBAR
   return (
     <Box ref={mainPanel}>
-      <Box display={{ sm: "none", xl: "block" }} position='fixed'>
+      <Box display={{ sm: "none", xl: "block" }} position='fixed' zIndex={1000}>
         <Box
           bg={sidebarBg}
           backdropFilter='blur(10px)'
-          transition={variantChange}
-          w='260px'
-          maxW='260px'
+          transition='all 0.3s ease'
+          w='80px'
+          maxW='80px'
           ms={{
             sm: "16px",
           }}
@@ -234,15 +239,62 @@ function Sidebar(props) {
             sm: "16px",
           }}
           h='calc(100vh - 32px)'
-          ps='20px'
-          pe='20px'
           m={sidebarMargins}
-          borderRadius={sidebarRadius}>
-          <Box>{brand}</Box>
-          <Stack direction='column' mb='40px'>
+          borderRadius={sidebarRadius}
+          overflowX='visible'
+          overflowY='auto'
+          ps='0px'
+          pe='0px'
+          sx={{
+            '&:hover': {
+              width: '260px !important',
+              maxWidth: '260px !important',
+              paddingLeft: '20px !important',
+              paddingRight: '20px !important',
+            },
+            '.sidebar-text': {
+              opacity: 0,
+              visibility: 'hidden',
+              maxWidth: 0,
+              transition: 'opacity 0.2s ease, visibility 0.2s ease, max-width 0.2s ease',
+            },
+            '.sidebar-brand-text': {
+              opacity: 0,
+              visibility: 'hidden',
+              maxWidth: 0,
+              transition: 'opacity 0.2s ease, visibility 0.2s ease, max-width 0.2s ease',
+            },
+            '&:hover .sidebar-text': {
+              opacity: 1,
+              visibility: 'visible',
+              maxWidth: '200px',
+            },
+            '&:hover .sidebar-brand-text': {
+              opacity: 1,
+              visibility: 'visible',
+              maxWidth: '200px',
+            },
+            '.sidebar-icon': {
+              flexShrink: 0,
+            },
+            '.sidebar-button': {
+              justifyContent: 'flex-start !important',
+            },
+            '&:hover > div:first-of-type': {
+              paddingLeft: '20px !important',
+              paddingRight: '20px !important',
+            },
+            '&:hover > div:last-of-type': {
+              paddingLeft: '20px !important',
+              paddingRight: '20px !important',
+            },
+          }}>
+          <Box ps='10px' pe='10px'>
+            {brand}
+          </Box>
+          <Stack direction='column' mb='40px' ps='10px' pe='10px'>
             <Box>{links}</Box>
           </Stack>
-          <SidebarHelp></SidebarHelp>
         </Box>
       </Box>
     </Box>
@@ -285,11 +337,13 @@ export function SidebarResponsive(props) {
                 xl: "12px",
               }}
               mx='auto'
-              ps={{
-                sm: "10px",
-                xl: "16px",
-              }}
-              py='12px'>
+          ps={{
+            sm: "10px",
+            xl: "10px",
+          }}
+          justifyContent='flex-start'
+              py='12px'
+              whiteSpace='nowrap'>
               {document.documentElement.dir === "rtl"
                 ? prop.rtlName
                 : prop.name}
@@ -310,12 +364,13 @@ export function SidebarResponsive(props) {
                 xl: "12px",
               }}
               mx={{
-                xl: "auto",
+                xl: "0",
               }}
-              ps={{
-                sm: "10px",
-                xl: "16px",
-              }}
+          ps={{
+            sm: "10px",
+            xl: "10px",
+          }}
+          justifyContent='flex-start'
               py='12px'
               borderRadius='15px'
               _hover='none'
@@ -341,7 +396,7 @@ export function SidebarResponsive(props) {
                     {prop.icon}
                   </IconBox>
                 )}
-                <Text color={activeColor} my='auto' fontSize='sm'>
+                <Text className='sidebar-text' color={activeColor} my='auto' fontSize='sm' whiteSpace='nowrap' flexShrink={0} ml='12px'>
                   {document.documentElement.dir === "rtl"
                     ? prop.rtlName
                     : prop.name}
@@ -358,13 +413,14 @@ export function SidebarResponsive(props) {
                 xl: "12px",
               }}
               mx={{
-                xl: "auto",
+                xl: "0",
               }}
               py='12px'
-              ps={{
-                sm: "10px",
-                xl: "16px",
-              }}
+          ps={{
+            sm: "10px",
+            xl: "10px",
+          }}
+          justifyContent='flex-start'
               borderRadius='15px'
               _hover='none'
               w='100%'
@@ -389,7 +445,7 @@ export function SidebarResponsive(props) {
                     {prop.icon}
                   </IconBox>
                 )}
-                <Text color={inactiveColor} my='auto' fontSize='sm'>
+                <Text color={inactiveColor} my='auto' fontSize='sm' whiteSpace='nowrap'>
                   {document.documentElement.dir === "rtl"
                     ? prop.rtlName
                     : prop.name}
@@ -415,14 +471,14 @@ export function SidebarResponsive(props) {
         lineHeight='100%'
         mb='30px'
         fontWeight='bold'
-        justifyContent='center'
+        justifyContent='flex-start'
         alignItems='center'
         fontSize='11px'>
         <SimmmpleLogoWhite w='22px' h='22px' me='10px' mt='2px' />
         <Box
           bg='linear-gradient(97.89deg, #FFFFFF 70.67%, rgba(117, 122, 140, 0) 108.55%)'
           bgClip='text'>
-          <Text fontSize='sm' letterSpacing='3px' mt='3px' color='transparent'>
+          <Text fontSize='sm' letterSpacing='3px' mt='3px' color='transparent' whiteSpace='nowrap'>
             {logoText}
           </Text>
         </Box>
@@ -477,7 +533,6 @@ export function SidebarResponsive(props) {
               <Stack direction='column' mb='40px'>
                 <Box>{links}</Box>
               </Stack>
-              <SidebarHelp></SidebarHelp>
             </Box>
           </DrawerBody>
         </DrawerContent>

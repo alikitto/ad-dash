@@ -16,16 +16,18 @@
 
 */
 
+import React from "react";
 import { Box, useStyleConfig } from "@chakra-ui/react";
-function MainPanel(props) {
+
+const MainPanel = React.forwardRef(function MainPanel(props, ref) {
   const { variant, children, ...rest } = props;
   const styles = useStyleConfig("MainPanel", { variant });
   // Pass the computed styles into the `__css` prop
   return (
-    <Box __css={styles} {...rest}>
+    <Box ref={ref} __css={styles} {...rest}>
       {children}
     </Box>
   );
-}
+});
 
 export default MainPanel;

@@ -110,7 +110,14 @@ export default function Dashboard(props) {
     });
   };
   const { isOpen, onOpen, onClose } = useDisclosure();
-  document.documentElement.dir = "rtl";
+  
+  // Устанавливаем направление текста только в браузере
+  React.useEffect(() => {
+    if (typeof document !== "undefined") {
+      document.documentElement.dir = "rtl";
+    }
+  }, []);
+  
   // Chakra Color Mode
   return (
     <ChakraProvider theme={theme} resetCss={false}>

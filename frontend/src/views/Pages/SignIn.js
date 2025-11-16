@@ -37,8 +37,15 @@ function SignIn() {
   const [password, setPassword] = useState("");
   // Восстанавливаем состояние rememberMe из localStorage если есть сохраненное значение
   const [rememberMe, setRememberMe] = useState(() => {
-    const saved = localStorage.getItem("authRememberMe");
-    return saved === "true";
+    if (typeof window === "undefined" || typeof localStorage === "undefined") {
+      return false;
+    }
+    try {
+      const saved = localStorage.getItem("authRememberMe");
+      return saved === "true";
+    } catch {
+      return false;
+    }
   });
   const [isLoading, setIsLoading] = useState(false);
   const toast = useToast();

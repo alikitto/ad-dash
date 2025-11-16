@@ -24,15 +24,26 @@ export function useAdsets() {
     setLoading(true);
     setError(null);
     try {
+      console.log("Fetching adsets with datePreset:", datePreset);
       const data = await api.fetchAdsets(datePreset);
-      setAllAdsets(data);
+      console.log("Fetched adsets:", data?.length || 0, "items");
+      setAllAdsets(data || []);
       setLastUpdated(new Date());
     } catch (e) {
+      console.error("Error fetching adsets:", e);
       setError(e.message || "Failed to load data");
+      toast({
+        title: "Ошибка загрузки данных",
+        description: e.message || "Не удалось загрузить данные",
+        status: "error",
+        duration: 5000,
+        isClosable: true,
+        position: "top",
+      });
     } finally {
       setLoading(false);
     }
-  }, [datePreset]);
+  }, [datePreset, toast]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 

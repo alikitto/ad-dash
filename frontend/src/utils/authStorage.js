@@ -10,6 +10,9 @@ const AUTH_REMEMBER_ME_KEY = "authRememberMe";
  * @param {boolean} rememberMe - Whether to remember for 30 days or session only
  */
 export function saveAuthToken(token, rememberMe = false) {
+  if (typeof window === "undefined" || typeof localStorage === "undefined") {
+    return;
+  }
   if (rememberMe) {
     // Save for 30 days
     const expiryDate = new Date();
@@ -33,6 +36,9 @@ export function saveAuthToken(token, rememberMe = false) {
  * @returns {string|null} - The token or null if expired/missing
  */
 export function getAuthToken() {
+  if (typeof window === "undefined" || typeof localStorage === "undefined") {
+    return null;
+  }
   const token = localStorage.getItem(AUTH_TOKEN_KEY);
   const expiryStr = localStorage.getItem(AUTH_TOKEN_EXPIRY_KEY);
 
@@ -66,6 +72,9 @@ export function isAuthTokenValid() {
  * Clear authentication token and related data
  */
 export function clearAuthToken() {
+  if (typeof window === "undefined" || typeof localStorage === "undefined") {
+    return;
+  }
   localStorage.removeItem(AUTH_TOKEN_KEY);
   localStorage.removeItem(AUTH_TOKEN_EXPIRY_KEY);
   localStorage.removeItem(AUTH_REMEMBER_ME_KEY);
@@ -76,6 +85,9 @@ export function clearAuthToken() {
  * @returns {number|null} - Days remaining or null if no token
  */
 export function getTokenExpiryDays() {
+  if (typeof window === "undefined" || typeof localStorage === "undefined") {
+    return null;
+  }
   const expiryStr = localStorage.getItem(AUTH_TOKEN_EXPIRY_KEY);
   if (!expiryStr) return null;
 

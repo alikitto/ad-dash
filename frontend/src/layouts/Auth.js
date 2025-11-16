@@ -26,10 +26,12 @@ export default function AuthLayout(props) {
   const wrapper = React.createRef();
 
   React.useEffect(() => {
-    document.body.style.overflow = "unset";
+    if (typeof document !== "undefined") {
+      document.body.style.overflow = "unset";
+    }
     // Specify how to clean up after this effect:
     return function cleanup() {};
-  });
+  }, []);
   
   const getRoutes = (routes) => {
     return routes.map((prop, key) => {
