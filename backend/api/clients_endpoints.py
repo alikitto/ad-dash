@@ -67,6 +67,23 @@ class ClientResponse(BaseModel):
     created_at: str
     updated_at: str
 
+def serialize_client_row(row):
+    if not row:
+        return None
+    mapping = row
+    if hasattr(row, "_mapping"):
+        mapping = row._mapping
+    return {
+        "id": int(mapping["id"]),
+        "account_id": str(mapping["account_id"]),
+        "account_name": str(mapping["account_name"]),
+        "avatar_url": str(mapping["avatar_url"] or ""),
+        "monthly_budget": float(mapping["monthly_budget"] or 0.0),
+        "start_date": str(mapping["start_date"]),
+        "monthly_payment_azn": float(mapping["monthly_payment_azn"] or 0.0),
+        "created_at": str(mapping["created_at"]),
+        "updated_at": str(mapping["updated_at"]),
+    }
 
 def init_clients_table():
     """Ensure clients table exists (PostgreSQL)."""
@@ -135,22 +152,7 @@ async def get_all_clients():
             result = conn.execute(query)
             rows = result.fetchall()
             logging.info(f"Fetched {len(rows)} rows from database")
-            
-            clients = []
-            for row in rows:
-                client = {
-                    "id": int(row[0]),
-                    "account_id": str(row[1]),
-                    "account_name": str(row[2]),
-                    "avatar_url": str(row[3]) if row[3] else "",
-                    "monthly_budget": float(row[4]) if row[4] is not None else 0.0,
-                    "start_date": str(row[5]),
-                    "monthly_payment_azn": float(row[6]) if row[6] is not None else 0.0,
-                    "created_at": str(row[7]),
-                    "updated_at": str(row[8]),
-                }
-                clients.append(client)
-            
+            clients = [serialize_client_row(row) for row in rows]
             logging.info(f"Successfully processed {len(clients)} clients")
             return clients
             
@@ -175,7 +177,7 @@ async def get_client(account_id: str):
             row = conn.execute(query, {"account_id": account_id}).mappings().first()
             if not row:
                 raise HTTPException(status_code=404, detail="Client not found")
-            return dict(row)
+            return serialize_client_row(row)
     except HTTPException:
         raise
     except SQLAlchemyError as e:
@@ -209,7 +211,7 @@ async def create_client(client: ClientCreate):
     try:
         with engine.begin() as conn:
             row = conn.execute(insert_sql, params).mappings().first()
-            return dict(row)
+            return serialize_client_row(row)
     except SQLAlchemyError as e:
         msg = str(e.__cause__ or e)
         if "unique" in msg.lower():
@@ -260,7 +262,7 @@ async def update_client(account_id: str, client_update: ClientUpdate):
             row = conn.execute(update_sql, params).mappings().first()
             if not row:
                 raise HTTPException(status_code=404, detail="Client not found")
-            return dict(row)
+            return serialize_client_row(row)
     except HTTPException:
         raise
     except SQLAlchemyError as e:
