@@ -1,8 +1,9 @@
 import logging
+from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.engine import make_url
@@ -64,8 +65,23 @@ class ClientResponse(BaseModel):
     monthly_budget: float
     start_date: str
     monthly_payment_azn: float
+    total_paid: float = 0.0
+    last_payment_at: Optional[str] = None
     created_at: str
     updated_at: str
+
+class PaymentCreate(BaseModel):
+    paid_at: str = Field(..., description="ISO date string")
+    amount: float
+    note: Optional[str] = None
+
+class PaymentResponse(BaseModel):
+    id: int
+    client_id: int
+    paid_at: str
+    amount: float
+    note: Optional[str]
+    created_at: str
 
 def serialize_client_row(row):
     if not row:
@@ -73,6 +89,7 @@ def serialize_client_row(row):
     mapping = row
     if hasattr(row, "_mapping"):
         mapping = row._mapping
+
     return {
         "id": int(mapping["id"]),
         "account_id": str(mapping["account_id"]),
@@ -81,8 +98,25 @@ def serialize_client_row(row):
         "monthly_budget": float(mapping["monthly_budget"] or 0.0),
         "start_date": str(mapping["start_date"]),
         "monthly_payment_azn": float(mapping["monthly_payment_azn"] or 0.0),
+        "total_paid": float(mapping.get("total_paid") or 0.0),
+        "last_payment_at": str(mapping["last_payment_at"]) if mapping.get("last_payment_at") else None,
         "created_at": str(mapping["created_at"]),
         "updated_at": str(mapping["updated_at"]),
+    }
+
+def serialize_payment_row(row):
+    if not row:
+        return None
+    mapping = row
+    if hasattr(row, "_mapping"):
+        mapping = row._mapping
+    return {
+        "id": int(mapping["id"]),
+        "client_id": int(mapping["client_id"]),
+        "paid_at": str(mapping["paid_at"]),
+        "amount": float(mapping["amount"]),
+        "note": mapping.get("note"),
+        "created_at": str(mapping["created_at"]),
     }
 
 def init_clients_table():
@@ -132,20 +166,60 @@ except Exception as e:
     logging.error(f"Failed to initialize clients table: {e}", exc_info=True)
     # Don't crash the whole app - table might already exist or DB not available
 
+def init_client_payments_table():
+    sql = """
+        CREATE TABLE IF NOT EXISTS client_payments (
+            id SERIAL PRIMARY KEY,
+            client_id INTEGER REFERENCES clients(id) ON DELETE CASCADE,
+            paid_at DATE NOT NULL,
+            amount NUMERIC(18,2) NOT NULL,
+            note TEXT,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        );
+    """
+    index_sql = "CREATE INDEX IF NOT EXISTS idx_client_payments_client_id ON client_payments(client_id);"
+    with engine.begin() as conn:
+        conn.execute(text(sql))
+        conn.execute(text(index_sql))
+
+try:
+    init_client_payments_table()
+    logging.info("client_payments table ready")
+except Exception as e:
+    logging.error(f"Failed to initialize client_payments table: {e}", exc_info=True)
+
+def get_client_row_by_account(account_id: str):
+    query = text("SELECT * FROM clients WHERE account_id = :account_id")
+    with engine.connect() as conn:
+        row = conn.execute(query, {"account_id": account_id}).mappings().first()
+        return row
+
 @router.get("/clients")
 async def get_all_clients():
     """Get all clients"""
     try:
         logging.info("GET /api/clients called")
         query = text("""
-            SELECT id, account_id, account_name, 
-                   COALESCE(avatar_url, '') as avatar_url,
-                   COALESCE(monthly_budget, 0) as monthly_budget,
-                   start_date, 
-                   COALESCE(monthly_payment_azn, 0) as monthly_payment_azn,
-                   created_at, updated_at
-            FROM clients
-            ORDER BY account_name
+            SELECT c.id,
+                   c.account_id,
+                   c.account_name,
+                   COALESCE(c.avatar_url, '') as avatar_url,
+                   COALESCE(c.monthly_budget, 0) as monthly_budget,
+                   c.start_date,
+                   COALESCE(c.monthly_payment_azn, 0) as monthly_payment_azn,
+                   c.created_at,
+                   c.updated_at,
+                   COALESCE(pay.total_paid, 0) AS total_paid,
+                   pay.last_payment_at
+            FROM clients c
+            LEFT JOIN (
+                SELECT client_id,
+                       SUM(amount) AS total_paid,
+                       MAX(paid_at) AS last_payment_at
+                FROM client_payments
+                GROUP BY client_id
+            ) pay ON pay.client_id = c.id
+            ORDER BY c.account_name
         """)
         
         with engine.connect() as conn:
@@ -167,10 +241,18 @@ async def get_all_clients():
 async def get_client(account_id: str):
     """Get client by account_id"""
     query = text("""
-        SELECT id, account_id, account_name, avatar_url, monthly_budget,
-               start_date, monthly_payment_azn, created_at, updated_at
-        FROM clients
-        WHERE account_id = :account_id
+        SELECT c.*,
+               COALESCE(pay.total_paid, 0) AS total_paid,
+               pay.last_payment_at
+        FROM clients c
+        LEFT JOIN (
+            SELECT client_id,
+                   SUM(amount) AS total_paid,
+                   MAX(paid_at) AS last_payment_at
+            FROM client_payments
+            GROUP BY client_id
+        ) pay ON pay.client_id = c.id
+        WHERE c.account_id = :account_id
     """)
     try:
         with engine.connect() as conn:
@@ -318,4 +400,47 @@ async def get_clients_from_accounts():
     except Exception as e:
         logging.error(f"Error fetching accounts from Meta: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/clients/{account_id}/payments", response_model=List[PaymentResponse])
+async def get_client_payments(account_id: str):
+    client = get_client_row_by_account(account_id)
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    query = text("""
+        SELECT id, client_id, paid_at, amount, note, created_at
+        FROM client_payments
+        WHERE client_id = :client_id
+        ORDER BY paid_at DESC, created_at DESC
+    """)
+    with engine.connect() as conn:
+        rows = conn.execute(query, {"client_id": client["id"]}).mappings().all()
+        return [serialize_payment_row(row) for row in rows]
+
+@router.post("/clients/{account_id}/payments", response_model=PaymentResponse)
+async def add_client_payment(account_id: str, payload: PaymentCreate):
+    client = get_client_row_by_account(account_id)
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    try:
+        paid_at = datetime.fromisoformat(payload.paid_at).date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+    insert_sql = text("""
+        INSERT INTO client_payments (client_id, paid_at, amount, note)
+        VALUES (:client_id, :paid_at, :amount, :note)
+        RETURNING id, client_id, paid_at, amount, note, created_at
+    """)
+    params = {
+        "client_id": client["id"],
+        "paid_at": paid_at,
+        "amount": payload.amount,
+        "note": payload.note,
+    }
+    try:
+        with engine.begin() as conn:
+            row = conn.execute(insert_sql, params).mappings().first()
+            return serialize_payment_row(row)
+    except SQLAlchemyError as e:
+        logging.error(f"Error adding payment: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to add payment")
 

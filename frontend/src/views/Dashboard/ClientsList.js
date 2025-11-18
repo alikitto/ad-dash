@@ -22,12 +22,15 @@ import {
   FormControl,
   FormLabel,
   Input,
+  Textarea,
   useDisclosure,
   Spinner,
   Badge,
   HStack,
   Box,
   Select,
+  VStack,
+  Divider,
 } from "@chakra-ui/react";
 import { EditIcon, DeleteIcon, AddIcon } from "@chakra-ui/icons";
 import Card from "components/Card/Card.js";
@@ -52,6 +55,15 @@ function ClientsList() {
     monthly_budget: "",
     start_date: "",
     monthly_payment_azn: "",
+  });
+  const paymentsModal = useDisclosure();
+  const [paymentsClient, setPaymentsClient] = useState(null);
+  const [payments, setPayments] = useState([]);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
+  const [paymentForm, setPaymentForm] = useState({
+    paid_at: "",
+    amount: "",
+    note: "",
   });
 
   const fetchClients = useCallback(async () => {
@@ -148,6 +160,98 @@ function ClientsList() {
         account_id: account.account_id,
         account_name: account.account_name,
       }));
+    }
+  };
+
+  const fetchPayments = useCallback(
+    async (client) => {
+      if (!client) return;
+      setPaymentsLoading(true);
+      try {
+        const response = await fetch(`${API_BASE}/api/clients/${client.account_id}/payments`);
+        if (!response.ok) throw new Error("Failed to fetch payments");
+        const data = await response.json();
+        setPayments(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error("Fetch payments error:", error);
+        toast({
+          title: "Ошибка загрузки оплат",
+          description: error.message,
+          status: "error",
+          duration: 4000,
+        });
+        setPayments([]);
+      } finally {
+        setPaymentsLoading(false);
+      }
+    },
+    [toast]
+  );
+
+  const openPaymentsModal = async (client) => {
+    setPaymentsClient(client);
+    setPaymentForm({
+      paid_at: new Date().toISOString().slice(0, 10),
+      amount: "",
+      note: "",
+    });
+    paymentsModal.onOpen();
+    fetchPayments(client);
+  };
+
+  const closePaymentsModal = () => {
+    paymentsModal.onClose();
+    setPaymentsClient(null);
+    setPayments([]);
+  };
+
+  const handleAddPayment = async () => {
+    if (!paymentsClient) return;
+    const amount = parseFloat(paymentForm.amount);
+    if (!paymentForm.paid_at || !isFinite(amount) || amount <= 0) {
+      toast({
+        title: "Введите корректные данные оплаты",
+        status: "warning",
+        duration: 3000,
+      });
+      return;
+    }
+    try {
+      const response = await fetch(`${API_BASE}/api/clients/${paymentsClient.account_id}/payments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          paid_at: paymentForm.paid_at,
+          amount,
+          note: paymentForm.note || null,
+        }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || "Failed to add payment");
+      }
+      const newPayment = await response.json();
+      setPayments((prev) => [newPayment, ...prev]);
+      setPaymentForm((prev) => ({ ...prev, amount: "", note: "" }));
+      setClients((prev) =>
+        prev.map((client) =>
+          client.account_id === paymentsClient.account_id
+            ? {
+                ...client,
+                total_paid: (client.total_paid || 0) + newPayment.amount,
+                last_payment_at: newPayment.paid_at,
+              }
+            : client
+        )
+      );
+      toast({ title: "Оплата добавлена", status: "success", duration: 2000 });
+    } catch (error) {
+      toast({
+        title: "Ошибка добавления оплаты",
+        description: error.message,
+        status: "error",
+        duration: 3000,
+      });
     }
   };
 
@@ -313,13 +417,14 @@ function ClientsList() {
                   <Th color="gray.400" isNumeric>
                     Оплата (AZN)
                   </Th>
+                  <Th color="gray.400">История оплат</Th>
                   <Th color="gray.400">Действия</Th>
                 </Tr>
               </Thead>
               <Tbody>
                 {clients.length === 0 ? (
                   <Tr>
-                    <Td colSpan={7} textAlign="center" py={8}>
+                    <Td colSpan={8} textAlign="center" py={8}>
                       <Text color="gray.400">Нет клиентов. Добавьте первого клиента.</Text>
                     </Td>
                   </Tr>
@@ -346,8 +451,27 @@ function ClientsList() {
                       <Td color="white" isNumeric>
                         {client.monthly_payment_azn.toFixed(2)} AZN
                       </Td>
+                      <Td color="white">
+                        <Text fontSize="sm" fontWeight="bold">
+                          {formatMoney(client.total_paid || 0)}
+                        </Text>
+                        <Text fontSize="xs" color="gray.400">
+                          Последняя: {client.last_payment_at ? formatDate(client.last_payment_at) : "—"}
+                        </Text>
+                      </Td>
                       <Td>
                         <HStack spacing={2}>
+                          <Button
+                            size="xs"
+                            colorScheme="purple"
+                            variant="outline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openPaymentsModal(client);
+                            }}
+                          >
+                            Оплаты
+                          </Button>
                           <IconButton
                             aria-label="Редактировать"
                             icon={<EditIcon />}
@@ -480,6 +604,84 @@ function ClientsList() {
             <Button colorScheme="blue" onClick={handleSave}>
               Сохранить
             </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* Payments Modal */}
+      <Modal isOpen={paymentsModal.isOpen} onClose={closePaymentsModal} size="xl">
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>
+            Оплаты: {paymentsClient?.account_name || "—"}
+          </ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <VStack align="stretch" spacing={4}>
+              <Text fontSize="sm" color="gray.600">
+                Управляйте платежами клиента, чтобы отслеживать поступления.
+              </Text>
+              <FormControl>
+                <FormLabel>Дата оплаты</FormLabel>
+                <Input
+                  type="date"
+                  value={paymentForm.paid_at}
+                  onChange={(e) => setPaymentForm((prev) => ({ ...prev, paid_at: e.target.value }))}
+                />
+              </FormControl>
+              <FormControl>
+                <FormLabel>Сумма ($)</FormLabel>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={paymentForm.amount}
+                  onChange={(e) => setPaymentForm((prev) => ({ ...prev, amount: e.target.value }))}
+                />
+              </FormControl>
+              <FormControl>
+                <FormLabel>Комментарий</FormLabel>
+                <Textarea
+                  placeholder="Например: предоплата за ноябрь"
+                  value={paymentForm.note}
+                  onChange={(e) => setPaymentForm((prev) => ({ ...prev, note: e.target.value }))}
+                />
+              </FormControl>
+              <Button colorScheme="blue" onClick={handleAddPayment}>
+                Добавить оплату
+              </Button>
+              <Divider />
+              {paymentsLoading ? (
+                <Flex justify="center" py={6}>
+                  <Spinner />
+                </Flex>
+              ) : payments.length === 0 ? (
+                <Text fontSize="sm" color="gray.500">
+                  Пока нет оплат.
+                </Text>
+              ) : (
+                <Table size="sm" variant="striped">
+                  <Thead>
+                    <Tr>
+                      <Th>Дата</Th>
+                      <Th isNumeric>Сумма</Th>
+                      <Th>Комментарий</Th>
+                    </Tr>
+                  </Thead>
+                  <Tbody>
+                    {payments.map((payment) => (
+                      <Tr key={payment.id}>
+                        <Td>{formatDate(payment.paid_at)}</Td>
+                        <Td isNumeric>{formatMoney(payment.amount)}</Td>
+                        <Td>{payment.note || "—"}</Td>
+                      </Tr>
+                    ))}
+                  </Tbody>
+                </Table>
+              )}
+            </VStack>
+          </ModalBody>
+          <ModalFooter>
+            <Button onClick={closePaymentsModal}>Закрыть</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>
