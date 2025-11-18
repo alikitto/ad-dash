@@ -12,21 +12,31 @@ from core.config import DATABASE_URL
 router = APIRouter()
 
 if not DATABASE_URL:
+    logging.error("DATABASE_URL is not configured!")
     raise RuntimeError("DATABASE_URL is not configured. Cannot initialize clients endpoints.")
+
+logging.info(f"Initializing clients engine with DATABASE_URL: {DATABASE_URL}")
 
 connect_args = {}
 try:
     url_obj = make_url(DATABASE_URL)
     if url_obj.drivername.startswith("postgres") and "sslmode" not in url_obj.query:
         connect_args["sslmode"] = "require"
-except Exception:
+        logging.info("Added sslmode=require to connect_args")
+except Exception as e:
+    logging.warning(f"Could not parse DATABASE_URL: {e}")
     pass
 
-engine = create_engine(
-    DATABASE_URL,
-    pool_pre_ping=True,
-    connect_args=connect_args if connect_args else {},
-)
+try:
+    engine = create_engine(
+        DATABASE_URL,
+        pool_pre_ping=True,
+        connect_args=connect_args if connect_args else {},
+    )
+    logging.info("SQLAlchemy engine created successfully")
+except Exception as e:
+    logging.error(f"Failed to create engine: {e}")
+    raise
 
 
 class ClientCreate(BaseModel):
@@ -102,6 +112,7 @@ init_clients_table()
 @router.get("/clients", response_model=List[ClientResponse])
 async def get_all_clients():
     """Get all clients"""
+    logging.info("GET /api/clients called")
     query = text("""
         SELECT id, account_id, account_name, avatar_url, monthly_budget,
                start_date, monthly_payment_azn, created_at, updated_at
@@ -111,10 +122,14 @@ async def get_all_clients():
     try:
         with engine.connect() as conn:
             rows = conn.execute(query).mappings().all()
+            logging.info(f"Successfully fetched {len(rows)} clients")
             return [dict(row) for row in rows]
     except SQLAlchemyError as e:
-        logging.error(f"Error fetching clients: {e}")
-        raise HTTPException(status_code=500, detail="Failed to fetch clients")
+        logging.error(f"Error fetching clients: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    except Exception as e:
+        logging.error(f"Unexpected error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
 
 @router.get("/clients/{account_id}", response_model=ClientResponse)
 async def get_client(account_id: str):
