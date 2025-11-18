@@ -107,7 +107,13 @@ def init_clients_table():
         conn.execute(text(trigger_sql))
 
 
-init_clients_table()
+# Initialize table only if engine is ready
+try:
+    init_clients_table()
+    logging.info("Clients table initialized successfully")
+except Exception as e:
+    logging.error(f"Failed to initialize clients table: {e}", exc_info=True)
+    # Don't crash the whole app - table might already exist or DB not available
 
 @router.get("/clients", response_model=List[ClientResponse])
 async def get_all_clients():
