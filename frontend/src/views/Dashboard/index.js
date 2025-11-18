@@ -1,11 +1,12 @@
 // src/views/Dashboard/index.js (Финальная версия)
 
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { Flex, Text, useToast } from "@chakra-ui/react";
 import { useAdsets } from "hooks/useAdsets";
 import { useColumnVisibility } from "hooks/useColumnVisibility";
 import * as api from "api/adsets";
 import { formatLastUpdated } from "utils/formatters";
+import { useCrmClients, normalizeClientKey } from "hooks/useCrmClients";
 
 // 👇 ВОТ НУЖНЫЕ ИМПОРТЫ 👇
 import Card from "components/Card/Card.js";
@@ -43,12 +44,36 @@ function Dashboard() {
   const [tick, setTick] = useState(0);
   const resetColumnsRef = useRef(null);
   const { visibility: columnVisibility, toggleColumn } = useColumnVisibility();
+  const { index: crmIndex } = useCrmClients();
   
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 60_000);
     return () => clearInterval(id);
   }, []);
   const lastUpdatedLabel = useMemo(() => formatLastUpdated(lastUpdated), [lastUpdated, tick]);
+
+  const attachCrmData = useCallback(
+    (adset) => {
+      if (!adset) return adset;
+      const crm =
+        crmIndex.byId[String(adset.account_id)] ||
+        crmIndex.byName[normalizeClientKey(adset.account_name)];
+      if (!crm) return adset;
+      return {
+        ...adset,
+        display_account_name: crm.account_name || adset.account_name,
+        display_avatar: crm.avatar_url,
+        crm_monthly_payment_azn: crm.monthly_payment_azn,
+        crm_start_date: crm.start_date,
+      };
+    },
+    [crmIndex]
+  );
+
+  const enhancedAdsets = useMemo(
+    () => safeProcessedAdsets.map((adset) => attachCrmData(adset)),
+    [safeProcessedAdsets, attachCrmData]
+  );
   
   const handleResetColumns = () => {
     if (resetColumnsRef.current) {
@@ -118,7 +143,7 @@ function Dashboard() {
         {/* 👆 -------------------------- 👆 */}
         <CardBody pt="0">
                 <AdsetTable
-                  adsets={safeProcessedAdsets}
+                  adsets={enhancedAdsets}
                   loading={loading}
                   error={error}
                   sortConfig={sortConfig || { key: "spend", direction: "descending" }}

@@ -348,7 +348,9 @@ export default function AdsetDetailsDrawer({
               {adset?.adset_name || "—"}
             </Text>
             <HStack spacing={3} wrap="wrap">
-              <Badge colorScheme="blue">{adset?.account_name || "—"}</Badge>
+              <Badge colorScheme="blue">
+                {adset?.display_account_name || adset?.account_name || "—"}
+              </Badge>
               <Badge colorScheme="purple">
                 {String(adset?.objective || "—")
                   .toUpperCase()

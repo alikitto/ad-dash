@@ -1,7 +1,7 @@
 // frontend/src/components/Tables/TablesTableRow.js
 
 import React, { useState } from "react";
-import { Avatar, Flex, Td, Text, Tr, Switch, useColorModeValue, Spinner, Image, Box, useToast, IconButton, Icon, Menu, MenuButton, MenuList, MenuItem, Tooltip } from "@chakra-ui/react";
+import { Avatar, Flex, Td, Text, Tr, Switch, useColorModeValue, Spinner, Image, Box, useToast, IconButton, Icon, Menu, MenuButton, MenuList, MenuItem, Tooltip, Badge } from "@chakra-ui/react";
 import { FaChartLine, FaExternalLinkAlt, FaEllipsisV, FaMagic, FaCopy, FaStickyNote, FaFileExport, FaInfoCircle } from "react-icons/fa";
 import AnalysisModal from "components/Tables/AnalysisModal";
 import AdsetStatsModal from "components/Tables/AdsetStatsModal";
@@ -11,6 +11,7 @@ import { fmtMoney, fmtPct, fmtNum, fmtFrequency } from "../../utils/formatters";
 
 function resolveAvatar(adset) {
   if (!adset) return undefined;
+  if (adset.display_avatar) return adset.display_avatar;
   const id = adset.account_id || "";
   const name = adset.account_name || "";
   const candidates = [];
@@ -46,6 +47,7 @@ function TablesTableRow(props) {
   const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
   
   const avatarSrc = resolveAvatar(adset);
+  const accountName = adset.display_account_name || adset.account_name;
   const ctrLinkClick = adset && adset.impressions > 0 ? (Number(adset.link_clicks || 0) / adset.impressions) * 100 : 0;
   const accountId = adset?.account_id ? String(adset.account_id) : "";
   const accountNumericId = accountId.replace(/^act_/, "");
@@ -164,9 +166,18 @@ function TablesTableRow(props) {
             >
               {expanded ? "▾" : "▸"}
             </Box>
-            <Avatar size="sm" name={adset.account_name} src={avatarSrc} bg="gray.500" />
+            <Avatar size="sm" name={accountName} src={avatarSrc} bg="gray.500" />
             <Flex direction="column" minW={0}>
-              <Text fontSize="10px" textTransform="uppercase" color="gray.500" noOfLines={1}>{adset.account_name || "—"}</Text>
+              <Flex align="center" gap={2}>
+                <Text fontSize="10px" textTransform="uppercase" color="gray.500" noOfLines={1}>
+                  {accountName || "—"}
+                </Text>
+                {adset.display_account_name && adset.display_account_name !== adset.account_name && (
+                  <Badge colorScheme="purple" fontSize="8px">
+                    CRM
+                  </Badge>
+                )}
+              </Flex>
               <Text fontSize="sm" fontWeight="semibold" color={textColor} noOfLines={1} mt="1px">{adset.campaign_name || "—"}</Text>
               <Text fontSize="sm" color="gray.600" noOfLines={1} mt="1px">{adset.adset_name || "—"}</Text>
             </Flex>

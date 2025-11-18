@@ -35,11 +35,14 @@ import CardBody from "components/Card/CardBody.js";
 import { API_BASE } from "../../config/api";
 import { CLIENT_AVATARS } from "../../variables/clientAvatars";
 import { formatLastUpdated } from "../../utils/formatters";
+import { useCrmClients, normalizeClientKey } from "hooks/useCrmClients";
 
-const USD_TO_AZN = 1.7;
 const MS_IN_DAY = 24 * 60 * 60 * 1000;
 
-const normalizeKey = (value) => (value ? String(value).trim().toLowerCase() : "");
+const formatUsd = (value) => {
+  if (typeof value !== "number" || !isFinite(value)) return "$0.00";
+  return `$${value.toFixed(2)}`;
+};
 
 const getPresetDays = (preset) => {
   switch (preset) {
@@ -55,51 +58,63 @@ const getPresetDays = (preset) => {
   }
 };
 
-const computeCycleMetrics = (crm, spendUSD) => {
-  if (!crm?.monthly_payment_azn || !crm?.start_date) {
-    return {
-      cycleDays: null,
-      daysElapsed: null,
-      plannedDailyAZN: null,
-      actualDailyAZN: null,
-      remainingAZN: null,
-      cycleSpendAZN: spendUSD * USD_TO_AZN,
-    };
-  }
+const computeCycleMetrics = ({
+  planMonthlyUSD,
+  startDate,
+  spendUSD,
+  avgDailyUSD,
+  periodDays,
+}) => {
   const today = new Date();
-  const startDate = new Date(crm.start_date);
-  if (isNaN(startDate)) {
-    return {
-      cycleDays: null,
-      daysElapsed: null,
-      plannedDailyAZN: null,
-      actualDailyAZN: null,
-      remainingAZN: null,
-      cycleSpendAZN: spendUSD * USD_TO_AZN,
-    };
+  let cycleStart = null;
+  let nextCycle = null;
+  let cycleDays = periodDays || null;
+  let daysElapsed = periodDays || null;
+
+  if (startDate) {
+    const parsed = new Date(startDate);
+    if (!isNaN(parsed)) {
+      cycleStart = new Date(today.getFullYear(), today.getMonth(), parsed.getDate());
+      if (today < cycleStart) {
+        cycleStart.setMonth(cycleStart.getMonth() - 1);
+      }
+      nextCycle = new Date(cycleStart);
+      nextCycle.setMonth(nextCycle.getMonth() + 1);
+      cycleDays = Math.max(1, Math.round((nextCycle - cycleStart) / MS_IN_DAY));
+      daysElapsed = Math.max(
+        1,
+        Math.min(cycleDays, Math.round((today - cycleStart) / MS_IN_DAY))
+      );
+    }
   }
-  const startDay = startDate.getDate();
-  let cycleStart = new Date(today.getFullYear(), today.getMonth(), startDay);
-  if (today < cycleStart) {
-    cycleStart.setMonth(cycleStart.getMonth() - 1);
+
+  if (!cycleDays && periodDays) {
+    cycleDays = periodDays;
+    daysElapsed = periodDays;
   }
-  const nextCycle = new Date(cycleStart);
-  nextCycle.setMonth(nextCycle.getMonth() + 1);
-  const cycleDays = Math.max(1, Math.round((nextCycle - cycleStart) / MS_IN_DAY));
-  const daysElapsed = Math.max(1, Math.min(cycleDays, Math.round((today - cycleStart) / MS_IN_DAY)));
-  const plannedDailyAZN = crm.monthly_payment_azn / cycleDays;
-  const cycleSpendAZN = spendUSD * USD_TO_AZN;
-  const actualDailyAZN = cycleSpendAZN / daysElapsed;
-  const remainingAZN = crm.monthly_payment_azn - cycleSpendAZN;
+
+  const effectiveDays = Math.max(1, daysElapsed || cycleDays || periodDays || 1);
+  const baseDaily = typeof avgDailyUSD === "number" ? avgDailyUSD : (spendUSD || 0) / effectiveDays;
+  const cycleSpendUSD = baseDaily * effectiveDays;
+  const plannedDailyUSD =
+    typeof planMonthlyUSD === "number" && cycleDays
+      ? planMonthlyUSD / cycleDays
+      : typeof planMonthlyUSD === "number"
+      ? planMonthlyUSD / effectiveDays
+      : null;
+  const actualDailyUSD = cycleSpendUSD / effectiveDays;
+  const remainingUSD =
+    typeof planMonthlyUSD === "number" ? planMonthlyUSD - cycleSpendUSD : null;
+
   return {
     cycleDays,
-    daysElapsed,
-    plannedDailyAZN,
-    actualDailyAZN,
-    remainingAZN,
-    cycleSpendAZN,
-    cycleStart: cycleStart.toISOString(),
-    nextCycle: nextCycle.toISOString(),
+    daysElapsed: effectiveDays,
+    plannedDailyUSD,
+    actualDailyUSD,
+    remainingUSD,
+    cycleSpendUSD,
+    cycleStart: cycleStart ? cycleStart.toISOString() : null,
+    nextCycle: nextCycle ? nextCycle.toISOString() : null,
   };
 };
 
@@ -118,16 +133,15 @@ function ClientCard({ clientData, onOpenDetails }) {
     impressions = 0,
     displayAvatar,
     crm,
-    plannedDailyAZN,
-    actualDailyAZN,
-    remainingAZN,
+    planMonthlyUSD,
+    plannedDailyUSD,
+    actualDailyUSD,
+    remainingUSD,
     cycleDays,
     daysElapsed,
-    cycleSpendAZN,
-    monthly_payment_azn = 0,
+    cycleSpendUSD,
     periodDays,
     avgDailyUSD,
-    avgDailyAZN,
   } = clientData;
 
   const avatarSrc =
@@ -138,18 +152,11 @@ function ClientCard({ clientData, onOpenDetails }) {
 
   const budgetUsed = monthly_budget > 0 ? (spent / monthly_budget) * 100 : 0;
   const budgetColor = budgetUsed > 90 ? "red" : budgetUsed > 70 ? "orange" : "green";
-  const planMonthlyAZN = monthly_payment_azn || crm?.monthly_payment_azn || 0;
-  const actualMonthlyAZN = typeof cycleSpendAZN === "number" ? cycleSpendAZN : spent * USD_TO_AZN;
-  const aznUsage = planMonthlyAZN > 0 ? Math.min(100, (actualMonthlyAZN / planMonthlyAZN) * 100) : 0;
-  const formatAZN = (value) => {
-    if (typeof value !== "number" || !isFinite(value)) return "0.00 AZN";
-    return `${value.toFixed(2)} AZN`;
-  };
-
-  const formatMoney = (value) => {
-    if (typeof value !== "number" || !isFinite(value)) return "$0.00";
-    return `$${value.toFixed(2)}`;
-  };
+  const planUsage =
+    typeof planMonthlyUSD === "number" && planMonthlyUSD > 0
+      ? Math.min(100, Math.max(0, ((cycleSpendUSD || 0) / planMonthlyUSD) * 100))
+      : 0;
+  const factCycleSpend = typeof cycleSpendUSD === "number" ? cycleSpendUSD : spent;
 
   const formatNumber = (value) => {
     if (typeof value !== "number" || !isFinite(value)) return "0";
@@ -205,107 +212,82 @@ function ClientCard({ clientData, onOpenDetails }) {
       </CardHeader>
       <CardBody>
         <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4}>
-          {/* Бюджет Meta + CRM */}
+          {/* Бюджет Meta */}
           <Box>
             <Text fontSize="sm" color="gray.400" mb={1}>
               Месячный бюджет (Meta)
             </Text>
             <Text fontSize="xl" fontWeight="bold" color="gray.800" mb={2}>
-              {formatMoney(monthly_budget)}
+              {formatUsd(monthly_budget)}
             </Text>
             <Text fontSize="sm" color="gray.600" mb={2}>
-              Осталось: {formatMoney(remaining_budget)}
+              Осталось: {formatUsd(remaining_budget)}
             </Text>
             <Progress value={budgetUsed} colorScheme={budgetColor} size="sm" borderRadius="md" />
             <Text fontSize="xs" color="gray.500" mt={1}>
               Использовано {budgetUsed.toFixed(1)}%
             </Text>
-            {crm && (
-              <Box mt={4} p={3} borderWidth="1px" borderRadius="md" borderColor="purple.100">
-                <Text fontSize="sm" color="gray.600" mb={2}>
-                  Платёжный план (AZN)
-                </Text>
-                <HStack justify="space-between" fontSize="xs" color="gray.500" mb={1}>
-                  <Text>План на месяц</Text>
-                  <Text fontWeight="bold" color="gray.800">
-                    {formatAZN(planMonthlyAZN)}
-                  </Text>
-                </HStack>
-                <HStack justify="space-between" fontSize="xs" color="gray.500" mb={1}>
-                  <Text>Потрачено (факт)</Text>
-                  <Text fontWeight="bold" color="gray.800">
-                    {formatAZN(actualMonthlyAZN)}
-                  </Text>
-                </HStack>
-                <Progress
-                  value={aznUsage}
-                  colorScheme={aznUsage > 90 ? "red" : aznUsage > 70 ? "yellow" : "green"}
-                  size="sm"
-                  borderRadius="md"
-                  mb={2}
-                />
-                <VStack align="stretch" spacing={1}>
-                  <Text fontSize="xs" color="gray.600">
-                    План/день:{" "}
-                    <Text as="span" fontWeight="bold">
-                      {plannedDailyAZN ? formatAZN(plannedDailyAZN) : "—"}
-                    </Text>
-                  </Text>
-                  <Text fontSize="xs" color="gray.600">
-                    Факт/день:{" "}
-                    <Text as="span" fontWeight="bold">
-                      {actualDailyAZN ? formatAZN(actualDailyAZN) : "—"}
-                    </Text>
-                  </Text>
-                  <Text fontSize="xs" color="gray.600">
-                    Осталось:{" "}
-                    <Text
-                      as="span"
-                      fontWeight="bold"
-                      color={remainingAZN < 0 ? "red.500" : "gray.800"}
-                    >
-                      {formatAZN(Math.max(0, remainingAZN ?? planMonthlyAZN - actualMonthlyAZN))}
-                    </Text>
-                  </Text>
-                  {cycleDays && (
-                    <Text fontSize="xs" color="gray.500">
-                      Цикл: {daysElapsed || 0} / {cycleDays} дней
-                    </Text>
-                  )}
-                </VStack>
-              </Box>
-            )}
+            <Text fontSize="xs" color="gray.400" mt={4}>
+              Факт по spend Meta за выбранный диапазон ({periodDays || "?"} дн.)
+            </Text>
           </Box>
 
-          {/* Активность */}
+          {/* План vs факт (USD) */}
           <Box>
             <Text fontSize="sm" color="gray.600" mb={2}>
-              Активность
+              План расхода (USD)
             </Text>
-            <HStack spacing={4} mb={2}>
-              <Box>
-                <Text fontSize="xs" color="gray.500" mb={1}>
-                  Группы
+            <Box p={3} borderWidth="1px" borderRadius="md" borderColor="gray.100">
+              <HStack justify="space-between" fontSize="xs" color="gray.500" mb={1}>
+                <Text>План на месяц</Text>
+                <Text fontWeight="bold" color="gray.800">
+                  {planMonthlyUSD ? formatUsd(planMonthlyUSD) : "—"}
                 </Text>
-                <Badge colorScheme="green" fontSize="md" p={2}>
-                  {active_adsets}
-                </Badge>
-              </Box>
-              <Box>
-                <Text fontSize="xs" color="gray.500" mb={1}>
-                  Объявления
+              </HStack>
+              <HStack justify="space-between" fontSize="xs" color="gray.500" mb={1}>
+                <Text>Потрачено (факт)</Text>
+                <Text fontWeight="bold" color="gray.800">
+                  {formatUsd(factCycleSpend)}
                 </Text>
-                <Badge colorScheme="blue" fontSize="md" p={2}>
-                  {active_ads}
-                </Badge>
-              </Box>
-            </HStack>
-            <Text fontSize="xs" color="gray.500" mt={2}>
-              Обновлено: {formatDate(last_updated)}
-            </Text>
+              </HStack>
+              <Progress
+                value={planUsage}
+                colorScheme={planUsage > 90 ? "red" : planUsage > 70 ? "yellow" : "green"}
+                size="sm"
+                borderRadius="md"
+                mb={2}
+              />
+              <VStack align="stretch" spacing={1}>
+                <Text fontSize="xs" color="gray.600">
+                  План/день:{" "}
+                  <Text as="span" fontWeight="bold">
+                    {plannedDailyUSD ? formatUsd(plannedDailyUSD) : "—"}
+                  </Text>
+                </Text>
+                <Text fontSize="xs" color="gray.600">
+                  Факт/день:{" "}
+                  <Text as="span" fontWeight="bold">
+                    {actualDailyUSD ? formatUsd(actualDailyUSD) : "—"}
+                  </Text>
+                </Text>
+                <Text fontSize="xs" color="gray.600">
+                  Осталось:{" "}
+                  <Text
+                    as="span"
+                    fontWeight="bold"
+                    color={remainingUSD != null && remainingUSD < 0 ? "red.500" : "gray.800"}
+                  >
+                    {remainingUSD != null ? formatUsd(remainingUSD) : "—"}
+                  </Text>
+                </Text>
+                <Text fontSize="xs" color="gray.500">
+                  Цикл: {daysElapsed || "—"} / {cycleDays || "—"} дней
+                </Text>
+              </VStack>
+            </Box>
           </Box>
 
-          {/* Метрики */}
+          {/* Активность + метрики */}
           <Box>
             <Text fontSize="sm" color="gray.600" mb={2}>
               Метрики
@@ -315,7 +297,7 @@ function ClientCard({ clientData, onOpenDetails }) {
                 Цена за результат (CPL)
               </Text>
               <Text fontSize="lg" fontWeight="bold" color="gray.800">
-                {formatMoney(cpl)}
+                {formatUsd(cpl)}
               </Text>
             </Box>
             <Box mb={2}>
@@ -326,19 +308,27 @@ function ClientCard({ clientData, onOpenDetails }) {
                 {formatNumber(impressions)}
               </Text>
             </Box>
-            <Box>
+            <Box mb={2}>
               <Text fontSize="xs" color="gray.600">
-                Потрачено
+                Потрачено (Meta)
               </Text>
               <Text fontSize="lg" fontWeight="bold" color="gray.800">
-                {formatMoney(spent)}
+                {formatUsd(spent)}
+              </Text>
+            </Box>
+            <Box>
+              <Text fontSize="xs" color="gray.600">
+                Средн. расход/день
+              </Text>
+              <Text fontSize="lg" fontWeight="bold" color="gray.800">
+                {avgDailyUSD ? formatUsd(avgDailyUSD) : "—"}
+              </Text>
+              <Text fontSize="xs" color="gray.500">
+                На основе {periodDays || 0} дн.
               </Text>
             </Box>
           </Box>
         </SimpleGrid>
-        <Text fontSize="xs" color="gray.400" mt={4}>
-          Факт по spend Meta за выбранный диапазон ({clientData.periodDays || "?"} дн.)
-        </Text>
       </CardBody>
     </Card>
   );
@@ -346,13 +336,53 @@ function ClientCard({ clientData, onOpenDetails }) {
 
 function MetaAdsStatus() {
   const [clients, setClients] = useState([]);
+  const [rawClients, setRawClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [datePreset, setDatePreset] = useState("today");
   const [lastUpdated, setLastUpdated] = useState(null);
-  const [crmIndex, setCrmIndex] = useState({ byId: {}, byName: {} });
   const detailDrawer = useDisclosure();
   const [detailClient, setDetailClient] = useState(null);
   const toast = useToast();
+  const { index: crmIndex } = useCrmClients();
+
+  const attachCrmData = useCallback(
+    (client) => {
+      const crmMatch =
+        crmIndex.byId[String(client.account_id)] ||
+        crmIndex.byName[normalizeClientKey(client.account_name)];
+      const planMonthlyUSD =
+        typeof client.monthly_budget === "number" && client.monthly_budget > 0
+          ? client.monthly_budget
+          : null;
+      const periodDays = getPresetDays(datePreset);
+      const avgDailyUSD = periodDays > 0 ? (client.spent || 0) / periodDays : 0;
+      const metrics = computeCycleMetrics({
+        planMonthlyUSD,
+        startDate: crmMatch?.start_date,
+        spendUSD: client.spent || 0,
+        avgDailyUSD,
+        periodDays,
+      });
+      return {
+        ...client,
+        crm: crmMatch,
+        planMonthlyUSD,
+        periodDays,
+        avgDailyUSD,
+        displayAvatar:
+          crmMatch?.avatar_url ||
+          CLIENT_AVATARS[client.account_id] ||
+          CLIENT_AVATARS[client.account_name] ||
+          CLIENT_AVATARS[normalizeClientKey(client.account_name)],
+        ...metrics,
+      };
+    },
+    [crmIndex, datePreset]
+  );
+
+  useEffect(() => {
+    setClients(rawClients.map((client) => attachCrmData(client)));
+  }, [rawClients, attachCrmData]);
 
   // Маппинг дат
   const datePresetMap = {
@@ -361,62 +391,6 @@ function MetaAdsStatus() {
     month: "last_30d",
     maximum: "maximum",
   };
-
-  const fetchCrmClients = useCallback(async () => {
-    try {
-      const response = await fetch(`${API_BASE}/api/clients`);
-      if (!response.ok) throw new Error("Failed to fetch CRM clients");
-      const data = await response.json();
-      const byId = {};
-      const byName = {};
-      data.forEach((client) => {
-        if (client.account_id) byId[String(client.account_id)] = client;
-        if (client.account_name) byName[normalizeKey(client.account_name)] = client;
-      });
-      setCrmIndex({ byId, byName });
-    } catch (error) {
-      console.error("CRM clients fetch error:", error);
-      toast({
-        title: "Не удалось загрузить данных CRM",
-        description: error.message,
-        status: "warning",
-        duration: 3000,
-      });
-    }
-  }, [toast]);
-
-  useEffect(() => {
-    fetchCrmClients();
-  }, [fetchCrmClients]);
-
-  const attachCrmData = useCallback(
-    (client) => {
-      const crm =
-        crmIndex.byId[String(client.account_id)] ||
-        crmIndex.byName[normalizeKey(client.account_name)];
-      const merged = { ...client };
-      if (crm) {
-        merged.crm = crm;
-        merged.account_name = crm.account_name || merged.account_name;
-        merged.start_date = crm.start_date || merged.start_date;
-        merged.monthly_payment_azn = crm.monthly_payment_azn || merged.monthly_payment_azn || 0;
-        merged.total_paid = crm.total_paid;
-        merged.last_payment_at = crm.last_payment_at;
-      }
-      merged.displayAvatar =
-        crm?.avatar_url ||
-        CLIENT_AVATARS[client.account_id] ||
-        CLIENT_AVATARS[client.account_name] ||
-        CLIENT_AVATARS[normalizeKey(client.account_name)];
-      const periodDays = getPresetDays(datePreset);
-      merged.periodDays = periodDays;
-      merged.avgDailyUSD = periodDays > 0 ? (client.spent || 0) / periodDays : 0;
-      merged.avgDailyAZN = merged.avgDailyUSD * USD_TO_AZN;
-      const metrics = computeCycleMetrics(crm, client.spent || 0);
-      return { ...merged, ...metrics };
-    },
-    [crmIndex, datePreset]
-  );
 
   const fetchClientsData = useCallback(async () => {
     setLoading(true);
@@ -555,8 +529,8 @@ function MetaAdsStatus() {
         })
       );
 
-      const finalClientsList = Object.values(clientsMap).map((client) => attachCrmData(client));
-      setClients(finalClientsList);
+      const finalClientsList = Object.values(clientsMap);
+      setRawClients(finalClientsList);
       setLastUpdated(new Date());
     } catch (error) {
       toast({
