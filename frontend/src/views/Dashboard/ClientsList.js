@@ -65,6 +65,8 @@ function ClientsList() {
     amount: "",
     note: "",
   });
+  const [isPaymentSaving, setIsPaymentSaving] = useState(false);
+  const [editingPayment, setEditingPayment] = useState(null);
 
   const fetchClients = useCallback(async () => {
     setLoading(true);
@@ -190,11 +192,12 @@ function ClientsList() {
 
   const openPaymentsModal = async (client) => {
     setPaymentsClient(client);
-    setPaymentForm({
-      paid_at: new Date().toISOString().slice(0, 10),
-      amount: "",
-      note: "",
-    });
+      setPaymentForm({
+        paid_at: new Date().toISOString().slice(0, 10),
+        amount: "",
+        note: "",
+      });
+    setEditingPayment(null);
     paymentsModal.onOpen();
     fetchPayments(client);
   };
@@ -205,7 +208,7 @@ function ClientsList() {
     setPayments([]);
   };
 
-  const handleAddPayment = async () => {
+  const handleSubmitPayment = async () => {
     if (!paymentsClient) return;
     const amount = parseFloat(paymentForm.amount);
     if (!paymentForm.paid_at || !isFinite(amount) || amount <= 0) {
@@ -216,42 +219,78 @@ function ClientsList() {
       });
       return;
     }
+    setIsPaymentSaving(true);
+    const previousPayment = editingPayment
+      ? payments.find((payment) => payment.id === editingPayment.id)
+      : null;
     try {
-      const response = await fetch(`${API_BASE}/api/clients/${paymentsClient.account_id}/payments`, {
-        method: "POST",
+      const payload = {
+        paid_at: paymentForm.paid_at,
+        amount,
+        note: paymentForm.note || null,
+      };
+      let url = `${API_BASE}/api/clients/${paymentsClient.account_id}/payments`;
+      let method = "POST";
+      if (editingPayment) {
+        url += `/${editingPayment.id}`;
+        method = "PUT";
+      }
+      const response = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          paid_at: paymentForm.paid_at,
-          amount,
-          note: paymentForm.note || null,
-        }),
+        body: JSON.stringify(payload),
       });
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || "Failed to add payment");
+        throw new Error(errorData.detail || "Failed to save payment");
       }
-      const newPayment = await response.json();
-      setPayments((prev) => [newPayment, ...prev]);
+      const savedPayment = await response.json();
+      savedPayment.amount = Number(savedPayment.amount) || 0;
+      setPayments((prev) => {
+        if (editingPayment) {
+          return prev.map((payment) => (payment.id === savedPayment.id ? savedPayment : payment));
+        }
+        return [savedPayment, ...prev];
+      });
       setPaymentForm((prev) => ({ ...prev, amount: "", note: "" }));
+      setEditingPayment(null);
       setClients((prev) =>
-        prev.map((client) =>
-          client.account_id === paymentsClient.account_id
-            ? {
-                ...client,
-                total_paid: (client.total_paid || 0) + newPayment.amount,
-                last_payment_at: newPayment.paid_at,
-              }
-            : client
-        )
+        prev.map((client) => {
+          if (client.account_id !== paymentsClient.account_id) return client;
+          const currentTotal = client.total_paid || 0;
+          const newTotal =
+            editingPayment && previousPayment
+              ? currentTotal - previousPayment.amount + savedPayment.amount
+              : currentTotal + savedPayment.amount;
+          const lastPaymentDate = client.last_payment_at
+            ? new Date(client.last_payment_at)
+            : null;
+          const savedDate = savedPayment.paid_at ? new Date(savedPayment.paid_at) : null;
+          const newLastPayment =
+            savedDate && (!lastPaymentDate || savedDate > lastPaymentDate)
+              ? savedPayment.paid_at
+              : client.last_payment_at;
+          return {
+            ...client,
+            total_paid: newTotal,
+            last_payment_at: newLastPayment,
+          };
+        })
       );
-      toast({ title: "Оплата добавлена", status: "success", duration: 2000 });
+      toast({
+        title: editingPayment ? "Оплата обновлена" : "Оплата добавлена",
+        status: "success",
+        duration: 2000,
+      });
     } catch (error) {
       toast({
-        title: "Ошибка добавления оплаты",
+        title: "Ошибка сохранения оплаты",
         description: error.message,
         status: "error",
         duration: 3000,
       });
+    } finally {
+      setIsPaymentSaving(false);
     }
   };
 
@@ -358,6 +397,11 @@ function ClientsList() {
     return `$${value.toFixed(2)}`;
   };
 
+  const formatAZN = (value) => {
+    if (typeof value !== "number" || !isFinite(value)) return "0.00 AZN";
+    return `${value.toFixed(2)} AZN`;
+  };
+
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
     try {
@@ -449,11 +493,11 @@ function ClientsList() {
                       </Td>
                       <Td color="white">{formatDate(client.start_date)}</Td>
                       <Td color="white" isNumeric>
-                        {client.monthly_payment_azn.toFixed(2)} AZN
+                        {formatAZN(client.monthly_payment_azn)}
                       </Td>
                       <Td color="white">
                         <Text fontSize="sm" fontWeight="bold">
-                          {formatMoney(client.total_paid || 0)}
+                          {formatAZN(client.total_paid || 0)}
                         </Text>
                         <Text fontSize="xs" color="gray.400">
                           Последняя: {client.last_payment_at ? formatDate(client.last_payment_at) : "—"}
@@ -630,7 +674,7 @@ function ClientsList() {
                 />
               </FormControl>
               <FormControl>
-                <FormLabel>Сумма ($)</FormLabel>
+                <FormLabel>Сумма (AZN)</FormLabel>
                 <Input
                   type="number"
                   step="0.01"
@@ -646,8 +690,27 @@ function ClientsList() {
                   onChange={(e) => setPaymentForm((prev) => ({ ...prev, note: e.target.value }))}
                 />
               </FormControl>
-              <Button colorScheme="blue" onClick={handleAddPayment}>
-                Добавить оплату
+              {editingPayment && (
+                <HStack justify="space-between">
+                  <Badge colorScheme="purple">Редактирование оплаты #{editingPayment.id}</Badge>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setEditingPayment(null);
+                      setPaymentForm({
+                        paid_at: new Date().toISOString().slice(0, 10),
+                        amount: "",
+                        note: "",
+                      });
+                    }}
+                  >
+                    Отменить
+                  </Button>
+                </HStack>
+              )}
+              <Button colorScheme="blue" onClick={handleSubmitPayment} isLoading={isPaymentSaving}>
+                {editingPayment ? "Сохранить изменения" : "Добавить оплату"}
               </Button>
               <Divider />
               {paymentsLoading ? (
@@ -665,14 +728,32 @@ function ClientsList() {
                       <Th>Дата</Th>
                       <Th isNumeric>Сумма</Th>
                       <Th>Комментарий</Th>
+                      <Th>Действия</Th>
                     </Tr>
                   </Thead>
                   <Tbody>
                     {payments.map((payment) => (
                       <Tr key={payment.id}>
                         <Td>{formatDate(payment.paid_at)}</Td>
-                        <Td isNumeric>{formatMoney(payment.amount)}</Td>
+                        <Td isNumeric>{formatAZN(payment.amount)}</Td>
                         <Td>{payment.note || "—"}</Td>
+                        <Td>
+                          <HStack spacing={2}>
+                            <Button
+                              size="xs"
+                              onClick={() => {
+                                setEditingPayment(payment);
+                                setPaymentForm({
+                                  paid_at: payment.paid_at,
+                                  amount: payment.amount.toString(),
+                                  note: payment.note || "",
+                                });
+                              }}
+                            >
+                              Редактировать
+                            </Button>
+                          </HStack>
+                        </Td>
                       </Tr>
                     ))}
                   </Tbody>

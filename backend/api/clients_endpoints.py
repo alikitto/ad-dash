@@ -75,6 +75,11 @@ class PaymentCreate(BaseModel):
     amount: float
     note: Optional[str] = None
 
+class PaymentUpdate(BaseModel):
+    paid_at: Optional[str] = None
+    amount: Optional[float] = None
+    note: Optional[str] = None
+
 class PaymentResponse(BaseModel):
     id: int
     client_id: int
@@ -192,6 +197,19 @@ def get_client_row_by_account(account_id: str):
     query = text("SELECT * FROM clients WHERE account_id = :account_id")
     with engine.connect() as conn:
         row = conn.execute(query, {"account_id": account_id}).mappings().first()
+        return row
+
+def get_payment_row(payment_id: int, client_id: Optional[int] = None):
+    query = text("""
+        SELECT * FROM client_payments
+        WHERE id = :payment_id
+        {client_filter}
+    """.format(client_filter="AND client_id = :client_id" if client_id is not None else ""))
+    params = {"payment_id": payment_id}
+    if client_id is not None:
+        params["client_id"] = client_id
+    with engine.connect() as conn:
+        row = conn.execute(query, params).mappings().first()
         return row
 
 @router.get("/clients")
@@ -443,4 +461,43 @@ async def add_client_payment(account_id: str, payload: PaymentCreate):
     except SQLAlchemyError as e:
         logging.error(f"Error adding payment: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to add payment")
+
+@router.put("/clients/{account_id}/payments/{payment_id}", response_model=PaymentResponse)
+async def update_client_payment(account_id: str, payment_id: int, payload: PaymentUpdate):
+    client = get_client_row_by_account(account_id)
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    payment = get_payment_row(payment_id, client_id=client["id"])
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    updates = []
+    params = {"payment_id": payment_id}
+    if payload.paid_at is not None:
+        try:
+            paid_at = datetime.fromisoformat(payload.paid_at).date()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+        updates.append("paid_at = :paid_at")
+        params["paid_at"] = paid_at
+    if payload.amount is not None:
+        updates.append("amount = :amount")
+        params["amount"] = payload.amount
+    if payload.note is not None:
+        updates.append("note = :note")
+        params["note"] = payload.note
+    if not updates:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    update_sql = text(f"""
+        UPDATE client_payments
+        SET {', '.join(updates)}
+        WHERE id = :payment_id
+        RETURNING id, client_id, paid_at, amount, note, created_at
+    """)
+    try:
+        with engine.begin() as conn:
+            row = conn.execute(update_sql, params).mappings().first()
+            return serialize_payment_row(row)
+    except SQLAlchemyError as e:
+        logging.error(f"Error updating payment: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to update payment")
 
