@@ -25,7 +25,7 @@ except Exception:
 engine = create_engine(
     DATABASE_URL,
     pool_pre_ping=True,
-    connect_args=connect_args or None,
+    connect_args=connect_args if connect_args else {},
 )
 
 
