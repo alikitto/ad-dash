@@ -57,17 +57,34 @@ function ClientsList() {
   const fetchClients = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/api/clients`);
-      if (!response.ok) throw new Error("Failed to fetch clients");
+      console.log("Fetching clients from:", `${API_BASE}/api/clients`);
+      const response = await fetch(`${API_BASE}/api/clients`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      
+      console.log("Response status:", response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Response error:", errorText);
+        throw new Error(`Server error: ${response.status}`);
+      }
+      
       const data = await response.json();
-      setClients(data);
+      console.log("Clients loaded:", data.length);
+      setClients(Array.isArray(data) ? data : []);
     } catch (error) {
+      console.error("Fetch clients error:", error);
       toast({
         title: "Ошибка загрузки клиентов",
-        description: error.message,
+        description: error.message || "Проверьте подключение к серверу",
         status: "error",
-        duration: 3000,
+        duration: 5000,
       });
+      setClients([]); // Set empty array on error
     } finally {
       setLoading(false);
     }
