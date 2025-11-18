@@ -115,26 +115,50 @@ except Exception as e:
     logging.error(f"Failed to initialize clients table: {e}", exc_info=True)
     # Don't crash the whole app - table might already exist or DB not available
 
-@router.get("/clients", response_model=List[ClientResponse])
+@router.get("/clients")
 async def get_all_clients():
     """Get all clients"""
-    logging.info("GET /api/clients called")
-    query = text("""
-        SELECT id, account_id, account_name, avatar_url, monthly_budget,
-               start_date, monthly_payment_azn, created_at, updated_at
-        FROM clients
-        ORDER BY account_name
-    """)
     try:
+        logging.info("GET /api/clients called")
+        query = text("""
+            SELECT id, account_id, account_name, 
+                   COALESCE(avatar_url, '') as avatar_url,
+                   COALESCE(monthly_budget, 0) as monthly_budget,
+                   start_date, 
+                   COALESCE(monthly_payment_azn, 0) as monthly_payment_azn,
+                   created_at, updated_at
+            FROM clients
+            ORDER BY account_name
+        """)
+        
         with engine.connect() as conn:
-            rows = conn.execute(query).mappings().all()
-            logging.info(f"Successfully fetched {len(rows)} clients")
-            return [dict(row) for row in rows]
+            result = conn.execute(query)
+            rows = result.fetchall()
+            logging.info(f"Fetched {len(rows)} rows from database")
+            
+            clients = []
+            for row in rows:
+                client = {
+                    "id": int(row[0]),
+                    "account_id": str(row[1]),
+                    "account_name": str(row[2]),
+                    "avatar_url": str(row[3]) if row[3] else "",
+                    "monthly_budget": float(row[4]) if row[4] is not None else 0.0,
+                    "start_date": str(row[5]),
+                    "monthly_payment_azn": float(row[6]) if row[6] is not None else 0.0,
+                    "created_at": str(row[7]),
+                    "updated_at": str(row[8]),
+                }
+                clients.append(client)
+            
+            logging.info(f"Successfully processed {len(clients)} clients")
+            return clients
+            
     except SQLAlchemyError as e:
-        logging.error(f"Error fetching clients: {e}", exc_info=True)
+        logging.error(f"Database error fetching clients: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
     except Exception as e:
-        logging.error(f"Unexpected error: {e}", exc_info=True)
+        logging.error(f"Unexpected error fetching clients: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
 
 @router.get("/clients/{account_id}", response_model=ClientResponse)
