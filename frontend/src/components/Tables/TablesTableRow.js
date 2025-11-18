@@ -149,7 +149,21 @@ function TablesTableRow(props) {
       >
         <Td position="sticky" left="0" zIndex="1" bg={stickyBg} py={1.5}>
           <Flex align="flex-start" gap={3}>
-            <Box as="button" onClick={toggleExpanded} lineHeight="1" fontSize="18px" w="20px" textAlign="center" mt="2px" color="gray.700">{expanded ? "▾" : "▸"}</Box>
+            <Box
+              as="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleExpanded();
+              }}
+              lineHeight="1"
+              fontSize="18px"
+              w="20px"
+              textAlign="center"
+              mt="2px"
+              color="gray.700"
+            >
+              {expanded ? "▾" : "▸"}
+            </Box>
             <Avatar size="sm" name={adset.account_name} src={avatarSrc} bg="gray.500" />
             <Flex direction="column" minW={0}>
               <Text fontSize="10px" textTransform="uppercase" color="gray.500" noOfLines={1}>{adset.account_name || "—"}</Text>
@@ -183,7 +197,8 @@ function TablesTableRow(props) {
                 size="sm" 
                 colorScheme="blue" 
                 variant="solid" 
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   console.log("Opening stats modal for adset:", adset.adset_name);
                   setIsStatsModalOpen(true);
                 }} 

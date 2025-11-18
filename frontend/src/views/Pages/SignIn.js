@@ -80,7 +80,7 @@ function SignIn() {
       const response = await fetch(`${API_BASE}/auth/token`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password }),
+          body: JSON.stringify({ email, password, remember_me: rememberMe }),
       });
 
       if (!response.ok) {

@@ -1,22 +1,29 @@
-# backend/api/clients_endpoints.py
-
-import sqlite3
 import logging
 from typing import List, Optional
-from datetime import datetime
-from fastapi import APIRouter, HTTPException, Body
+
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+from sqlalchemy import create_engine, text
+from sqlalchemy.exc import SQLAlchemyError
+
+from core.config import DATABASE_URL
 
 router = APIRouter()
 
-# Pydantic models
+if not DATABASE_URL:
+    raise RuntimeError("DATABASE_URL is not configured. Cannot initialize clients endpoints.")
+
+engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+
+
 class ClientCreate(BaseModel):
     account_id: str
     account_name: str
     avatar_url: Optional[str] = None
     monthly_budget: float
-    start_date: str  # Дата начала работы в формате YYYY-MM-DD
-    monthly_payment_azn: float  # Оплата в месяц в AZN
+    start_date: str
+    monthly_payment_azn: float
+
 
 class ClientUpdate(BaseModel):
     account_name: Optional[str] = None
@@ -24,6 +31,7 @@ class ClientUpdate(BaseModel):
     monthly_budget: Optional[float] = None
     start_date: Optional[str] = None
     monthly_payment_azn: Optional[float] = None
+
 
 class ClientResponse(BaseModel):
     id: int
@@ -36,206 +44,172 @@ class ClientResponse(BaseModel):
     created_at: str
     updated_at: str
 
-def get_db_connection():
-    """Get database connection"""
-    conn = sqlite3.connect("ad_dash.db")
-    conn.row_factory = sqlite3.Row  # Return rows as dictionaries
-    return conn
 
 def init_clients_table():
-    """Initialize clients table if it doesn't exist"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS clients (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                account_id TEXT UNIQUE NOT NULL,
-                account_name TEXT NOT NULL,
-                avatar_url TEXT,
-                monthly_budget REAL NOT NULL DEFAULT 0,
-                start_date TEXT NOT NULL,
-                monthly_payment_azn REAL NOT NULL DEFAULT 0,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_clients_account_id ON clients(account_id)
-        """)
-        conn.commit()
-    except Exception as e:
-        logging.error(f"Error initializing clients table: {e}")
-        conn.rollback()
-    finally:
-        conn.close()
+    """Ensure clients table exists (PostgreSQL)."""
+    create_table_sql = """
+        CREATE TABLE IF NOT EXISTS clients (
+            id SERIAL PRIMARY KEY,
+            account_id TEXT UNIQUE NOT NULL,
+            account_name TEXT NOT NULL,
+            avatar_url TEXT,
+            monthly_budget NUMERIC(18,2) NOT NULL DEFAULT 0,
+            start_date DATE NOT NULL,
+            monthly_payment_azn NUMERIC(18,2) NOT NULL DEFAULT 0,
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+        );
+    """
+    create_index_sql = "CREATE INDEX IF NOT EXISTS idx_clients_account_id ON clients(account_id);"
+    trigger_fn_sql = """
+        CREATE OR REPLACE FUNCTION set_clients_updated_at()
+        RETURNS TRIGGER AS $$
+        BEGIN
+            NEW.updated_at = NOW();
+            RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+    """
+    trigger_sql = """
+        DROP TRIGGER IF EXISTS trg_clients_updated_at ON clients;
+        CREATE TRIGGER trg_clients_updated_at
+        BEFORE UPDATE ON clients
+        FOR EACH ROW
+        EXECUTE FUNCTION set_clients_updated_at();
+    """
+    with engine.begin() as conn:
+        conn.execute(text(create_table_sql))
+        conn.execute(text(create_index_sql))
+        conn.execute(text(trigger_fn_sql))
+        conn.execute(text(trigger_sql))
 
-# Initialize table on module load
+
 init_clients_table()
 
 @router.get("/clients", response_model=List[ClientResponse])
 async def get_all_clients():
     """Get all clients"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    query = text("""
+        SELECT id, account_id, account_name, avatar_url, monthly_budget,
+               start_date, monthly_payment_azn, created_at, updated_at
+        FROM clients
+        ORDER BY account_name
+    """)
     try:
-        cursor.execute("""
-            SELECT id, account_id, account_name, avatar_url, monthly_budget, 
-                   start_date, monthly_payment_azn, created_at, updated_at
-            FROM clients
-            ORDER BY account_name
-        """)
-        rows = cursor.fetchall()
-        return [dict(row) for row in rows]
-    except Exception as e:
+        with engine.connect() as conn:
+            rows = conn.execute(query).mappings().all()
+            return [dict(row) for row in rows]
+    except SQLAlchemyError as e:
         logging.error(f"Error fetching clients: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        conn.close()
+        raise HTTPException(status_code=500, detail="Failed to fetch clients")
 
 @router.get("/clients/{account_id}", response_model=ClientResponse)
 async def get_client(account_id: str):
     """Get client by account_id"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    query = text("""
+        SELECT id, account_id, account_name, avatar_url, monthly_budget,
+               start_date, monthly_payment_azn, created_at, updated_at
+        FROM clients
+        WHERE account_id = :account_id
+    """)
     try:
-        cursor.execute("""
-            SELECT id, account_id, account_name, avatar_url, monthly_budget, 
-                   start_date, monthly_payment_azn, created_at, updated_at
-            FROM clients
-            WHERE account_id = ?
-        """, (account_id,))
-        row = cursor.fetchone()
-        if not row:
-            raise HTTPException(status_code=404, detail="Client not found")
-        return dict(row)
+        with engine.connect() as conn:
+            row = conn.execute(query, {"account_id": account_id}).mappings().first()
+            if not row:
+                raise HTTPException(status_code=404, detail="Client not found")
+            return dict(row)
     except HTTPException:
         raise
-    except Exception as e:
+    except SQLAlchemyError as e:
         logging.error(f"Error fetching client: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        conn.close()
+        raise HTTPException(status_code=500, detail="Failed to fetch client")
 
 @router.post("/clients", response_model=ClientResponse)
 async def create_client(client: ClientCreate):
     """Create a new client"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    insert_sql = text("""
+        INSERT INTO clients (account_id, account_name, avatar_url, monthly_budget, start_date, monthly_payment_azn)
+        VALUES (:account_id, :account_name, :avatar_url, :monthly_budget, :start_date, :monthly_payment_azn)
+        RETURNING id, account_id, account_name, avatar_url, monthly_budget,
+                  start_date, monthly_payment_azn, created_at, updated_at
+    """)
+    params = {
+        "account_id": client.account_id,
+        "account_name": client.account_name,
+        "avatar_url": client.avatar_url,
+        "monthly_budget": client.monthly_budget,
+        "start_date": client.start_date,
+        "monthly_payment_azn": client.monthly_payment_azn,
+    }
     try:
-        cursor.execute("""
-            INSERT INTO clients (account_id, account_name, avatar_url, monthly_budget, start_date, monthly_payment_azn)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (
-            client.account_id,
-            client.account_name,
-            client.avatar_url,
-            client.monthly_budget,
-            client.start_date,
-            client.monthly_payment_azn
-        ))
-        conn.commit()
-        
-        # Fetch the created client
-        cursor.execute("""
-            SELECT id, account_id, account_name, avatar_url, monthly_budget, 
-                   start_date, monthly_payment_azn, created_at, updated_at
-            FROM clients
-            WHERE id = ?
-        """, (cursor.lastrowid,))
-        row = cursor.fetchone()
-        return dict(row)
-    except sqlite3.IntegrityError as e:
-        if "UNIQUE constraint" in str(e):
+        with engine.begin() as conn:
+            row = conn.execute(insert_sql, params).mappings().first()
+            return dict(row)
+    except SQLAlchemyError as e:
+        msg = str(e.__cause__ or e)
+        if "unique" in msg.lower():
             raise HTTPException(status_code=400, detail="Client with this account_id already exists")
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
         logging.error(f"Error creating client: {e}")
-        conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        conn.close()
+        raise HTTPException(status_code=500, detail="Failed to create client")
 
 @router.put("/clients/{account_id}", response_model=ClientResponse)
 async def update_client(account_id: str, client_update: ClientUpdate):
     """Update a client"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    updates = []
+    params = {"account_id": account_id}
+    if client_update.account_name is not None:
+        updates.append("account_name = :account_name")
+        params["account_name"] = client_update.account_name
+    if client_update.avatar_url is not None:
+        updates.append("avatar_url = :avatar_url")
+        params["avatar_url"] = client_update.avatar_url
+    if client_update.monthly_budget is not None:
+        updates.append("monthly_budget = :monthly_budget")
+        params["monthly_budget"] = client_update.monthly_budget
+    if client_update.start_date is not None:
+        updates.append("start_date = :start_date")
+        params["start_date"] = client_update.start_date
+    if client_update.monthly_payment_azn is not None:
+        updates.append("monthly_payment_azn = :monthly_payment_azn")
+        params["monthly_payment_azn"] = client_update.monthly_payment_azn
+
+    if not updates:
+        raise HTTPException(status_code=400, detail="No fields to update")
+
+    update_sql = text(f"""
+        UPDATE clients
+        SET {', '.join(updates)}
+        WHERE account_id = :account_id
+        RETURNING id, account_id, account_name, avatar_url, monthly_budget,
+                  start_date, monthly_payment_azn, created_at, updated_at
+    """)
     try:
-        # Build update query dynamically based on provided fields
-        updates = []
-        values = []
-        
-        if client_update.account_name is not None:
-            updates.append("account_name = ?")
-            values.append(client_update.account_name)
-        if client_update.avatar_url is not None:
-            updates.append("avatar_url = ?")
-            values.append(client_update.avatar_url)
-        if client_update.monthly_budget is not None:
-            updates.append("monthly_budget = ?")
-            values.append(client_update.monthly_budget)
-        if client_update.start_date is not None:
-            updates.append("start_date = ?")
-            values.append(client_update.start_date)
-        if client_update.monthly_payment_azn is not None:
-            updates.append("monthly_payment_azn = ?")
-            values.append(client_update.monthly_payment_azn)
-        
-        if not updates:
-            raise HTTPException(status_code=400, detail="No fields to update")
-        
-        updates.append("updated_at = CURRENT_TIMESTAMP")
-        values.append(account_id)
-        
-        query = f"""
-            UPDATE clients
-            SET {', '.join(updates)}
-            WHERE account_id = ?
-        """
-        cursor.execute(query, values)
-        conn.commit()
-        
-        if cursor.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Client not found")
-        
-        # Fetch the updated client
-        cursor.execute("""
-            SELECT id, account_id, account_name, avatar_url, monthly_budget, 
-                   start_date, monthly_payment_azn, created_at, updated_at
-            FROM clients
-            WHERE account_id = ?
-        """, (account_id,))
-        row = cursor.fetchone()
-        return dict(row)
+        with engine.begin() as conn:
+            row = conn.execute(update_sql, params).mappings().first()
+            if not row:
+                raise HTTPException(status_code=404, detail="Client not found")
+            return dict(row)
     except HTTPException:
         raise
-    except Exception as e:
+    except SQLAlchemyError as e:
         logging.error(f"Error updating client: {e}")
-        conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        conn.close()
+        raise HTTPException(status_code=500, detail="Failed to update client")
 
 @router.delete("/clients/{account_id}")
 async def delete_client(account_id: str):
     """Delete a client"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    delete_sql = text("DELETE FROM clients WHERE account_id = :account_id")
     try:
-        cursor.execute("DELETE FROM clients WHERE account_id = ?", (account_id,))
-        conn.commit()
-        if cursor.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Client not found")
-        return {"message": "Client deleted successfully"}
+        with engine.begin() as conn:
+            result = conn.execute(delete_sql, {"account_id": account_id})
+            if result.rowcount == 0:
+                raise HTTPException(status_code=404, detail="Client not found")
+            return {"message": "Client deleted successfully"}
     except HTTPException:
         raise
-    except Exception as e:
+    except SQLAlchemyError as e:
         logging.error(f"Error deleting client: {e}")
-        conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        conn.close()
+        raise HTTPException(status_code=500, detail="Failed to delete client")
 
 @router.get("/clients/from-accounts/list")
 async def get_clients_from_accounts():

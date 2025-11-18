@@ -3,8 +3,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
+from datetime import timedelta
+
 from services.auth_service import get_password_hash, verify_password, create_access_token
-from core.config import DATABASE_URL
+from core.config import DATABASE_URL, JWT_EXPIRE_MINUTES
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +21,7 @@ class UserCreate(BaseModel):
 class UserLogin(BaseModel):
     email: str
     password: str
+    remember_me: bool = False
 
 class Token(BaseModel):
     access_token: str
@@ -101,7 +104,15 @@ def login_for_access_token(form_data: UserLogin, db = Depends(get_db)):
                 detail="Account is not active. Please contact administrator.",
             )
             
-        access_token = create_access_token(subject=user['email'])
+        # Extend token lifetime if remember_me requested (30 days), otherwise use default config
+        expiry_minutes = JWT_EXPIRE_MINUTES
+        if form_data.remember_me:
+            expiry_minutes = 60 * 24 * 30  # 30 days
+
+        access_token = create_access_token(
+            subject=user['email'],
+            expires_delta=timedelta(minutes=expiry_minutes)
+        )
         return {"access_token": access_token, "token_type": "bearer"}
         
     except HTTPException:

@@ -187,9 +187,10 @@ function Sidebar(props) {
       );
     });
   };
-  const { logoText, routes, sidebarVariant } = props;
+  const { logoText, routes = [], sidebarVariant } = props;
+  const adminRoutes = React.useMemo(() => routes.filter((route) => route.layout === "/admin"), [routes]);
 
-  var links = <>{createLinks(routes)}</>;
+  var links = <>{createLinks(adminRoutes)}</>;
   //  BRAND
   //  Chakra Color Mode
   let sidebarBg =
@@ -457,9 +458,10 @@ export function SidebarResponsive(props) {
       );
     });
   };
-  const { logoText, routes, iconColor, ...rest } = props;
+  const { logoText, routes = [], iconColor, ...rest } = props;
+  const adminRoutes = React.useMemo(() => routes.filter((route) => route.layout === "/admin"), [routes]);
 
-  var links = <>{createLinks(routes)}</>;
+  var links = <>{createLinks(adminRoutes)}</>;
   //  BRAND
   //  Chakra Color Mode
   var brand = (

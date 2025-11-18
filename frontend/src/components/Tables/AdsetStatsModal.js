@@ -25,6 +25,9 @@ import {
   Button,
   Image,
   Avatar,
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
 } from "@chakra-ui/react";
 import { FaChartLine } from "react-icons/fa";
 import { API_BASE } from "../../config/api";
@@ -384,18 +387,33 @@ const AdsetStatsModal = ({ isOpen, onClose, adset }) => {
       <ModalOverlay />
       <ModalContent bg={bgColor} maxW="1400px" maxH="95vh" display="flex" flexDirection="column">
         <ModalHeader pb={3} flexShrink={0}>
-          <Flex align="center" justify="space-between" w="full" flexWrap="wrap" gap={2}>
-            <Flex align="center" gap={2} minW="200px">
-              <Icon as={FaChartLine} color="purple.500" />
-              <Text fontSize="md">Детальная статистика</Text>
+          <Flex align="center" justify="space-between" w="full" flexWrap="wrap" gap={4}>
+            <Flex direction="column" align="flex-start" gap={1} flex="1" minW="220px">
+              <Breadcrumb fontSize="xs" color="gray.500">
+                {[adset?.account_name, adset?.campaign_name, adset?.adset_name]
+                  .filter(Boolean)
+                  .map((label, idx, arr) => (
+                    <BreadcrumbItem key={`${label}-${idx}`} isCurrentPage={idx === arr.length - 1}>
+                      <BreadcrumbLink as="span" color={idx === arr.length - 1 ? textColor : "gray.500"}>
+                        {label}
+                      </BreadcrumbLink>
+                    </BreadcrumbItem>
+                  ))}
+              </Breadcrumb>
+              <Flex align="center" gap={2}>
+                <Icon as={FaChartLine} color="purple.500" />
+                <Text fontSize="md" fontWeight="bold" color={textColor}>
+                  Детальная статистика
+                </Text>
+              </Flex>
             </Flex>
             
-            <Badge colorScheme="purple" fontSize="xs" px={2} py={1}>
+            <Badge colorScheme="purple" fontSize="xs" px={2} py={1} alignSelf="flex-start">
               {adset?.adset_name || "Adset"}
             </Badge>
             
             {/* Quick Actions */}
-            <Flex gap={1}>
+            <Flex gap={1} flexWrap="wrap" justify="flex-end">
               <Button
                 size="xs"
                 colorScheme={adset?.status === "ACTIVE" ? "red" : "green"}

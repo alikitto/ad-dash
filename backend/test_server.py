@@ -36,6 +36,7 @@ class UserCreate(BaseModel):
 class UserLogin(BaseModel):
     email: str
     password: str
+    remember_me: bool = False
 
 class Token(BaseModel):
     access_token: str
@@ -68,11 +69,12 @@ def verify_password(password: str, hashed: str) -> bool:
     """Verify password"""
     return hash_password(password) == hashed
 
-def create_token(email: str) -> str:
+def create_token(email: str, remember_me: bool = False) -> str:
     """Create JWT token"""
+    expiry = timedelta(days=30) if remember_me else timedelta(hours=24)
     payload = {
         "sub": email,
-        "exp": datetime.utcnow() + timedelta(hours=24)
+        "exp": datetime.utcnow() + expiry
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
@@ -133,8 +135,8 @@ def login(user: UserLogin):
         if not is_active:
             raise HTTPException(status_code=403, detail="Account is not active")
         
-        # Create token
-        token = create_token(email)
+        # Create token with requested duration
+        token = create_token(email, user.remember_me)
         return {"access_token": token, "token_type": "bearer"}
         
     except HTTPException:
