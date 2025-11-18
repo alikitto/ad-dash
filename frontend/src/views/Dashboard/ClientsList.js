@@ -167,14 +167,29 @@ function ClientsList() {
         throw new Error(errorData.detail || "Failed to save client");
       }
 
+      const savedClient = await response.json().catch(() => null);
+
       toast({
         title: editingClient ? "Клиент обновлен" : "Клиент добавлен",
         status: "success",
         duration: 2000,
       });
 
+      if (savedClient && typeof savedClient === "object") {
+        setClients((prev) => {
+          if (editingClient) {
+            return prev.map((client) =>
+              client.account_id === savedClient.account_id ? savedClient : client
+            );
+          } else {
+            return [...prev, savedClient];
+          }
+        });
+      } else {
+        fetchClients();
+      }
+
       onClose();
-      fetchClients();
     } catch (error) {
       toast({
         title: "Ошибка сохранения",

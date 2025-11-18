@@ -143,8 +143,15 @@ async def create_client(client: ClientCreate):
     insert_sql = text("""
         INSERT INTO clients (account_id, account_name, avatar_url, monthly_budget, start_date, monthly_payment_azn)
         VALUES (:account_id, :account_name, :avatar_url, :monthly_budget, :start_date, :monthly_payment_azn)
-        RETURNING id, account_id, account_name, avatar_url, monthly_budget,
-                  start_date, monthly_payment_azn, created_at, updated_at
+        RETURNING id,
+                  account_id,
+                  account_name,
+                  COALESCE(avatar_url, '') AS avatar_url,
+                  COALESCE(monthly_budget, 0) AS monthly_budget,
+                  start_date,
+                  COALESCE(monthly_payment_azn, 0) AS monthly_payment_azn,
+                  created_at,
+                  updated_at
     """)
     params = {
         "account_id": client.account_id,
@@ -193,8 +200,15 @@ async def update_client(account_id: str, client_update: ClientUpdate):
         UPDATE clients
         SET {', '.join(updates)}
         WHERE account_id = :account_id
-        RETURNING id, account_id, account_name, avatar_url, monthly_budget,
-                  start_date, monthly_payment_azn, created_at, updated_at
+        RETURNING id,
+                  account_id,
+                  account_name,
+                  COALESCE(avatar_url, '') AS avatar_url,
+                  COALESCE(monthly_budget, 0) AS monthly_budget,
+                  start_date,
+                  COALESCE(monthly_payment_azn, 0) AS monthly_payment_azn,
+                  created_at,
+                  updated_at
     """)
     try:
         with engine.begin() as conn:
