@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.engine import make_url
 
 from core.config import DATABASE_URL
 
@@ -13,7 +14,19 @@ router = APIRouter()
 if not DATABASE_URL:
     raise RuntimeError("DATABASE_URL is not configured. Cannot initialize clients endpoints.")
 
-engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+connect_args = {}
+try:
+    url_obj = make_url(DATABASE_URL)
+    if url_obj.drivername.startswith("postgres") and "sslmode" not in url_obj.query:
+        connect_args["sslmode"] = "require"
+except Exception:
+    pass
+
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,
+    connect_args=connect_args or None,
+)
 
 
 class ClientCreate(BaseModel):
